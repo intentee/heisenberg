@@ -1,0 +1,9 @@
+[package]
+name = "explicit_import_of_a_build_script_shaped_item"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+shaped = { path = "shaped" }
+
+[workspace]

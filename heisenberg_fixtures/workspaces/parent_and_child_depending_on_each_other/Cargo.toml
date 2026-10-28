@@ -1,0 +1,6 @@
+[package]
+name = "parent_and_child_depending_on_each_other"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

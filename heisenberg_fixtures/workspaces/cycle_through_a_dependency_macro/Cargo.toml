@@ -1,0 +1,9 @@
+[package]
+name = "cycle_through_a_dependency_macro"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+macros = { path = "macros" }
+
+[workspace]

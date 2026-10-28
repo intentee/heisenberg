@@ -1,0 +1,9 @@
+[package]
+name = "proc_macro_attribute_consuming_a_helper_attribute"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+strip = { path = "strip" }
+
+[workspace]

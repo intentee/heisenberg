@@ -1,0 +1,7 @@
+[package]
+name = "right"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+bottom = { path = "../bottom" }

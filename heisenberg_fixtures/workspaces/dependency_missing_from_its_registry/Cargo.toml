@@ -1,0 +1,9 @@
+[package]
+name = "dependency_missing_from_its_registry"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+vendored = "=0.1.0"
+
+[workspace]

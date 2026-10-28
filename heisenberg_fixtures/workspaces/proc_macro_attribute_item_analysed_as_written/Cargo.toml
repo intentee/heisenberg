@@ -1,0 +1,9 @@
+[package]
+name = "proc_macro_attribute_item_analysed_as_written"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+attribute = { path = "attribute" }
+
+[workspace]

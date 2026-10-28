@@ -1,0 +1,9 @@
+[package]
+name = "proc_macro_crate_gating_a_cycle_on_its_crate_type"
+edition = "2024"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[workspace]

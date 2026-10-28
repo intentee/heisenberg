@@ -1,0 +1,6 @@
+[package]
+name = "cfg_attr_disabled_import_of_a_sibling"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

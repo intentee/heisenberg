@@ -1,0 +1,6 @@
+[package]
+name = "own_macro_with_an_unresolvable_body"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

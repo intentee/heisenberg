@@ -1,0 +1,14 @@
+[package]
+name = "heisenberg"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+clap = { workspace = true }
+heisenberg_command = { workspace = true }
+
+[dev-dependencies]
+heisenberg_fixtures = { workspace = true }
+
+[lints]
+workspace = true

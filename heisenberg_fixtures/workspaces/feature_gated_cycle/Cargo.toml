@@ -1,0 +1,9 @@
+[package]
+name = "feature_gated_cycle"
+edition = "2024"
+version = "0.1.0"
+
+[features]
+cyclic = []
+
+[workspace]

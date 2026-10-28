@@ -1,0 +1,11 @@
+[package]
+name = "heisenberg_test_harness"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+clap = { workspace = true }
+heisenberg_command = { workspace = true }
+
+[lints]
+workspace = true

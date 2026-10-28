@@ -1,0 +1,6 @@
+[package]
+name = "build_script_generated_items"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

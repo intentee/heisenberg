@@ -1,0 +1,12 @@
+[package]
+name = "heisenberg_command_tests"
+edition.workspace = true
+version.workspace = true
+
+[dev-dependencies]
+heisenberg_command = { workspace = true }
+heisenberg_fixtures = { workspace = true }
+heisenberg_test_harness = { workspace = true }
+
+[lints]
+workspace = true

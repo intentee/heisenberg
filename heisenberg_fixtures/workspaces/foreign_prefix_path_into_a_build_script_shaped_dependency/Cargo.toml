@@ -1,0 +1,9 @@
+[package]
+name = "foreign_prefix_path_into_a_build_script_shaped_dependency"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+shaped = { path = "shaped" }
+
+[workspace]

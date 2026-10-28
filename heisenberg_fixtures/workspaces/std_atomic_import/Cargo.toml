@@ -1,0 +1,6 @@
+[package]
+name = "std_atomic_import"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

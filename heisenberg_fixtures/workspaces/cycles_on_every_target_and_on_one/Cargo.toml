@@ -1,0 +1,6 @@
+[package]
+name = "cycles_on_every_target_and_on_one"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

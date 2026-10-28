@@ -1,0 +1,9 @@
+[package]
+name = "target_gated_cycle"
+edition = "2024"
+version = "0.1.0"
+
+[target.'cfg(windows)'.dependencies]
+windows_only = { path = "windows_only" }
+
+[workspace]

@@ -1,0 +1,12 @@
+[package]
+name = "dependency_renamed_twice"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+shared = { path = "shared" }
+
+[dev-dependencies]
+renamed = { package = "shared", path = "shared" }
+
+[workspace]

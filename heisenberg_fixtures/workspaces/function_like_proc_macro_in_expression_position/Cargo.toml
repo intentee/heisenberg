@@ -1,0 +1,9 @@
+[package]
+name = "function_like_proc_macro_in_expression_position"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+values = { path = "values" }
+
+[workspace]

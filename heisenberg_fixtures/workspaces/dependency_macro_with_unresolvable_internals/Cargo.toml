@@ -1,0 +1,9 @@
+[package]
+name = "dependency_macro_with_unresolvable_internals"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+wrapping = { path = "wrapping" }
+
+[workspace]

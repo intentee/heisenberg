@@ -1,0 +1,6 @@
+pub struct First;
+
+#[cfg(proc_macro)]
+pub fn second() -> crate::second::Second {
+    crate::second::Second
+}

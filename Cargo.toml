@@ -1,0 +1,90 @@
+[workspace]
+exclude = ["heisenberg_fixtures/workspaces"]
+members = [
+    "heisenberg",
+    "heisenberg_analysis_threads",
+    "heisenberg_command",
+    "heisenberg_command_tests",
+    "heisenberg_fixtures",
+    "heisenberg_module_cycles",
+    "heisenberg_module_dependencies",
+    "heisenberg_module_graph",
+    "heisenberg_project_model",
+    "heisenberg_test_harness",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+
+[workspace.dependencies]
+cargo = { version = "0.100", features = ["vendored-libgit2", "vendored-openssl"] }
+cargo-platform = "0.3"
+cargo-util-terminal = "0.1"
+cargo_metadata = "0.23"
+clap = { version = "4.6", features = ["derive", "env"] }
+guppy = { version = "0.19", features = ["custom-cfg-platforms"] }
+heisenberg_analysis_threads = { version = "0.1", path = "heisenberg_analysis_threads" }
+heisenberg_command = { version = "0.1", path = "heisenberg_command" }
+heisenberg_fixtures = { version = "0.1", path = "heisenberg_fixtures" }
+heisenberg_module_cycles = { version = "0.1", path = "heisenberg_module_cycles" }
+heisenberg_module_dependencies = { version = "0.1", path = "heisenberg_module_dependencies" }
+heisenberg_module_graph = { version = "0.1", path = "heisenberg_module_graph" }
+heisenberg_project_model = { version = "0.1", path = "heisenberg_project_model" }
+heisenberg_test_harness = { version = "0.1", path = "heisenberg_test_harness" }
+petgraph = "0.8"
+ra_ap_cfg = "0.0.358"
+ra_ap_hir = "0.0.358"
+ra_ap_hir_expand = "0.0.358"
+ra_ap_ide_db = "0.0.358"
+ra_ap_intern = "0.0.358"
+ra_ap_load-cargo = "0.0.358"
+ra_ap_paths = "0.0.358"
+ra_ap_project_model = "0.0.358"
+ra_ap_stdx = "0.0.358"
+ra_ap_syntax = "0.0.358"
+ra_ap_vfs = "0.0.358"
+serde_json = "1.0"
+thiserror = "2.0"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 3
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+
+absolute_paths = "deny"
+allow_attributes = "deny"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+dbg_macro = "deny"
+error_impl_error = "allow"
+expect_used = "deny"
+future_not_send = "allow"
+infinite_loop = "deny"
+literal_string_with_formatting_args = "allow"
+missing_docs_in_private_items = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+needless_pass_by_value = "allow"
+panic = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+rc_mutex = "deny"
+rest_pat_in_fully_bound_structs = "deny"
+self_named_module_files = "deny"
+significant_drop_tightening = "allow"
+str_to_string = "deny"
+tests_outside_test_module = "allow"
+todo = "deny"
+too_many_lines = "allow"
+unimplemented = "deny"
+unwrap_used = "deny"

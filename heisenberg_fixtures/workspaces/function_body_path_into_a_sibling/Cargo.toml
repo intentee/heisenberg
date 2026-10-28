@@ -1,0 +1,6 @@
+[package]
+name = "function_body_path_into_a_sibling"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

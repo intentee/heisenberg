@@ -1,0 +1,7 @@
+[package]
+name = "heisenberg_fixtures"
+edition.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
