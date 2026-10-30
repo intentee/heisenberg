@@ -1,8 +1,8 @@
 use heisenberg_module_graph::crate_target::CrateTarget;
-use heisenberg_module_graph::violation::Violation;
+use heisenberg_module_graph::module_path::ModulePath;
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct CrateViolation {
+pub struct ModuleInclusion {
+    pub module: ModulePath,
     pub crate_target: CrateTarget,
-    pub violation: Violation,
 }

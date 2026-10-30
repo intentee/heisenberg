@@ -17,15 +17,26 @@ fn negated_configuration_predicate_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            violation in negated_configuration_predicates lib: configuration predicate negates a feature, test or debug_assertions at src/lib.rs:4:5 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation in negated_configuration_predicates lib: configuration predicate negates a feature, test or debug_assertions at src/lib.rs:7:5 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation in negated_configuration_predicates lib: configuration predicate negates a feature, test or debug_assertions at src/lib.rs:12:5 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation in negated_configuration_predicates lib: configuration predicate negates a feature, test or debug_assertions at src/lib.rs:15:5 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 4 violations\n")
+        Ok(
+            "ERROR: NegatedConfiguration - src/lib.rs:4:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            #[cfg(any(windows, not(feature = \"optional\")))]\n\
+            \n\
+            ERROR: NegatedConfiguration - src/lib.rs:7:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            #[cfg_attr(not(test), must_use)]\n\
+            \n\
+            ERROR: NegatedConfiguration - src/lib.rs:12:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            #[cfg(any(windows, all(unix, not(debug_assertions))))]\n\
+            \n\
+            ERROR: NegatedConfiguration - src/lib.rs:15:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            #[cfg_attr(unix, cfg(not(feature = \"optional\")))]\n\
+            \n\
+            ------------------------------\n\
+            4 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

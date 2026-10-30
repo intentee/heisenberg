@@ -1,2 +1,2 @@
-pub mod fixture_directory;
+pub mod constants;
 pub mod fixture_workspace;

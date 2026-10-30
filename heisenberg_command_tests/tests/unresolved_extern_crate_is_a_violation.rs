@@ -17,12 +17,17 @@ fn unresolved_extern_crate_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            violation in unresolved_extern_crate lib: extern crate is unresolved at src/lib.rs:1:1 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 1 violations\n")
+        Ok(
+            "ERROR: UnresolvedExternCrate - src/lib.rs:1:1 - Extern crate is unresolved\n\
+            extern crate missing_dependency;\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

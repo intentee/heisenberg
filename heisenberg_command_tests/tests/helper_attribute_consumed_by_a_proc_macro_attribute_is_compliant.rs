@@ -17,11 +17,12 @@ fn helper_attribute_consumed_by_a_proc_macro_attribute_is_compliant() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            result: 0 cycles, 0 violations\n")
+        Ok("------------------------------\n\
+            No errors found!\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);
 }

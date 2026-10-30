@@ -44,6 +44,7 @@ impl CargoMetadataDocument<'_, '_> {
                     self.context.cli_unstable(),
                     self.workspace.unstable_features()
                 )),
+                manifest_path: package.manifest_path().to_path_buf(),
                 name: package.name().to_string(),
             })
             .collect()

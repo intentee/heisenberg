@@ -17,12 +17,17 @@ fn unimplemented_builtin_macro_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            violation in unimplemented_builtin_macro lib: built-in macro is not implemented at src/lib.rs:2:14 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 1 violations\n")
+        Ok(
+            "ERROR: UnimplementedBuiltinMacro - src/lib.rs:2:14 - Built-in macro is not implemented\n\
+            macro_rules! unknown_builtin {\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

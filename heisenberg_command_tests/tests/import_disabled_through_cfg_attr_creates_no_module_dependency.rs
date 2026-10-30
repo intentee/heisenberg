@@ -17,17 +17,22 @@ fn import_disabled_through_cfg_attr_creates_no_module_dependency() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            cycle in cfg_attr_disabled_import_of_a_sibling lib among the parts of crate (targets: x86_64-pc-windows-msvc):\n  \
+        Ok(
+            "ERROR: ModuleCycle - src/first.rs:2:5 - Parts of crate depend on each other (only in cfg_attr_disabled_import_of_a_sibling lib on x86_64-pc-windows-msvc)\n\
+            use crate::second::Second;\n  \
             crate::first -> crate::second:\n    \
             crate::first uses crate::second at src/first.rs:2:5\n  \
             crate::second -> crate::first:\n    \
             crate::second uses crate::first at src/second.rs:1:5\n    \
             crate::second uses crate::first at src/second.rs:4:16\n\
-            result: 1 cycles, 0 violations\n")
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

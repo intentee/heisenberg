@@ -15,6 +15,20 @@ pub struct ConfiguredNode<'node> {
 }
 
 impl ConfiguredNode<'_> {
+    pub fn enabled_items(&self) -> Vec<ast::Item> {
+        self.node
+            .children()
+            .filter_map(ast::Item::cast)
+            .filter(|item| {
+                !ConfiguredNode {
+                    node: item.syntax(),
+                    options: self.options,
+                }
+                .is_disabled()
+            })
+            .collect()
+    }
+
     pub fn is_disabled(&self) -> bool {
         ast::AnyHasAttrs::cast(self.node.clone()).is_some_and(|owner| {
             expand_cfg_attr(

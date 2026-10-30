@@ -1,0 +1,6 @@
+[package]
+name = "module_file_shared_on_some_platforms"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

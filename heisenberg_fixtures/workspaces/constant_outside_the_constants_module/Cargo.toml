@@ -1,0 +1,6 @@
+[package]
+name = "constant_outside_the_constants_module"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

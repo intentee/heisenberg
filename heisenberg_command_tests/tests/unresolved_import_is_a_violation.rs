@@ -17,12 +17,17 @@ fn unresolved_import_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            violation in unresolved_import lib: path is unresolved at src/lib.rs:3:5 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 1 violations\n")
+        Ok(
+            "ERROR: UnresolvedPath - src/lib.rs:3:5 - Path is unresolved\n\
+            use crate::present::Absent;\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

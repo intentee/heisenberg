@@ -1,0 +1,6 @@
+[package]
+name = "issue_narrowed_to_some_crates"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

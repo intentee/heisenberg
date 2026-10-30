@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
-use heisenberg_fixtures::fixture_directory::FIXTURE_DIRECTORY;
+use heisenberg_fixtures::constants::FIXTURE_DIRECTORY;
 use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]

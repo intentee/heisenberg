@@ -14,13 +14,18 @@ fn reexport_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            violation in reexport lib: re-export at src/lib.rs:3:1 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation in reexport lib: re-export at src/lib.rs:5:1 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 2 violations\n")
+        Ok("ERROR: Reexport - src/lib.rs:3:1 - Re-export\n\
+            pub use inner::Inner;\n\
+            \n\
+            ERROR: Reexport - src/lib.rs:5:1 - Re-export\n\
+            pub extern crate std as standard;\n\
+            \n\
+            ------------------------------\n\
+            2 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

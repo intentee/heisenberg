@@ -17,13 +17,20 @@ fn paths_written_inside_an_own_macro_are_checked() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            violation in own_macro_with_an_unresolvable_body lib: path is unresolved at src/lib.rs:13:17 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation: code is active on no supported target at src/lib.rs:1:1\n\
-            result: 0 cycles, 2 violations\n")
+        Ok(
+            "ERROR: CodeActiveOnNoTarget - src/lib.rs:1:1 - Code is active on no supported target\n\
+            #[cfg(generated)]\n\
+            \n\
+            ERROR: UnresolvedPath - src/lib.rs:13:17 - Path is unresolved\n    \
+            let _item = configured_item!();\n\
+            \n\
+            ------------------------------\n\
+            2 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

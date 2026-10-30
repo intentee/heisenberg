@@ -1,17 +1,22 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
+use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
+use heisenberg_module_graph::violation::Violation;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::supported_target::SupportedTarget;
 
-use crate::crate_module::CrateModule;
-use crate::crate_violation::CrateViolation;
-use crate::finding::Finding;
+use crate::analysis_context::AnalysisContext;
+use crate::constants::SUPPORTED_RUST_VERSION;
+use crate::cycle_shape::CycleShape;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::inactive_code::InactiveCode;
-use crate::shared_file::SharedFile;
+use crate::issue::Issue;
+use crate::module_inclusion::ModuleInclusion;
 use crate::target_analysis::TargetAnalysis;
-use crate::targeted_finding::TargetedFinding;
+
+const SEPARATOR: &str = "------------------------------";
 
 pub struct CheckReport {
     pub analyses: Vec<TargetAnalysis>,
@@ -20,140 +25,40 @@ pub struct CheckReport {
 
 impl CheckReport {
     #[must_use]
-    pub fn findings(&self) -> Vec<TargetedFinding> {
-        let mut merged: BTreeMap<Finding, BTreeSet<SupportedTarget>> = BTreeMap::new();
-
-        for analysis in &self.analyses {
-            let mut shared_files: BTreeMap<&str, BTreeSet<CrateModule>> = BTreeMap::new();
-
-            for graph in &analysis.graphs {
-                for shared in &graph.shared_module_files {
-                    shared_files
-                        .entry(shared.file.as_str())
-                        .or_default()
-                        .insert(CrateModule {
-                            module: shared.module.clone(),
-                            crate_target: graph.crate_target.clone(),
-                        });
-                }
-            }
-
-            let cycles = analysis.cycles.iter().cloned().map(Finding::Cycle);
-            let violations = analysis.graphs.iter().flat_map(|graph| {
-                graph.violations.iter().map(|violation| {
-                    Finding::Violation(CrateViolation {
-                        crate_target: graph.crate_target.clone(),
-                        violation: violation.clone(),
-                    })
-                })
-            });
-            let shared = shared_files.into_iter().map(|(file, modules)| {
-                Finding::SharedFile(SharedFile {
-                    file: file.to_owned(),
-                    modules,
-                })
-            });
-
-            for finding in cycles.chain(violations).chain(shared) {
-                merged.entry(finding).or_default().insert(analysis.target);
-            }
-        }
-
-        merged
-            .into_iter()
-            .map(|(finding, targets)| TargetedFinding { finding, targets })
-            .collect()
-    }
-
-    #[must_use]
     pub fn render(&self) -> String {
-        let findings = self.findings();
-        let inactive_regions = InactiveCode {
-            analyses: &self.analyses,
-        }
-        .regions();
-        let mut lines = vec![
-            "heisenberg check".to_owned(),
-            "precondition: rustc 1.99.1 compiles the workspace for every supported target"
-                .to_owned(),
-        ];
-        let mut cycle_count = 0;
-        let mut violation_count = inactive_regions.len() + self.package_violations.len();
+        let issues = self.issues();
+        let contexts_by_file = self.contexts_by_file();
+        let mut lines: Vec<String> = Vec::new();
 
-        lines.extend(self.analyses.iter().map(|analysis| {
-            format!(
-                "analysed on {}: {} crate targets, {} modules",
-                analysis.target.triple(),
-                analysis.graphs.len(),
-                analysis
-                    .graphs
-                    .iter()
-                    .map(|graph| graph.modules.len())
-                    .sum::<usize>()
-            )
-        }));
-
-        for targeted in &findings {
-            let targets = targeted
-                .targets
-                .iter()
-                .map(|target| target.triple())
-                .collect::<Vec<&str>>()
-                .join(", ");
-
-            match &targeted.finding {
-                Finding::Cycle(cycle) => {
-                    cycle_count += 1;
-                    lines.push(format!(
-                        "cycle in {} among the parts of {} (targets: {targets}):",
-                        cycle.crate_target, cycle.container
-                    ));
-                    for witness in &cycle.witnesses {
-                        lines.push(format!("  {} -> {}:", witness.from, witness.to));
-                        lines.extend(witness.dependencies.iter().map(|dependency| {
-                            format!(
-                                "    {} uses {} at {}",
-                                dependency.from, dependency.to, dependency.location
-                            )
-                        }));
-                    }
-                }
-                Finding::Violation(crate_violation) => {
-                    violation_count += 1;
-                    lines.push(format!(
-                        "violation in {}: {} at {} (targets: {targets})",
-                        crate_violation.crate_target,
-                        crate_violation.violation.kind,
-                        crate_violation.violation.location
-                    ));
-                }
-                Finding::SharedFile(shared_file) => {
-                    violation_count += 1;
-                    lines.push(format!(
-                        "violation: module file {} belongs to {} modules (targets: {targets}):",
-                        shared_file.file,
-                        shared_file.modules.len()
-                    ));
-                    lines.extend(shared_file.modules.iter().map(|crate_module| {
-                        format!("  {} in {}", crate_module.module, crate_module.crate_target)
-                    }));
-                }
-            }
+        for issue in &issues {
+            lines.extend(issue.lines(&contexts_by_file));
+            lines.push(String::new());
         }
 
-        lines.extend(inactive_regions.iter().map(|region| {
-            format!(
-                "violation: code is active on no supported target at {}",
-                region.start
-            )
-        }));
+        lines.push(SEPARATOR.to_owned());
+        lines.push(if issues.is_empty() {
+            "No errors found!".to_owned()
+        } else {
+            format!("{} errors found", issues.len())
+        });
+        lines.push(SEPARATOR.to_owned());
         lines.extend(
-            self.package_violations
+            self.analyses
                 .iter()
-                .map(|package_violation| format!("violation: {package_violation}")),
+                .map(|TargetAnalysis { graphs, target, .. }| {
+                    format!(
+                        "Analysed on {}: {} crate targets, {} modules",
+                        target.triple(),
+                        graphs.len(),
+                        graphs
+                            .iter()
+                            .map(|CrateModuleGraph { modules, .. }| modules.len())
+                            .sum::<usize>()
+                    )
+                }),
         );
         lines.push(format!(
-            "result: {cycle_count} cycles, {violation_count} violations"
+            "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace for every supported target"
         ));
 
         lines.join("\n") + "\n"
@@ -161,18 +66,106 @@ impl CheckReport {
 
     #[must_use]
     pub fn status(&self) -> HeisenbergExitStatus {
-        let inactive_regions = InactiveCode {
-            analyses: &self.analyses,
-        }
-        .regions();
-
-        if self.findings().is_empty()
-            && self.package_violations.is_empty()
-            && inactive_regions.is_empty()
-        {
+        if self.issues().is_empty() {
             HeisenbergExitStatus::Compliant
         } else {
             HeisenbergExitStatus::Violations
         }
+    }
+
+    fn contexts_by_file(&self) -> BTreeMap<String, BTreeSet<AnalysisContext>> {
+        let mut contexts_by_file: BTreeMap<String, BTreeSet<AnalysisContext>> = BTreeMap::new();
+
+        for analysis in &self.analyses {
+            for graph in &analysis.graphs {
+                for file in &graph.walked_files {
+                    contexts_by_file
+                        .entry(file.clone())
+                        .or_default()
+                        .insert(AnalysisContext {
+                            crate_target: graph.crate_target.clone(),
+                            target: analysis.target,
+                        });
+                }
+            }
+        }
+
+        contexts_by_file
+    }
+
+    fn issues(&self) -> BTreeSet<Issue> {
+        let mut violations: BTreeMap<&Violation, BTreeSet<AnalysisContext>> = BTreeMap::new();
+        let mut cycles: BTreeMap<CycleShape<'_>, BTreeSet<AnalysisContext>> = BTreeMap::new();
+        let mut shared_files: BTreeMap<
+            &str,
+            BTreeMap<ModuleInclusion, BTreeMap<SupportedTarget, ModuleFileAnalysis>>,
+        > = BTreeMap::new();
+
+        for analysis in &self.analyses {
+            for graph in &analysis.graphs {
+                for violation in &graph.violations {
+                    violations
+                        .entry(violation)
+                        .or_default()
+                        .insert(AnalysisContext {
+                            crate_target: graph.crate_target.clone(),
+                            target: analysis.target,
+                        });
+                }
+
+                for shared in &graph.shared_module_files {
+                    shared_files
+                        .entry(shared.file.as_str())
+                        .or_default()
+                        .entry(ModuleInclusion {
+                            crate_target: graph.crate_target.clone(),
+                            module: shared.module.clone(),
+                        })
+                        .or_default()
+                        .insert(analysis.target, shared.analysis.clone());
+                }
+            }
+
+            for cycle in &analysis.cycles {
+                cycles
+                    .entry(CycleShape {
+                        container: &cycle.container,
+                        witnesses: &cycle.witnesses,
+                    })
+                    .or_default()
+                    .insert(AnalysisContext {
+                        crate_target: cycle.crate_target.clone(),
+                        target: analysis.target,
+                    });
+            }
+        }
+
+        let mut issues = BTreeSet::new();
+
+        for (violation, reported) in violations {
+            issues.insert(Issue::new_violation(violation, reported));
+        }
+
+        for (shape, reported) in cycles {
+            issues.insert(Issue::new_cycle(shape, reported));
+        }
+
+        for (file, inclusions) in shared_files {
+            issues.insert(Issue::new_shared_module_file(file, inclusions));
+        }
+
+        for region in &(InactiveCode {
+            analyses: &self.analyses,
+        })
+        .regions()
+        {
+            issues.insert(Issue::new_inactive_code(region));
+        }
+
+        for violation in &self.package_violations {
+            issues.insert(Issue::new_package(violation));
+        }
+
+        issues
     }
 }

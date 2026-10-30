@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::fixture_directory::FIXTURE_DIRECTORY;
+use crate::constants::FIXTURE_DIRECTORY;
 
 pub struct FixtureWorkspace<'name> {
     pub name: &'name str,

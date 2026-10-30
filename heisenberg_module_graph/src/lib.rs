@@ -1,8 +1,11 @@
+pub mod constants;
 pub mod crate_module_graph;
 pub mod crate_target;
 pub mod crate_target_kind;
 pub mod inactive_region;
+pub mod line_position;
 pub mod module_dependency;
+pub mod module_file_analysis;
 pub mod module_path;
 pub mod shared_module_file;
 pub mod source_location;

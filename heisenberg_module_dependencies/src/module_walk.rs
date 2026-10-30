@@ -18,12 +18,14 @@ use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_module_graph::inactive_region::InactiveRegion;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
+use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::shared_module_file::SharedModuleFile;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
 use crate::configured_node::ConfiguredNode;
+use crate::constants_module::ConstantsModule;
 use crate::implemented_type::ImplementedType;
 use crate::module_paths::ModulePaths;
 use crate::path_reference::PathReference;
@@ -46,23 +48,36 @@ pub struct ModuleWalk<'walk, 'database> {
 }
 
 impl ModuleWalk<'_, '_> {
+    #[expect(
+        clippy::expect_used,
+        reason = "rust-analyzer maps the file of a module back to that module"
+    )]
     pub fn module(&self, module: Module, graph: &mut CrateModuleGraph) {
         let database = self.semantics.db;
 
         if let Some(source_file_id) = module.as_source_file_id(database) {
             let file_id = source_file_id.file_id(database);
             let file_modules: Vec<Module> = self.semantics.file_to_module_defs(file_id).collect();
-            let start = self.file_start(file_id);
+            let file = self.file_start(file_id).file;
+            let first = *file_modules
+                .first()
+                .expect("the file of a module maps back to that module");
+            let analysis = if first == module {
+                ModuleFileAnalysis::Analysed
+            } else {
+                ModuleFileAnalysis::AlreadyAnalysedAs(self.module_paths.path(first))
+            };
 
             if file_modules.len() > 1 {
                 graph.shared_module_files.insert(SharedModuleFile {
-                    file: start.file.clone(),
+                    analysis: analysis.clone(),
+                    file: file.clone(),
                     module: self.module_paths.path(module),
                 });
             }
 
-            if file_modules.first() == Some(&module) {
-                graph.walked_files.insert(start.file);
+            if analysis == ModuleFileAnalysis::Analysed {
+                graph.walked_files.insert(file);
                 self.walk(
                     Subtree {
                         origin: SubtreeOrigin::SourceFile,
@@ -70,11 +85,6 @@ impl ModuleWalk<'_, '_> {
                     },
                     graph,
                 );
-            } else {
-                graph.violations.insert(Violation {
-                    kind: ViolationKind::ModuleFileRepeatedInCrate,
-                    location: start,
-                });
             }
         }
     }
@@ -146,6 +156,22 @@ impl ModuleWalk<'_, '_> {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "rust-analyzer gives every node of a parsed module file a scope"
+    )]
+    fn is_constants_module(&self, container: &SyntaxNode) -> bool {
+        ConstantsModule {
+            database: self.semantics.db,
+        }
+        .matches(
+            self.semantics
+                .scope(container)
+                .expect("the container belongs to a parsed module file")
+                .module(),
+        )
+    }
+
     fn is_public_item_container(node: &SyntaxNode) -> bool {
         ast::SourceFile::can_cast(node.kind())
             || ast::ItemList::cast(node.clone()).is_some_and(|items| {
@@ -164,6 +190,20 @@ impl ModuleWalk<'_, '_> {
                     .and_then(|declaration| declaration.visibility())
             })
             .is_some_and(|visibility| !self.token_origin.is_foreign_text(visibility.syntax()))
+    }
+
+    fn item_violations<'items>(
+        &self,
+        items: impl Iterator<Item = &'items ast::Item>,
+        kind: &ViolationKind,
+        origin: &SubtreeOrigin,
+    ) -> Vec<Violation> {
+        items
+            .map(|item| Violation {
+                kind: kind.clone(),
+                location: self.locate(item.syntax(), origin),
+            })
+            .collect()
     }
 
     fn locate(&self, node: &SyntaxNode, origin: &SubtreeOrigin) -> SourceLocation {
@@ -306,36 +346,55 @@ impl ModuleWalk<'_, '_> {
                 kind: ViolationKind::GlobImport,
                 location: self.locate(tree.syntax(), origin),
             });
+        } else if let Some(constant) = ast::Const::cast(node.clone()).filter(|constant| {
+            matches!(origin, SubtreeOrigin::SourceFile)
+                && constant.visibility().is_some()
+                && !constant.syntax().parent().is_some_and(|container| {
+                    Self::is_public_item_container(&container)
+                        && self.is_constants_module(&container)
+                })
+        }) {
+            graph.violations.insert(Violation {
+                kind: ViolationKind::PublicConstantOutsideConstantsModule,
+                location: self.locate(constant.syntax(), origin),
+            });
         } else if matches!(origin, SubtreeOrigin::SourceFile)
             && Self::is_public_item_container(node)
         {
-            graph.violations.extend(
-                PublicItems {
-                    container: node,
-                    options: self.options,
-                    semantics: self.semantics,
-                }
-                .after_the_first()
-                .iter()
-                .map(|item| Violation {
-                    kind: ViolationKind::AdditionalPublicItem,
-                    location: self.locate(item.syntax(), origin),
-                }),
-            );
+            let non_constant = PublicItems {
+                container: node,
+                options: self.options,
+                semantics: self.semantics,
+            }
+            .non_constant();
+
+            if self.is_constants_module(node) {
+                graph.violations.extend(self.item_violations(
+                    non_constant.iter(),
+                    &ViolationKind::NonConstantInConstantsModule,
+                    origin,
+                ));
+            } else {
+                graph.violations.extend(self.item_violations(
+                    non_constant.iter().skip(1),
+                    &ViolationKind::AdditionalPublicItem,
+                    origin,
+                ));
+            }
 
             if self.crate_target_kind == CrateTargetKind::IntegrationTest {
                 graph.violations.extend(
-                    TestTargetItems {
-                        container: node,
-                        options: self.options,
-                        semantics: self.semantics,
-                    }
-                    .neither_tests_nor_imports()
-                    .iter()
-                    .map(|item| Violation {
-                        kind: ViolationKind::NonTestItemInTestTarget,
-                        location: self.locate(item.syntax(), origin),
-                    }),
+                    self.item_violations(
+                        TestTargetItems {
+                            container: node,
+                            options: self.options,
+                            semantics: self.semantics,
+                        }
+                        .neither_tests_constants_nor_imports()
+                        .iter(),
+                        &ViolationKind::NonTestItemInTestTarget,
+                        origin,
+                    ),
                 );
             }
         }

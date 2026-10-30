@@ -29,8 +29,6 @@ impl SupportedTarget {
         }
     }
 
-    pub const ALL: [Self; 2] = [Self::X86_64PcWindowsMsvc, Self::X86_64UnknownLinuxGnu];
-
     #[must_use]
     pub const fn triple(self) -> &'static str {
         match self {

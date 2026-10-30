@@ -1,1 +1,7 @@
-pub const VALUE: u8 = crate::first::First::LIMIT;
+pub struct Second;
+
+impl Second {
+    pub fn value() -> u8 {
+        crate::first::First::limit()
+    }
+}

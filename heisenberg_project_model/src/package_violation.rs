@@ -4,29 +4,52 @@ use std::fmt::Formatter;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PackageViolation {
-    DependencyCycle {
+    PackageDependencyCycle {
+        manifest: String,
         packages: Vec<String>,
     },
-    TestsWithoutTestLibraries {
+    TestsOnlyPackageWithoutTestLibraries {
         destinations: Vec<String>,
+        manifest: String,
         package: String,
     },
+}
+
+impl PackageViolation {
+    #[must_use]
+    pub const fn issue_type(&self) -> &'static str {
+        match self {
+            Self::PackageDependencyCycle { .. } => "PackageDependencyCycle",
+            Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
+                "TestsOnlyPackageWithoutTestLibraries"
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn manifest(&self) -> &str {
+        match self {
+            Self::PackageDependencyCycle { manifest, .. }
+            | Self::TestsOnlyPackageWithoutTestLibraries { manifest, .. } => manifest,
+        }
+    }
 }
 
 impl Display for PackageViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::DependencyCycle { packages } => write!(
+            Self::PackageDependencyCycle { packages, .. } => write!(
                 formatter,
-                "packages {} depend on each other through dev-dependencies",
+                "Packages {} depend on each other through dev-dependencies",
                 packages.join(", ")
             ),
-            Self::TestsWithoutTestLibraries {
+            Self::TestsOnlyPackageWithoutTestLibraries {
                 destinations,
                 package,
+                ..
             } => write!(
                 formatter,
-                "package {package} holds only tests that need no test library; move them into the tests directory of {}",
+                "Package {package} holds only tests that need no test library; move them into the tests directory of {}",
                 destinations.join(", ")
             ),
         }

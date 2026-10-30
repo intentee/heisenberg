@@ -1,0 +1,6 @@
+[package]
+name = "constants_in_an_integration_test_target"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

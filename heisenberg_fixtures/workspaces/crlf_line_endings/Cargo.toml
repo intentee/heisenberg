@@ -1,0 +1,6 @@
+[package]
+name = "crlf_line_endings"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

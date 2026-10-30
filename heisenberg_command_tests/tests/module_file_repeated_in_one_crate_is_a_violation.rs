@@ -17,15 +17,18 @@ fn module_file_repeated_in_one_crate_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            violation in module_file_repeated_in_crate lib: module file is another module of the same crate, so it cannot be analysed as this module at src/shared.rs:1:1 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation: module file src/shared.rs belongs to 2 modules (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu):\n  \
+        Ok(
+            "ERROR: SharedModuleFile - src/shared.rs - Module file belongs to 2 modules\n  \
             crate::first in module_file_repeated_in_crate lib\n  \
-            crate::second in module_file_repeated_in_crate lib\n\
-            result: 0 cycles, 2 violations\n")
+            crate::second in module_file_repeated_in_crate lib, not analysed: the crate already analyses the file as crate::first\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

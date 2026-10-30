@@ -2,7 +2,7 @@ pub struct First;
 
 pub fn second() {}
 
-pub const THIRD: u8 = 3;
+pub static THIRD: u8 = 3;
 
 #[macro_export]
 macro_rules! fourth {

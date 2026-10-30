@@ -5,12 +5,13 @@ use clap::Args;
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use heisenberg_module_cycles::module_cycles::ModuleCycles;
 use heisenberg_module_dependencies::module_dependencies::ModuleDependencies;
+use heisenberg_project_model::constants::SUPPORTED_TARGETS;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::project_model::ProjectModel;
-use heisenberg_project_model::supported_target::SupportedTarget;
 
 use crate::absolute_path::AbsolutePath;
 use crate::check_report::CheckReport;
+use crate::constants::SUPPORTED_RUST_VERSION;
 use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::target_analysis::TargetAnalysis;
 
@@ -26,7 +27,7 @@ pub struct CheckCommand {
     #[arg(
         long,
         value_parser = AbsolutePath::parse,
-        help = "Absolute path of the Rust 1.99.1 sysroot that contains the rust-src component"
+        help = format!("Absolute path of the Rust {SUPPORTED_RUST_VERSION} sysroot that contains the rust-src component")
     )]
     pub sysroot: AbsolutePath,
     #[arg(
@@ -53,7 +54,7 @@ impl CheckCommand {
         let analyses = scope(|scope| {
             let threads = AnalysisThreads { scope };
 
-            SupportedTarget::ALL
+            SUPPORTED_TARGETS
                 .map(|target| {
                     threads.spawn(move || {
                         let mut loaded = project.load(target);

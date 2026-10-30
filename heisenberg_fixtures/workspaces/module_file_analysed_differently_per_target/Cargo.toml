@@ -1,0 +1,6 @@
+[package]
+name = "module_file_analysed_differently_per_target"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

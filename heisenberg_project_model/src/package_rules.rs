@@ -14,9 +14,11 @@ use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use crate::dependency_kind::DependencyKind;
 use crate::member_target::MemberTarget;
 use crate::node_document::NodeDocument;
+use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
+use crate::workspace_path::WorkspacePath;
 
 pub struct PackageRules<'rules> {
     pub resolved: &'rules ResolvedPackages,
@@ -32,8 +34,13 @@ impl PackageRules<'_> {
         Ok(violations)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "cargo resolves dev-dependencies only for workspace members, so every package cycle runs through a member"
+    )]
     fn dependency_cycles(&self) -> Vec<PackageViolation> {
         let names = self.names();
+        let manifests = self.member_manifests();
         let mut graph: DiGraphMap<&str, ()> = DiGraphMap::new();
 
         for node in &self.resolved.nodes {
@@ -52,8 +59,13 @@ impl PackageRules<'_> {
             .map(|component| {
                 let packages: BTreeSet<String> =
                     component.iter().map(|id| names[id].to_owned()).collect();
-
-                PackageViolation::DependencyCycle {
+                PackageViolation::PackageDependencyCycle {
+                    manifest: component
+                        .iter()
+                        .filter(|id| manifests.contains_key(*id))
+                        .min_by_key(|id| names[*id])
+                        .map(|id| manifests[*id].clone())
+                        .expect("a dev-dependency cycle runs through a workspace member"),
                     packages: packages.into_iter().collect(),
                 }
             })
@@ -74,6 +86,23 @@ impl PackageRules<'_> {
             .is_none())
     }
 
+    fn member_manifests(&self) -> BTreeMap<&str, String> {
+        let workspace_path = WorkspacePath {
+            root: &self.resolved.workspace_root,
+        };
+
+        self.resolved
+            .packages
+            .iter()
+            .filter(|PackageDocument { id, .. }| self.resolved.workspace.members.contains(id))
+            .map(
+                |PackageDocument {
+                     id, manifest_path, ..
+                 }| (id.as_str(), workspace_path.relative(manifest_path)),
+            )
+            .collect()
+    }
+
     fn names(&self) -> BTreeMap<&str, &str> {
         self.resolved
             .packages
@@ -83,6 +112,7 @@ impl PackageRules<'_> {
     }
 
     fn tests_without_test_libraries(&self) -> Result<Vec<PackageViolation>, ProjectModelError> {
+        let manifests = self.member_manifests();
         let names = self.names();
         let members: BTreeSet<&str> = self
             .resolved
@@ -147,8 +177,9 @@ impl PackageRules<'_> {
                     .collect();
 
                 if !destinations.is_empty() {
-                    violations.push(PackageViolation::TestsWithoutTestLibraries {
+                    violations.push(PackageViolation::TestsOnlyPackageWithoutTestLibraries {
                         destinations,
+                        manifest: manifests[member].clone(),
                         package: names[member].to_owned(),
                     });
                 }

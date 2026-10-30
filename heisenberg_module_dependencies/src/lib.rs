@@ -1,4 +1,5 @@
 mod configured_node;
+mod constants_module;
 mod crate_extraction;
 mod diagnostic_site;
 mod diagnostic_violation;

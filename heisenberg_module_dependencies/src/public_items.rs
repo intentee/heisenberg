@@ -17,25 +17,21 @@ pub struct PublicItems<'items, 'database> {
 }
 
 impl PublicItems<'_, '_> {
-    pub fn after_the_first(&self) -> Vec<ast::Item> {
-        self.container
-            .children()
-            .filter_map(ast::Item::cast)
-            .filter(|item| {
-                !ConfiguredNode {
-                    node: item.syntax(),
-                    options: self.options,
-                }
-                .is_disabled()
-            })
-            .filter(|item| self.is_public(item))
-            .skip(1)
-            .collect()
+    pub fn non_constant(&self) -> Vec<ast::Item> {
+        ConfiguredNode {
+            node: self.container,
+            options: self.options,
+        }
+        .enabled_items()
+        .into_iter()
+        .filter(|item| self.is_public_non_constant(item))
+        .collect()
     }
 
-    fn is_public(&self, item: &ast::Item) -> bool {
+    fn is_public_non_constant(&self, item: &ast::Item) -> bool {
         match item {
             ast::Item::AsmExpr(_)
+            | ast::Item::Const(_)
             | ast::Item::ExternBlock(_)
             | ast::Item::ExternCrate(_)
             | ast::Item::Impl(_)
@@ -48,8 +44,7 @@ impl PublicItems<'_, '_> {
                 .is_some_and(|definition| {
                     definition.visibility(self.semantics.db) == Visibility::Public
                 }),
-            ast::Item::Const(_)
-            | ast::Item::Enum(_)
+            ast::Item::Enum(_)
             | ast::Item::Fn(_)
             | ast::Item::MacroDef(_)
             | ast::Item::Static(_)

@@ -17,13 +17,20 @@ fn impl_outside_the_file_of_its_struct_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("heisenberg check\n\
-            precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 4 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 4 modules\n\
-            violation in misplaced_impl lib: impl block belongs in src/first.rs at src/second.rs:4:1 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            violation in misplaced_impl lib: impl block belongs in src/first.rs at src/second.rs:10:1 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 2 violations\n")
+        Ok(
+            "ERROR: MisplacedImpl - src/second.rs:4:1 - Impl block belongs in src/first.rs\n\
+            impl First {\n\
+            \n\
+            ERROR: MisplacedImpl - src/second.rs:10:1 - Impl block belongs in src/first.rs\n\
+            impl Greeting for First {\n\
+            \n\
+            ------------------------------\n\
+            2 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 4 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 4 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }
