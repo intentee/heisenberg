@@ -1,0 +1,3 @@
+[workspace]
+members = ["base", "extra_harness", "harness", "justified_tests", "library", "library_tests"]
+resolver = "3"

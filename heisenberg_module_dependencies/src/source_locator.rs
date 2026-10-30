@@ -1,10 +1,11 @@
-use heisenberg_module_graph::source_location::SourceLocation;
 use ra_ap_hir::FileRangeWrapper;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::SourceDatabase;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_vfs::FileId;
 use ra_ap_vfs::Vfs;
+
+use heisenberg_module_graph::source_location::SourceLocation;
 
 pub struct SourceLocator<'project> {
     pub database: &'project RootDatabase,
@@ -17,14 +18,17 @@ impl SourceLocator<'_> {
         clippy::expect_used,
         reason = "rust-analyzer loads every source file from a real path inside a member package, and every member lies inside the workspace root"
     )]
-    pub fn locate(&self, range: FileRangeWrapper<FileId>) -> SourceLocation {
+    pub fn locate(
+        &self,
+        FileRangeWrapper { file_id, range }: FileRangeWrapper<FileId>,
+    ) -> SourceLocation {
         let absolute = self
             .vfs
-            .file_path(range.file_id)
+            .file_path(file_id)
             .as_path()
             .expect("rust-analyzer loaded the source file from a real path");
-        let text = self.database.file_text(range.file_id).text(self.database);
-        let prefix = &text[..usize::from(range.range.start())];
+        let text = self.database.file_text(file_id).text(self.database);
+        let prefix = &text[..usize::from(range.start())];
 
         SourceLocation {
             column: prefix

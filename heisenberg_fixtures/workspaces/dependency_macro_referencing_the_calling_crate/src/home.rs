@@ -1,5 +1,9 @@
-pub fn run() {}
+pub struct Home;
 
-pub fn back() {
-    crate::caller::call();
+impl Home {
+    pub fn back() {
+        crate::caller::call();
+    }
+
+    pub fn run() {}
 }

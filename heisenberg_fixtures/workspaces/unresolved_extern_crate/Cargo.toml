@@ -1,0 +1,6 @@
+[package]
+name = "unresolved_extern_crate"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

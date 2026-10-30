@@ -1,4 +1,4 @@
-#[cfg_attr(all(), cfg(any()))]
+#[cfg_attr(unix, cfg(windows))]
 use crate::second::Second;
 
 pub struct First;

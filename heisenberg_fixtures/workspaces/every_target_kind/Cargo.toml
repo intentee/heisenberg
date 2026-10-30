@@ -1,0 +1,10 @@
+[package]
+name = "every_target_kind"
+edition = "2024"
+version = "0.1.0"
+
+[[bench]]
+name = "measurement"
+harness = false
+
+[workspace]

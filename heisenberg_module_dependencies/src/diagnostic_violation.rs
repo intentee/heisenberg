@@ -1,9 +1,10 @@
-use heisenberg_module_graph::violation::Violation;
-use heisenberg_module_graph::violation_kind::ViolationKind;
 use ra_ap_hir::AnyDiagnostic;
 use ra_ap_hir::Semantics;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstPtr;
+
+use heisenberg_module_graph::violation::Violation;
+use heisenberg_module_graph::violation_kind::ViolationKind;
 
 use crate::diagnostic_site::DiagnosticSite;
 use crate::source_locator::SourceLocator;

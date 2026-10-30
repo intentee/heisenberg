@@ -19,13 +19,30 @@ impl ModulePath {
     }
 
     #[must_use]
-    pub fn common_ancestor(&self, other: &Self) -> Self {
+    pub fn child_towards(
+        &self,
+        Self {
+            segments: descendant_segments,
+        }: &Self,
+    ) -> Option<Self> {
+        descendant_segments
+            .get(self.segments.len())
+            .map(|name| self.child(name))
+    }
+
+    #[must_use]
+    pub fn common_ancestor(
+        &self,
+        Self {
+            segments: other_segments,
+        }: &Self,
+    ) -> Self {
         let mut shared_length = 0;
 
         while self
             .segments
             .get(shared_length)
-            .is_some_and(|segment| other.segments.get(shared_length) == Some(segment))
+            .is_some_and(|segment| other_segments.get(shared_length) == Some(segment))
         {
             shared_length += 1;
         }
@@ -33,14 +50,6 @@ impl ModulePath {
         Self {
             segments: self.segments.iter().take(shared_length).cloned().collect(),
         }
-    }
-
-    #[must_use]
-    pub fn child_towards(&self, descendant: &Self) -> Option<Self> {
-        descendant
-            .segments
-            .get(self.segments.len())
-            .map(|name| self.child(name))
     }
 }
 

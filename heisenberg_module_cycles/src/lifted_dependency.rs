@@ -12,12 +12,12 @@ pub struct LiftedDependency {
 
 impl LiftedDependency {
     #[must_use]
-    pub fn of(dependency: &ModuleDependency) -> Self {
-        let container = dependency.from.common_ancestor(&dependency.to);
+    pub fn of(ModuleDependency { from, to, .. }: &ModuleDependency) -> Self {
+        let container = from.common_ancestor(to);
 
         Self {
-            from: ModuleUnit::within(&container, &dependency.from),
-            to: ModuleUnit::within(&container, &dependency.to),
+            from: ModuleUnit::within(&container, from),
+            to: ModuleUnit::within(&container, to),
             container,
         }
     }

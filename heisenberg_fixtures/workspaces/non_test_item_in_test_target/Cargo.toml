@@ -1,0 +1,10 @@
+[package]
+name = "non_test_item_in_test_target"
+edition = "2024"
+version = "0.1.0"
+
+[dev-dependencies]
+runtime = { path = "runtime" }
+
+[workspace]
+exclude = ["runtime"]

@@ -1,0 +1,6 @@
+[package]
+name = "shared_module_file_closing_a_cycle"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

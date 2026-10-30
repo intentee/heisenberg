@@ -14,6 +14,16 @@ pub struct TokenOrigin<'origin, 'database> {
 }
 
 impl TokenOrigin<'_, '_> {
+    pub fn is_foreign_text(&self, node: &SyntaxNode) -> bool {
+        let file_id = self.semantics.hir_file_for(node);
+
+        !node
+            .descendants_with_tokens()
+            .filter_map(NodeOrToken::into_token)
+            .filter(|token| !token.kind().is_trivia())
+            .any(|token| self.is_own_text(file_id, token.text_range()))
+    }
+
     pub fn is_own_file(&self, file_id: FileId) -> bool {
         self.own_files.contains(&file_id)
     }
@@ -27,15 +37,5 @@ impl TokenOrigin<'_, '_> {
                 .file_id
                 .file_id(),
         )
-    }
-
-    pub fn is_foreign_text(&self, node: &SyntaxNode) -> bool {
-        let file_id = self.semantics.hir_file_for(node);
-
-        !node
-            .descendants_with_tokens()
-            .filter_map(NodeOrToken::into_token)
-            .filter(|token| !token.kind().is_trivia())
-            .any(|token| self.is_own_text(file_id, token.text_range()))
     }
 }

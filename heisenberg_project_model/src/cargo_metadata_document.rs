@@ -8,6 +8,7 @@ use cargo::workspace::Workspace;
 use serde_json::Value;
 use serde_json::json;
 
+use crate::cargo_dependency_kind::CargoDependencyKind;
 use crate::dependency_document::DependencyDocument;
 use crate::node_document::NodeDocument;
 use crate::package_document::PackageDocument;
@@ -22,6 +23,18 @@ pub struct CargoMetadataDocument<'document, 'context> {
 }
 
 impl CargoMetadataDocument<'_, '_> {
+    pub fn nodes(&self) -> Result<Vec<NodeDocument>, ProjectModelError> {
+        self.packages
+            .keys()
+            .map(|package_id| {
+                Ok(NodeDocument {
+                    dependencies: self.dependencies(*package_id)?,
+                    id: package_id.to_spec().to_string(),
+                })
+            })
+            .collect()
+    }
+
     pub fn packages(&self) -> Vec<PackageDocument> {
         self.packages
             .values()
@@ -31,18 +44,7 @@ impl CargoMetadataDocument<'_, '_> {
                     self.context.cli_unstable(),
                     self.workspace.unstable_features()
                 )),
-            })
-            .collect()
-    }
-
-    pub fn nodes(&self) -> Result<Vec<NodeDocument>, ProjectModelError> {
-        self.packages
-            .keys()
-            .map(|package_id| {
-                Ok(NodeDocument {
-                    dependencies: self.dependencies(*package_id)?,
-                    id: package_id.to_spec().to_string(),
-                })
+                name: package.name().to_string(),
             })
             .collect()
     }
@@ -95,6 +97,15 @@ impl CargoMetadataDocument<'_, '_> {
                                     "name": extern_crate_name.as_str(),
                                     "pkg": dependency_id.to_spec().to_string(),
                                 }),
+                                kinds: dependencies
+                                    .iter()
+                                    .map(|dependency| {
+                                        CargoDependencyKind {
+                                            kind: dependency.kind(),
+                                        }
+                                        .dependency_kind()
+                                    })
+                                    .collect(),
                                 package_id: dependency_id.to_spec().to_string(),
                             })
                             .map_err(|source| ProjectModelError::ExternCrateName {

@@ -1,6 +1,8 @@
 use cargo::workspace::Workspace;
+
 use heisenberg_module_graph::crate_target::CrateTarget;
 
+use crate::cargo_target_kind::CargoTargetKind;
 use crate::member_target::MemberTarget;
 
 pub struct WorkspaceMemberTargets<'workspace, 'context> {
@@ -17,6 +19,10 @@ impl WorkspaceMemberTargets<'_, '_> {
                         crate_target: CrateTarget {
                             package_name: member.name().to_string(),
                             target_description: target.description_named(),
+                            kind: CargoTargetKind {
+                                kind: target.kind(),
+                            }
+                            .crate_target_kind(),
                         },
                         root: root.to_path_buf(),
                     })

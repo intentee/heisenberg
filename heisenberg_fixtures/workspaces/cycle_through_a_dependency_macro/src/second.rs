@@ -1,5 +1,9 @@
-pub fn helper() {}
+pub struct Second;
 
-pub fn back() {
-    crate::first::run();
+impl Second {
+    pub fn back() {
+        crate::first::run();
+    }
+
+    pub fn helper() {}
 }

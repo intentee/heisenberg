@@ -19,8 +19,8 @@ fn type_anchored_path_is_not_ambiguous() {
         str::from_utf8(&outcome.output),
         Ok("heisenberg check\n\
             precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
-            analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
+            analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
+            analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
             result: 0 cycles, 0 violations\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);

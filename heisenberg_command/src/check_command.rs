@@ -1,9 +1,11 @@
 use std::thread::scope;
 
 use clap::Args;
+
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use heisenberg_module_cycles::module_cycles::ModuleCycles;
 use heisenberg_module_dependencies::module_dependencies::ModuleDependencies;
+use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::supported_target::SupportedTarget;
 
@@ -54,8 +56,11 @@ impl CheckCommand {
             SupportedTarget::ALL
                 .map(|target| {
                     threads.spawn(move || {
-                        let loaded = project.load(target);
-                        let graphs = ModuleDependencies { project: &loaded }.extract();
+                        let mut loaded = project.load(target);
+                        let graphs = ModuleDependencies {
+                            project: &mut loaded,
+                        }
+                        .extract();
 
                         TargetAnalysis {
                             cycles: graphs
@@ -76,6 +81,10 @@ impl CheckCommand {
 
         Ok(CheckReport {
             analyses: Vec::from(analyses),
+            package_violations: PackageRules {
+                resolved: &project.project.resolved,
+            }
+            .violations()?,
         })
     }
 }

@@ -1,3 +1,3 @@
 pub fn run() {
-    macros::call!(crate::second::helper);
+    macros::call!(crate::second::Second::helper);
 }

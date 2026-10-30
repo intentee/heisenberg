@@ -1,0 +1,9 @@
+[package]
+name = "library_tests"
+edition = "2024"
+version = "0.1.0"
+
+[dev-dependencies]
+base = { path = "../base" }
+harness = { path = "../harness" }
+library = { path = "../library" }

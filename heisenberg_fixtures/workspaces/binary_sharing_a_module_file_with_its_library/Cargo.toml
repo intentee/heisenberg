@@ -1,0 +1,6 @@
+[package]
+name = "binary_sharing_a_module_file_with_its_library"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

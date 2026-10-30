@@ -1,7 +1,8 @@
 use std::io;
 
-use heisenberg_project_model::project_model_error::ProjectModelError;
 use thiserror::Error;
+
+use heisenberg_project_model::project_model_error::ProjectModelError;
 
 #[derive(Debug, Error)]
 pub enum HeisenbergCommandError {

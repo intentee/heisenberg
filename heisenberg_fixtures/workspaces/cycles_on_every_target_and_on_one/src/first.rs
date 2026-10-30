@@ -1,5 +1,7 @@
 pub struct First;
 
-pub fn second() -> crate::second::Second {
-    crate::second::Second
+impl First {
+    pub fn second() -> crate::second::Second {
+        crate::second::Second
+    }
 }

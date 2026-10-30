@@ -1,6 +1,7 @@
-use heisenberg_module_graph::module_path::ModulePath;
 use ra_ap_hir::Module;
 use ra_ap_ide_db::RootDatabase;
+
+use heisenberg_module_graph::module_path::ModulePath;
 
 pub struct ModulePaths<'database> {
     pub database: &'database RootDatabase,

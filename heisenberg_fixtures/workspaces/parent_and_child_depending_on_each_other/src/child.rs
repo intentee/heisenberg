@@ -1,5 +1,7 @@
 pub struct Child;
 
-pub fn parent() -> crate::Parent {
-    crate::Parent
+impl Child {
+    pub fn parent() -> crate::Parent {
+        crate::Parent
+    }
 }

@@ -1,3 +1,2 @@
-pub fn shared() -> crate::Marker {
-    crate::Marker
-}
+#[test]
+fn shared() {}

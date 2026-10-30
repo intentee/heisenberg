@@ -1,0 +1,6 @@
+[package]
+name = "additional_public_item"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

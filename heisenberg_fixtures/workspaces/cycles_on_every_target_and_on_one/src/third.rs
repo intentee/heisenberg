@@ -1,5 +1,7 @@
 pub struct Third;
 
-pub fn fourth() -> crate::fourth::Fourth {
-    crate::fourth::Fourth
+impl Third {
+    pub fn fourth() -> crate::fourth::Fourth {
+        crate::fourth::Fourth
+    }
 }

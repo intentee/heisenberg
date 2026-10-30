@@ -68,6 +68,20 @@ impl PathReference<'_, '_> {
             })
     }
 
+    fn is_attribute_name(&self) -> bool {
+        self.path
+            .syntax()
+            .ancestors()
+            .find(|ancestor| ancestor.kind() != SyntaxKind::PATH)
+            .is_some_and(|ancestor| ast::Meta::can_cast(ancestor.kind()))
+    }
+
+    fn is_type_anchor(&self) -> bool {
+        self.path
+            .segment()
+            .is_some_and(|segment| segment.type_anchor().is_some())
+    }
+
     fn qualified(&self, qualifier: &ast::Path) -> PathReferenceOutcome {
         match self.semantics.resolve_path(qualifier) {
             None
@@ -107,19 +121,5 @@ impl PathReference<'_, '_> {
         } else {
             PathReferenceOutcome::Unresolved
         }
-    }
-
-    fn is_type_anchor(&self) -> bool {
-        self.path
-            .segment()
-            .is_some_and(|segment| segment.type_anchor().is_some())
-    }
-
-    fn is_attribute_name(&self) -> bool {
-        self.path
-            .syntax()
-            .ancestors()
-            .find(|ancestor| ancestor.kind() != SyntaxKind::PATH)
-            .is_some_and(|ancestor| ast::Meta::can_cast(ancestor.kind()))
     }
 }

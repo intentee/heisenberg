@@ -1,5 +1,7 @@
 pub struct Second;
 
-pub fn first() -> super::first::First {
-    super::first::First
+impl Second {
+    pub fn first() -> super::first::First {
+        super::first::First
+    }
 }

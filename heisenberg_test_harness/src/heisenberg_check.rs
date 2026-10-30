@@ -4,6 +4,7 @@ use std::path::Path;
 
 use clap::Error;
 use clap::Parser;
+
 use heisenberg_command::heisenberg_command::HeisenbergCommand;
 
 use crate::check_outcome::CheckOutcome;
@@ -34,6 +35,11 @@ impl HeisenbergCheck<'_> {
         HeisenbergCommand::try_parse_from(arguments)
     }
 
+    pub fn run(&self) -> Result<CheckOutcome, Error> {
+        self.toolchain_command()
+            .map(|command| CheckOutcome::of(&command))
+    }
+
     #[expect(
         clippy::expect_used,
         reason = "tests run only through the Makefile, which exports the variable"
@@ -42,10 +48,5 @@ impl HeisenbergCheck<'_> {
         self.command(Path::new(
             &env::var_os("HEISENBERG_SYSROOT").expect("HEISENBERG_SYSROOT must be exported"),
         ))
-    }
-
-    pub fn run(&self) -> Result<CheckOutcome, Error> {
-        self.toolchain_command()
-            .map(|command| CheckOutcome::of(&command))
     }
 }

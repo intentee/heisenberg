@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io;
 use std::path::PathBuf;
 
 use thiserror::Error;
@@ -29,6 +30,12 @@ pub enum ProjectModelError {
         package: String,
         #[source]
         source: Box<dyn Error + Send + Sync>,
+    },
+    #[error("the library root `{path}` cannot be read")]
+    LibraryRootUnreadable {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
     },
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]
     PackageSources {

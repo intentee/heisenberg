@@ -22,8 +22,11 @@ fn item_under_a_proc_macro_attribute_is_analysed_as_written() {
             analysed on x86_64-pc-windows-msvc: 2 crate targets, 4 modules\n\
             analysed on x86_64-unknown-linux-gnu: 2 crate targets, 4 modules\n\
             cycle in proc_macro_attribute_item_analysed_as_written lib among the parts of crate (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu):\n  \
-            crate::first -> crate::second: crate::first uses crate::second at src/first.rs:2:25\n  \
-            crate::second -> crate::first: crate::second uses crate::first at src/second.rs:4:5\n\
+            crate::first -> crate::second:\n    \
+            crate::first uses crate::second at src/first.rs:2:25\n    \
+            crate::first uses crate::second at src/first.rs:3:5\n  \
+            crate::second -> crate::first:\n    \
+            crate::second uses crate::first at src/second.rs:5:9\n\
             result: 1 cycles, 0 violations\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

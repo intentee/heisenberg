@@ -1,5 +1,9 @@
-pub const LIMIT: u8 = 1;
+pub struct First;
 
-pub fn print() {
-    println!("{}", crate::second::VALUE);
+impl First {
+    pub const LIMIT: u8 = 1;
+
+    pub fn print() {
+        println!("{}", crate::second::VALUE);
+    }
 }

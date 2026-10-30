@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use std::thread::available_parallelism;
 use std::thread::scope;
 
-use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use ra_ap_hir::Crate;
 use ra_ap_ide_db::RootDatabase;
+
+use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 
 pub struct NameResolutionPriming<'priming> {
     pub database: &'priming RootDatabase,
@@ -39,22 +40,6 @@ impl NameResolutionPriming<'_> {
         }
     }
 
-    fn layers(&self) -> BTreeMap<usize, Vec<Crate>> {
-        let mut depths = HashMap::new();
-
-        for member in self.members {
-            self.depth(*member, &mut depths);
-        }
-
-        let mut layers: BTreeMap<usize, Vec<Crate>> = BTreeMap::new();
-
-        for (krate, depth) in depths {
-            layers.entry(depth).or_default().push(krate);
-        }
-
-        layers
-    }
-
     fn depth(&self, krate: Crate, depths: &mut HashMap<Crate, usize>) -> usize {
         if let Some(known) = depths.get(&krate) {
             return *known;
@@ -70,5 +55,21 @@ impl NameResolutionPriming<'_> {
         depths.insert(krate, depth);
 
         depth
+    }
+
+    fn layers(&self) -> BTreeMap<usize, Vec<Crate>> {
+        let mut depths = HashMap::new();
+
+        for member in self.members {
+            self.depth(*member, &mut depths);
+        }
+
+        let mut layers: BTreeMap<usize, Vec<Crate>> = BTreeMap::new();
+
+        for (krate, depth) in depths {
+            layers.entry(depth).or_default().push(krate);
+        }
+
+        layers
     }
 }

@@ -1,6 +1,10 @@
-pub fn helper() {}
+pub struct Second;
 
-#[cfg(windows)]
-pub fn back() {
-    crate::first::run();
+impl Second {
+    #[cfg(windows)]
+    pub fn back() {
+        crate::first::run();
+    }
+
+    pub fn helper() {}
 }

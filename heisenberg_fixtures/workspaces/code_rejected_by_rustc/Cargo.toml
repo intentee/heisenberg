@@ -1,6 +1,0 @@
-[package]
-name = "code_rejected_by_rustc"
-edition = "2024"
-version = "0.1.0"
-
-[workspace]

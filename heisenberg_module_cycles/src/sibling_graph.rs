@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use heisenberg_module_graph::crate_target::CrateTarget;
-use heisenberg_module_graph::module_dependency::ModuleDependency;
-use heisenberg_module_graph::module_path::ModulePath;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::DiGraph;
 use petgraph::graph::NodeIndex;
+
+use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_module_graph::module_dependency::ModuleDependency;
+use heisenberg_module_graph::module_path::ModulePath;
 
 use crate::cycle_witness::CycleWitness;
 use crate::lifted_dependency::LiftedDependency;
@@ -15,7 +16,7 @@ use crate::module_unit::ModuleUnit;
 
 pub struct SiblingGraph {
     pub container: ModulePath,
-    pub witnesses: BTreeMap<LiftedDependency, CycleWitness>,
+    pub edges: BTreeMap<LiftedDependency, BTreeSet<ModuleDependency>>,
 }
 
 impl SiblingGraph {
@@ -23,18 +24,15 @@ impl SiblingGraph {
     pub const fn new(container: ModulePath) -> Self {
         Self {
             container,
-            witnesses: BTreeMap::new(),
+            edges: BTreeMap::new(),
         }
     }
 
     pub fn add(&mut self, lifted: LiftedDependency, dependency: &ModuleDependency) {
-        let witness = CycleWitness {
-            dependency: dependency.clone(),
-            from: lifted.from.clone(),
-            to: lifted.to.clone(),
-        };
-
-        self.witnesses.entry(lifted).or_insert(witness);
+        self.edges
+            .entry(lifted)
+            .or_default()
+            .insert(dependency.clone());
     }
 
     #[must_use]
@@ -42,13 +40,13 @@ impl SiblingGraph {
         let mut graph: DiGraph<&ModuleUnit, ()> = DiGraph::new();
         let mut indices: BTreeMap<&ModuleUnit, NodeIndex> = BTreeMap::new();
 
-        for witness in self.witnesses.values() {
+        for lifted in self.edges.keys() {
             let from = *indices
-                .entry(&witness.from)
-                .or_insert_with(|| graph.add_node(&witness.from));
+                .entry(&lifted.from)
+                .or_insert_with(|| graph.add_node(&lifted.from));
             let to = *indices
-                .entry(&witness.to)
-                .or_insert_with(|| graph.add_node(&witness.to));
+                .entry(&lifted.to)
+                .or_insert_with(|| graph.add_node(&lifted.to));
 
             graph.add_edge(from, to, ());
         }
@@ -67,12 +65,16 @@ impl SiblingGraph {
                     crate_target: crate_target.clone(),
                     units: members.iter().map(|unit| (*unit).clone()).collect(),
                     witnesses: self
-                        .witnesses
-                        .values()
-                        .filter(|witness| {
-                            members.contains(&witness.from) && members.contains(&witness.to)
+                        .edges
+                        .iter()
+                        .filter(|(lifted, _)| {
+                            members.contains(&lifted.from) && members.contains(&lifted.to)
                         })
-                        .cloned()
+                        .map(|(lifted, dependencies)| CycleWitness {
+                            dependencies: dependencies.iter().cloned().collect(),
+                            from: lifted.from.clone(),
+                            to: lifted.to.clone(),
+                        })
                         .collect(),
                 }
             })

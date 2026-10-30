@@ -1,4 +1,4 @@
 #[cfg(windows)]
 pub fn run() {
-    windows_only::call!(crate::second::helper);
+    windows_only::call!(crate::second::Second::helper);
 }

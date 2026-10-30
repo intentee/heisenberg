@@ -1,0 +1,6 @@
+[package]
+name = "code_active_on_no_target"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]

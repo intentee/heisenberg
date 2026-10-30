@@ -30,7 +30,9 @@ fn items_produced_by_a_build_script_are_violations() {
             violation in build_script_generated_items lib: macro expansion failed at src/lib.rs:18:23 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
             violation in build_script_generated_items lib: path is unresolved at src/lib.rs:20:18 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
             violation in build_script_generated_items lib: path is unresolved at src/lib.rs:21:5 (targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu)\n\
-            result: 0 cycles, 9 violations\n")
+            violation: code is active on no supported target at src/lib.rs:4:1\n\
+            violation: code is active on no supported target at src/lib.rs:9:1\n\
+            result: 0 cycles, 11 violations\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

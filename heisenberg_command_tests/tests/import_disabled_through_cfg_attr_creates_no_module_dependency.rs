@@ -21,7 +21,13 @@ fn import_disabled_through_cfg_attr_creates_no_module_dependency() {
             precondition: rustc 1.99.1 compiles the workspace for every supported target\n\
             analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            result: 0 cycles, 0 violations\n")
+            cycle in cfg_attr_disabled_import_of_a_sibling lib among the parts of crate (targets: x86_64-pc-windows-msvc):\n  \
+            crate::first -> crate::second:\n    \
+            crate::first uses crate::second at src/first.rs:2:5\n  \
+            crate::second -> crate::first:\n    \
+            crate::second uses crate::first at src/second.rs:1:5\n    \
+            crate::second uses crate::first at src/second.rs:4:16\n\
+            result: 1 cycles, 0 violations\n")
     );
-    assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }
