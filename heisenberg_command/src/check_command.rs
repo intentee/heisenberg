@@ -18,6 +18,7 @@ use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
 use heisenberg_project_model::constants::CARGO_MANIFEST_FILE;
 use heisenberg_project_model::constants::SUPPORTED_TARGETS;
+use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::project_model_error::ProjectModelError;
@@ -80,6 +81,10 @@ pub struct CheckCommand {
 }
 
 impl CheckCommand {
+    /// # Errors
+    ///
+    /// Returns every [`HeisenbergCommandError`] that kept the project from loading or a
+    /// supported target from being analysed.
     pub fn execute(
         &self,
         environment: &BTreeMap<OsString, OsString>,
@@ -163,6 +168,12 @@ impl CheckCommand {
             .map(|analyses| {
                 let package_violations = clippy_violations
                     .into_iter()
+                    .chain(
+                        ManifestLintAllowances {
+                            resolved: &project.project.resolved,
+                        }
+                        .violations(),
+                    )
                     .chain(
                         PackageRules {
                             empty_libraries: &empty_libraries(&analyses),

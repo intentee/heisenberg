@@ -17,12 +17,14 @@ fn module_declared_inline_inside_a_block_is_code_of_its_enclosing_module() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ModuleCycle - src/lib.rs:5:9 - Parts of crate depend on each other\n        \
-            crate::OFFSET + 2\n  \
-            crate (own code) -> crate::widths:\n    \
-            crate uses crate::widths at src/lib.rs:12:13\n  \
-            crate::widths -> crate (own code):\n    \
+        Ok("ModuleCycle: 1 violation\n\
+            Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
+            \n\
+            - src/lib.rs:5:9: Parts of crate depend on each other\n            \
+            crate::OFFSET + 2\n      \
+            crate (own code) -> crate::widths:\n        \
+            crate uses crate::widths at src/lib.rs:12:13\n      \
+            crate::widths -> crate (own code):\n        \
             crate::widths uses crate at src/lib.rs:5:9\n\
             \n\
             ------------------------------\n\
@@ -30,8 +32,7 @@ fn module_declared_inline_inside_a_block_is_code_of_its_enclosing_module() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

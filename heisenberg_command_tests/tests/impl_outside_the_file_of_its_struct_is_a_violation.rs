@@ -17,11 +17,12 @@ fn impl_outside_the_file_of_its_struct_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: MisplacedImpl - src/second.rs:4:6 - Impl block belongs in src/first.rs\n\
-            impl First {\n\
+        Ok("MisplacedImpl: 2 violations\n\
+            All behavior of a type is read in one place, the file that defines it. Move the impl block into that file.\n\
             \n\
-            ERROR: MisplacedImpl - src/second.rs:10:19 - Impl block belongs in src/first.rs\n\
+            - src/second.rs:4:6: Impl block belongs in src/first.rs\n    \
+            impl First {\n\
+            - src/second.rs:10:19: Impl block belongs in src/first.rs\n    \
             impl Greeting for First {\n\
             \n\
             ------------------------------\n\
@@ -29,8 +30,7 @@ fn impl_outside_the_file_of_its_struct_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 4 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

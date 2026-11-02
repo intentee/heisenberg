@@ -17,12 +17,13 @@ fn failed_macro_expansion_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: FailedMacroExpansion - src/lib.rs:1:1 - Macro expansion failed\n\
-            include!(\"missing.rs\");\n  \
-            expansion failing at src/lib.rs:1:10\n\
+        Ok("FailedMacroExpansion: 2 violations\n\
+            A macro call that fails to expand produces no code to analyse. Fix the call so it expands.\n\
             \n\
-            ERROR: FailedMacroExpansion - src/lib.rs:3:3 - Macro expansion failed\n\
+            - src/lib.rs:1:1: Macro expansion failed\n    \
+            include!(\"missing.rs\");\n      \
+            expansion failing at src/lib.rs:1:10\n\
+            - src/lib.rs:3:3: Macro expansion failed\n    \
             #[derive(core::marker::CoerceShared)]\n\
             \n\
             ------------------------------\n\
@@ -30,8 +31,7 @@ fn failed_macro_expansion_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -2402,6 +2402,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "heisenberg_command",
+ "heisenberg_fixtures",
+ "heisenberg_test_harness",
 ]
 
 [[package]]

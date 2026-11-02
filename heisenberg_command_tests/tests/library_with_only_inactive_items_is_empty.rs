@@ -17,19 +17,23 @@ fn library_with_only_inactive_items_is_empty() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: TestsOnlyPackageWithoutTestLibraries - library_tests/Cargo.toml - Package library_tests holds only tests that need no test library; move them into the tests directory of library\n\
+        Ok("CodeActiveOnNoTarget: 1 violation\n\
+            Code active on no supported target is never built or analysed. Remove it, or make it active on a supported target.\n\
             \n\
-            ERROR: CodeActiveOnNoTarget - library_tests/src/lib.rs:2:8 - Code is active on no supported target\n\
+            - library_tests/src/lib.rs:2:8: Code is active on no supported target\n    \
             pub fn never() {}\n\
+            \n\
+            TestsOnlyPackageWithoutTestLibraries: 1 violation\n\
+            A separate tests package is justified only by test-only libraries. Move the tests into the tests directory of the package they test.\n\
+            \n\
+            - library_tests/Cargo.toml: Package library_tests holds only tests that need no test library; move them into the tests directory of library\n\
             \n\
             ------------------------------\n\
             2 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 3 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

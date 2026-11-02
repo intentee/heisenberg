@@ -17,17 +17,16 @@ fn unparsable_macro_expansion_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: UnparsableMacroExpansion - src/lib.rs:9:1 - Macro expansion cannot be parsed\n\
+        Ok("UnparsableMacroExpansion: 4 violations\n\
+            A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust.\n\
+            \n\
+            - src/lib.rs:9:1: Macro expansion cannot be parsed\n    \
             unparsable_expansion!();\n\
-            \n\
-            ERROR: UnparsableMacroExpansion - src/lib.rs:17:1 - Macro expansion cannot be parsed\n\
+            - src/lib.rs:17:1: Macro expansion cannot be parsed\n    \
             unparsable_impl!();\n\
-            \n\
-            ERROR: UnparsableMacroExpansion - src/lib.rs:26:12 - Macro expansion cannot be parsed\n\
+            - src/lib.rs:26:12: Macro expansion cannot be parsed\n    \
             pub struct Rewritten;\n\
-            \n\
-            ERROR: UnparsableMacroExpansion - src/lib.rs:34:3 - Macro expansion cannot be parsed\n\
+            - src/lib.rs:34:3: Macro expansion cannot be parsed\n    \
             #[derive(unparsable_derive)]\n\
             \n\
             ------------------------------\n\
@@ -35,8 +34,7 @@ fn unparsable_macro_expansion_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -17,13 +17,15 @@ fn derive_macro_output_closing_a_cycle_is_found() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ModuleCycle - src/first.rs:1:3 - Parts of crate depend on each other\n\
-            #[derive(described)]\n  \
-            crate::first -> crate::second:\n    \
-            crate::first uses crate::second at src/first.rs:1:3\n  \
-            crate::second -> crate::first:\n    \
-            crate::second uses crate::first at src/second.rs:2:19\n    \
+        Ok("ModuleCycle: 1 violation\n\
+            Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
+            \n\
+            - src/first.rs:1:3: Parts of crate depend on each other\n    \
+            #[derive(described)]\n      \
+            crate::first -> crate::second:\n        \
+            crate::first uses crate::second at src/first.rs:1:3\n      \
+            crate::second -> crate::first:\n        \
+            crate::second uses crate::first at src/second.rs:2:19\n        \
             crate::second uses crate::first at src/second.rs:3:9\n\
             \n\
             ------------------------------\n\
@@ -31,8 +33,7 @@ fn derive_macro_output_closing_a_cycle_is_found() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

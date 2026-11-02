@@ -22,8 +22,10 @@ fn source_line_of_a_crlf_file_has_no_carriage_return() {
     assert!(items.contains("\r\n"));
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: AdditionalPublicItem - src/items.rs:3:8 - Module already has a public item\n\
+        Ok("AdditionalPublicItem: 1 violation\n\
+            Each module exposes a single public item, so every file has one responsibility. Move each additional public item into its own module.\n\
+            \n\
+            - src/items.rs:3:8: Module already has a public item\n    \
             pub fn second() {}\n\
             \n\
             ------------------------------\n\
@@ -31,8 +33,7 @@ fn source_line_of_a_crlf_file_has_no_carriage_return() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

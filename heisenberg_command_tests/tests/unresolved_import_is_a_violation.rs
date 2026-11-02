@@ -17,8 +17,10 @@ fn unresolved_import_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: UnresolvedPath - src/lib.rs:3:5 - Path is unresolved\n\
+        Ok("UnresolvedPath: 1 violation\n\
+            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            \n\
+            - src/lib.rs:3:5: Path is unresolved\n    \
             use crate::present::Absent;\n\
             \n\
             ------------------------------\n\
@@ -26,8 +28,7 @@ fn unresolved_import_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

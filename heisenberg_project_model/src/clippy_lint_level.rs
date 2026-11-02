@@ -2,7 +2,7 @@ use cargo_util_schemas::manifest::TomlLintLevel;
 use cargo_util_schemas::manifest::TomlLints;
 
 use crate::clippy_lint::ClippyLint;
-use crate::constants::CLIPPY_DENIED_LINTS_GROUP;
+use crate::clippy_lint_selector::ClippyLintSelector;
 use crate::constants::CLIPPY_TOOL;
 use crate::constants::LINT_NAME_SEPARATOR;
 use crate::constants::LINT_NAME_SEPARATOR_ALIAS;
@@ -47,11 +47,10 @@ impl ClippyLintLevel<'_> {
             .into_iter()
             .flatten()
             .filter(|(name, _)| {
-                let name = name.replace(LINT_NAME_SEPARATOR_ALIAS, LINT_NAME_SEPARATOR);
-
-                name == CLIPPY_DENIED_LINTS_GROUP
-                    || name == self.lint.name
-                    || self.lint.former_names.contains(&name.as_str())
+                ClippyLintSelector {
+                    name: &name.replace(LINT_NAME_SEPARATOR_ALIAS, LINT_NAME_SEPARATOR),
+                }
+                .selects(self.lint)
             })
             .collect();
 

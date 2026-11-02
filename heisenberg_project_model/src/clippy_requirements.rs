@@ -65,6 +65,10 @@ pub struct ClippyRequirements<'requirements> {
 }
 
 impl ClippyRequirements<'_> {
+    /// # Errors
+    ///
+    /// Returns [`ProjectModelError`] when a clippy configuration that discovery finds
+    /// cannot be read or is not valid TOML.
     pub fn violations(&self) -> Result<Vec<PackageViolation>, ProjectModelError> {
         let workspace_path = self.resolved.workspace_path();
 

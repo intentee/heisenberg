@@ -17,11 +17,16 @@ fn paths_written_inside_an_own_macro_are_checked() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: CodeActiveOnNoTarget - src/lib.rs:2:9 - Code is active on no supported target\n\
+        Ok("CodeActiveOnNoTarget: 1 violation\n\
+            Code active on no supported target is never built or analysed. Remove it, or make it active on a supported target.\n\
+            \n\
+            - src/lib.rs:2:9: Code is active on no supported target\n    \
             pub mod configured {\n\
             \n\
-            ERROR: UnresolvedPath - src/lib.rs:13:17 - Path is unresolved\n    \
+            UnresolvedPath: 1 violation\n\
+            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            \n\
+            - src/lib.rs:13:17: Path is unresolved\n        \
             let _item = configured_item!();\n\
             \n\
             ------------------------------\n\
@@ -29,8 +34,7 @@ fn paths_written_inside_an_own_macro_are_checked() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

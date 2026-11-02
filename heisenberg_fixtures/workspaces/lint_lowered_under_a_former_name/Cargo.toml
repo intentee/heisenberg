@@ -1,0 +1,11 @@
+[package]
+name = "lint_lowered_under_a_former_name"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

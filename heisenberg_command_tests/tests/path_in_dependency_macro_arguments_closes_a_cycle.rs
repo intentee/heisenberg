@@ -17,12 +17,14 @@ fn path_in_dependency_macro_arguments_closes_a_cycle() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ModuleCycle - src/first.rs:2:19 - Parts of crate depend on each other\n    \
-            macros::call!(crate::second::Second::helper);\n  \
-            crate::first -> crate::second:\n    \
-            crate::first uses crate::second at src/first.rs:2:19\n  \
-            crate::second -> crate::first:\n    \
+        Ok("ModuleCycle: 1 violation\n\
+            Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
+            \n\
+            - src/first.rs:2:19: Parts of crate depend on each other\n        \
+            macros::call!(crate::second::Second::helper);\n      \
+            crate::first -> crate::second:\n        \
+            crate::first uses crate::second at src/first.rs:2:19\n      \
+            crate::second -> crate::first:\n        \
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
@@ -30,8 +32,7 @@ fn path_in_dependency_macro_arguments_closes_a_cycle() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 4 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

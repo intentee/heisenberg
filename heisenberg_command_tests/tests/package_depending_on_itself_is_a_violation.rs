@@ -17,16 +17,17 @@ fn package_depending_on_itself_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: PackageDependsOnItself - Cargo.toml - Package package_depending_on_itself v0.1.0 depends on itself through dev-dependencies\n\
+        Ok("PackageDependsOnItself: 1 violation\n\
+            A package depending on itself is built twice and blurs what it owns. Remove the self-dependency.\n\
+            \n\
+            - Cargo.toml: Package package_depending_on_itself v0.1.0 depends on itself through dev-dependencies\n\
             \n\
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -17,13 +17,15 @@ fn import_disabled_by_cfg_creates_no_module_dependency() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ModuleCycle - src/first.rs:2:5 - Parts of crate depend on each other (only in cfg_disabled_import_of_a_sibling lib on x86_64-pc-windows-msvc)\n\
-            use crate::second::Second;\n  \
-            crate::first -> crate::second:\n    \
-            crate::first uses crate::second at src/first.rs:2:5\n  \
-            crate::second -> crate::first:\n    \
-            crate::second uses crate::first at src/second.rs:1:5\n    \
+        Ok("ModuleCycle: 1 violation\n\
+            Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
+            \n\
+            - src/first.rs:2:5: Parts of crate depend on each other (only in cfg_disabled_import_of_a_sibling lib on x86_64-pc-windows-msvc)\n    \
+            use crate::second::Second;\n      \
+            crate::first -> crate::second:\n        \
+            crate::first uses crate::second at src/first.rs:2:5\n      \
+            crate::second -> crate::first:\n        \
+            crate::second uses crate::first at src/second.rs:1:5\n        \
             crate::second uses crate::first at src/second.rs:4:16\n\
             \n\
             ------------------------------\n\
@@ -31,8 +33,7 @@ fn import_disabled_by_cfg_creates_no_module_dependency() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

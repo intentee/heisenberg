@@ -17,20 +17,19 @@ fn missing_clippy_test_allowance_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ClippyTestAllowanceMissing - clippy.toml - Clippy configuration does not set allow-panic-in-tests = true\n\
+        Ok("ClippyTestAllowanceMissing: 3 violations\n\
+            Tests may fail fast with expect, unwrap and panic. Set the allowance to true in the clippy configuration.\n\
             \n\
-            ERROR: ClippyTestAllowanceMissing - clippy.toml - Clippy configuration does not set allow-unwrap-in-tests = true\n\
-            \n\
-            ERROR: ClippyTestAllowanceMissing - nested/clippy.toml - Clippy configuration does not set allow-expect-in-tests = true\n\
+            - clippy.toml: Clippy configuration does not set allow-panic-in-tests = true\n\
+            - clippy.toml: Clippy configuration does not set allow-unwrap-in-tests = true\n\
+            - nested/clippy.toml: Clippy configuration does not set allow-expect-in-tests = true\n\
             \n\
             ------------------------------\n\
             3 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

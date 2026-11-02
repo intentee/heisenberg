@@ -17,20 +17,18 @@ fn unresolved_macro_call_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: UnresolvedMacroCall - src/lib.rs:3:1 - Macro call is unresolved\n\
+        Ok("UnresolvedMacroCall: 5 violations\n\
+            Every name must resolve for the analysis to be complete. Define or import the macro.\n\
+            \n\
+            - src/lib.rs:3:1: Macro call is unresolved\n    \
             Marker!();\n\
-            \n\
-            ERROR: UnresolvedMacroCall - src/lib.rs:5:8 - Macro call is unresolved\n\
+            - src/lib.rs:5:8: Macro call is unresolved\n    \
             crate::missing!();\n\
-            \n\
-            ERROR: UnresolvedMacroCall - src/lib.rs:6:16 - Macro call is unresolved\n\
+            - src/lib.rs:6:16: Macro call is unresolved\n    \
             crate::absent::missing!();\n\
-            \n\
-            ERROR: UnresolvedMacroCall - src/lib.rs:8:10 - Macro call is unresolved\n\
+            - src/lib.rs:8:10: Macro call is unresolved\n    \
             #[derive(MissingDerive)]\n\
-            \n\
-            ERROR: UnresolvedMacroCall - src/lib.rs:11:3 - Macro call is unresolved\n\
+            - src/lib.rs:11:3: Macro call is unresolved\n    \
             #[missing_attribute]\n\
             \n\
             ------------------------------\n\
@@ -38,8 +36,7 @@ fn unresolved_macro_call_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

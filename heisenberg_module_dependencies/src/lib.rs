@@ -1,5 +1,6 @@
 mod adt_violation;
 mod attributed_item;
+mod code_tokens;
 mod configured_node;
 mod constants_module;
 mod covering_ancestors;
@@ -8,6 +9,7 @@ mod crate_module_files;
 mod defined_items;
 mod diagnostic_site;
 mod diagnostic_violation;
+mod impl_home;
 mod implemented_type;
 mod is_module_inside_block;
 mod item_adt;

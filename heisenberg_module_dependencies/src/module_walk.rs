@@ -21,9 +21,11 @@ use ra_ap_hir_expand::MacroDefKind;
 use ra_ap_hir_expand::builtin::BuiltinFnLikeExpander;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstNode;
+use ra_ap_syntax::AstToken;
 use ra_ap_syntax::NodeOrToken;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::SyntaxNodePtr;
+use ra_ap_syntax::SyntaxToken;
 use ra_ap_syntax::TextRange;
 use ra_ap_syntax::TextSize;
 use ra_ap_syntax::WalkEvent;
@@ -34,7 +36,7 @@ use ra_ap_vfs::FileId;
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
-use heisenberg_module_graph::inactive_region::InactiveRegion;
+use heisenberg_module_graph::inactive_focus::InactiveFocus;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::shared_module_file::SharedModuleFile;
@@ -42,10 +44,13 @@ use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_module_graph::walked_code::WalkedCode;
+use heisenberg_module_graph::written_tokens::WrittenTokens;
 
 use crate::adt_violation::AdtViolation;
+use crate::code_tokens::code_tokens;
 use crate::configured_node::ConfiguredNode;
 use crate::constants_module::ConstantsModule;
+use crate::impl_home::ImplHome;
 use crate::implemented_type::ImplementedType;
 use crate::is_module_inside_block::is_module_inside_block;
 use crate::item_adt::ItemAdt;
@@ -107,16 +112,34 @@ impl ModuleWalk<'_, '_> {
             }
 
             if analysis == ModuleFileAnalysis::Analysed {
+                let root = self.semantics.parse(source_file_id).syntax().clone();
+
                 graph.walked_code.files.insert(file);
+                self.non_doc_comments(file_id, &root, graph);
                 self.walk(
                     Subtree {
                         origin: SubtreeOrigin::SourceFile,
-                        root: self.semantics.parse(source_file_id).syntax().clone(),
+                        root,
                     },
                     graph,
                     test_target,
                 );
             }
+        }
+    }
+
+    fn activate(
+        &self,
+        node: &SyntaxNode,
+        CrateModuleGraph {
+            walked_code: WalkedCode { active_tokens, .. },
+            ..
+        }: &mut CrateModuleGraph,
+    ) {
+        if !ast::TokenTree::can_cast(node.kind()) {
+            let tokens: Vec<SyntaxToken> = code_tokens(node.children_with_tokens()).collect();
+
+            self.record_own_tokens(self.semantics.hir_file_for(node), &tokens, active_tokens);
         }
     }
 
@@ -160,8 +183,18 @@ impl ModuleWalk<'_, '_> {
         let database = self.semantics.db;
 
         if let Some(expansion) = self.semantics.to_def(call) {
+            let call_location = expansion.lookup(database);
+
+            if let Some(included) = call_location.include_file_id(database, expansion) {
+                self.non_doc_comments(
+                    included.file_id(database),
+                    self.semantics.parse(included).syntax(),
+                    graph,
+                );
+            }
+
             if matches!(
-                expansion.lookup(database).def.kind,
+                call_location.def.kind,
                 MacroDefKind::BuiltIn(_, BuiltinFnLikeExpander::CfgSelect)
             ) && !self.token_origin.is_foreign_text(call.syntax())
             {
@@ -214,6 +247,10 @@ impl ModuleWalk<'_, '_> {
         })
     }
 
+    fn has_own_visibility(&self, visibility: Option<ast::Visibility>) -> bool {
+        visibility.is_some_and(|visibility| !self.token_origin.is_foreign_text(visibility.syntax()))
+    }
+
     fn implemented_type(&self, implementation: &ast::Impl) -> Option<ImplementedType<'_>> {
         self.semantics
             .to_def(implementation)
@@ -228,41 +265,36 @@ impl ModuleWalk<'_, '_> {
         &self,
         node: &SyntaxNode,
         CrateModuleGraph {
-            walked_code: WalkedCode {
-                inactive_regions, ..
-            },
+            walked_code:
+                WalkedCode {
+                    inactive_foci,
+                    inactive_tokens,
+                    ..
+                },
             ..
         }: &mut CrateModuleGraph,
     ) {
         let file = self.semantics.hir_file_for(node);
-        let focus = self.token_origin.written_range(
-            file,
-            ItemFocus {
-                node,
-                semantics: self.semantics,
-            }
-            .range(),
-        );
+        let focus_range = ItemFocus {
+            node,
+            semantics: self.semantics,
+        }
+        .range();
+        let focus = self.token_origin.written_range(file, focus_range);
+        let tokens: Vec<SyntaxToken> = code_tokens(node.descendants_with_tokens()).collect();
+
+        self.record_own_tokens(file, &tokens, inactive_tokens);
 
         if self.token_origin.is_own_file(focus.file_id) {
-            let covered = node
-                .descendants_with_tokens()
-                .filter_map(NodeOrToken::into_token)
-                .filter(|token| !token.kind().is_trivia())
-                .map(|token| self.token_origin.written_range(file, token.text_range()))
-                .filter(|written| written.file_id == focus.file_id)
-                .fold(focus.range, |covered, written| covered.cover(written.range));
-
-            inactive_regions.insert(InactiveRegion {
-                end: self.locator.locate(FileRangeWrapper {
-                    file_id: focus.file_id,
-                    range: TextRange::empty(covered.end()),
-                }),
-                focus: self.locator.locate(focus),
-                start: self.locator.locate(FileRangeWrapper {
-                    file_id: focus.file_id,
-                    range: TextRange::empty(covered.start()),
-                }),
+            inactive_foci.insert(InactiveFocus {
+                location: self.locator.locate(focus),
+                token_starts: tokens
+                    .iter()
+                    .filter(|token| focus_range.contains_range(token.text_range()))
+                    .map(|token| self.token_origin.written_range(file, token.text_range()))
+                    .filter(|written| written.file_id == focus.file_id)
+                    .map(|written| u32::from(written.range.start()))
+                    .collect(),
             });
         }
     }
@@ -290,9 +322,9 @@ impl ModuleWalk<'_, '_> {
         let database = self.semantics.db;
         let outside = OutsideVisibility { database };
 
-        !self.token_origin.is_foreign_text(node)
-            && (ast::Use::cast(node.clone()).is_some_and(|import| {
-                self.semantics.scope(import.syntax()).is_some_and(|scope| {
+        ast::Use::cast(node.clone()).is_some_and(|import| {
+            self.has_own_visibility(import.visibility())
+                && self.semantics.scope(import.syntax()).is_some_and(|scope| {
                     let module = scope.module();
 
                     outside.reaches_outside(
@@ -307,7 +339,9 @@ impl ModuleWalk<'_, '_> {
                         module,
                     )
                 })
-            }) || matches!(definition, ItemDefinition::ExternCrate(declaration) if outside.reaches_outside(
+        }) || (ast::ExternCrate::cast(node.clone())
+            .is_some_and(|written| self.has_own_visibility(written.visibility()))
+            && matches!(definition, ItemDefinition::ExternCrate(declaration) if outside.reaches_outside(
                 declaration.visibility(database),
                 declaration.module(database),
             )))
@@ -325,6 +359,28 @@ impl ModuleWalk<'_, '_> {
                 location: self.locate_focus(item.syntax(), origin),
             })
             .collect()
+    }
+
+    fn lint_suppressions(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
+    ) {
+        violations.extend(
+            LintSuppressions {
+                node,
+                options: self.options,
+                semantics: self.semantics,
+            }
+            .attributes()
+            .iter()
+            .filter(|meta| self.token_origin.is_workspace_text(meta.syntax()))
+            .map(|meta| Violation {
+                kind: ViolationKind::LintSuppression,
+                location: self.locate(meta.syntax(), origin),
+            }),
+        );
     }
 
     fn locate(&self, node: &SyntaxNode, origin: &SubtreeOrigin) -> SourceLocation {
@@ -410,20 +466,68 @@ impl ModuleWalk<'_, '_> {
             implementation: definition,
             krate: self.krate,
         })
-        .file()
+        .home()
         {
-            Some(type_file) if type_file == written_in => None,
-            Some(type_file) => Some(Violation {
+            ImplHome::LocalType { file } | ImplHome::LocalTraitBlanket { file }
+                if file == written_in =>
+            {
+                None
+            }
+            ImplHome::LocalType { file } => Some(Violation {
                 kind: ViolationKind::MisplacedImpl {
-                    type_file: self.file_start(type_file).file,
+                    type_file: self.locator.file(file),
                 },
                 location,
             }),
-            None => Some(Violation {
+            ImplHome::LocalTraitBlanket { file } => Some(Violation {
+                kind: ViolationKind::MisplacedBlanketImpl {
+                    trait_file: self.locator.file(file),
+                },
+                location,
+            }),
+            ImplHome::Foreign => Some(Violation {
                 kind: ViolationKind::ImplWithoutLocalType,
                 location,
             }),
         }
+    }
+
+    fn negated_attributes(
+        &self,
+        configured: &ConfiguredNode<'_>,
+        origin: &SubtreeOrigin,
+        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
+    ) {
+        violations.extend(
+            configured
+                .negated_attributes()
+                .iter()
+                .filter(|attribute| !self.token_origin.is_foreign_text(attribute.syntax()))
+                .map(|attribute| Violation {
+                    kind: ViolationKind::NegatedConfiguration,
+                    location: self.locate(attribute.syntax(), origin),
+                }),
+        );
+    }
+
+    fn non_doc_comments(
+        &self,
+        file_id: FileId,
+        root: &SyntaxNode,
+        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
+    ) {
+        violations.extend(
+            root.descendants_with_tokens()
+                .filter_map(NodeOrToken::into_token)
+                .filter_map(ast::Comment::cast)
+                .map(|comment| Violation {
+                    kind: ViolationKind::NonDocComment,
+                    location: self.locator.locate(FileRangeWrapper {
+                        file_id,
+                        range: comment.syntax().text_range(),
+                    }),
+                }),
+        );
     }
 
     fn push_expansion(
@@ -488,6 +592,24 @@ impl ModuleWalk<'_, '_> {
                     kind: ViolationKind::UnresolvedPath,
                     location: self.locate(path.syntax(), origin),
                 });
+            }
+        }
+    }
+
+    fn record_own_tokens(
+        &self,
+        file: HirFileId,
+        tokens: &[SyntaxToken],
+        recorded: &mut WrittenTokens,
+    ) {
+        for token in tokens {
+            let written = self.token_origin.written_range(file, token.text_range());
+
+            if self.token_origin.is_own_file(written.file_id) {
+                recorded.insert(
+                    self.locator.file(written.file_id),
+                    u32::from(written.range.start()),
+                );
             }
         }
     }
@@ -637,18 +759,7 @@ impl ModuleWalk<'_, '_> {
                         options: self.options,
                     };
 
-                    graph.violations.extend(
-                        configured
-                            .negated_attributes()
-                            .iter()
-                            .filter(|attribute| {
-                                !self.token_origin.is_foreign_text(attribute.syntax())
-                            })
-                            .map(|attribute| Violation {
-                                kind: ViolationKind::NegatedConfiguration,
-                                location: self.locate(attribute.syntax(), &subtree.origin),
-                            }),
-                    );
+                    self.negated_attributes(&configured, &subtree.origin, graph);
 
                     let predicate = self.inactive_code.get(&InFile::new(
                         self.semantics.hir_file_for(&node),
@@ -670,20 +781,8 @@ impl ModuleWalk<'_, '_> {
 
                         self.inactive(&node, graph);
                     } else {
-                        graph.violations.extend(
-                            LintSuppressions {
-                                node: &node,
-                                options: self.options,
-                                semantics: self.semantics,
-                            }
-                            .attributes()
-                            .iter()
-                            .filter(|meta| self.token_origin.is_workspace_text(meta.syntax()))
-                            .map(|meta| Violation {
-                                kind: ViolationKind::LintSuppression,
-                                location: self.locate(meta.syntax(), &subtree.origin),
-                            }),
-                        );
+                        self.activate(&node, graph);
+                        self.lint_suppressions(&node, &subtree.origin, graph);
 
                         match ast::Item::cast(node.clone())
                             .map_or(ItemExpansion::Unexpanded, |item| {

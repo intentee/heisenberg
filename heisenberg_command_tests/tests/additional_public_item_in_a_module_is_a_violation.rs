@@ -17,29 +17,24 @@ fn additional_public_item_in_a_module_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: AdditionalPublicItem - src/items.rs:3:8 - Module already has a public item\n\
+        Ok("AdditionalPublicItem: 8 violations\n\
+            Each module exposes a single public item, so every file has one responsibility. Move each additional public item into its own module.\n\
+            \n\
+            - src/items.rs:3:8: Module already has a public item\n    \
             pub fn second() {}\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:5:12 - Module already has a public item\n\
+            - src/items.rs:5:12: Module already has a public item\n    \
             pub static THIRD: u8 = 3;\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:8:14 - Module already has a public item\n\
+            - src/items.rs:8:14: Module already has a public item\n    \
             macro_rules! fourth {\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:21:14 - Module already has a public item\n    \
+            - src/items.rs:21:14: Module already has a public item\n        \
             pub enum AlsoNested {}\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:24:10 - Module already has a public item\n\
+            - src/items.rs:24:10: Module already has a public item\n    \
             pub type Fifth = u8;\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:26:11 - Module already has a public item\n\
+            - src/items.rs:26:11: Module already has a public item\n    \
             pub macro sixth() {}\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:29:17 - Module already has a public item\n    \
+            - src/items.rs:29:17: Module already has a public item\n        \
             pub safe fn abs(value: i32) -> i32;\n\
-            \n\
-            ERROR: AdditionalPublicItem - src/items.rs:32:11 - Module already has a public item\n\
+            - src/items.rs:32:11: Module already has a public item\n    \
             pub union Seventh {\n\
             \n\
             ------------------------------\n\
@@ -47,8 +42,7 @@ fn additional_public_item_in_a_module_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

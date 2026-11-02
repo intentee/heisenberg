@@ -1,0 +1,15 @@
+[package]
+name = "lint_allowed_in_a_manifest"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+too_many_lines = "allow"
+unwrap_used = "deny"
+
+[lints.rust]
+dead_code = "allow"

@@ -17,8 +17,10 @@ fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: UnparsableMacroExpansion - src/lib.rs:1:1 - Macro expansion cannot be parsed\n\
+        Ok("UnparsableMacroExpansion: 1 violation\n\
+            A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust.\n\
+            \n\
+            - src/lib.rs:1:1: Macro expansion cannot be parsed\n    \
             macros::wrapping!();\n\
             \n\
             ------------------------------\n\
@@ -26,8 +28,7 @@ fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["heisenberg/tests/fixtures", "heisenberg_fixtures/workspaces"]
+exclude = ["heisenberg_fixtures/workspaces"]
 members = [
     "heisenberg",
     "heisenberg_absolute_path",
@@ -72,29 +72,16 @@ pedantic = { level = "deny", priority = -1 }
 
 absolute_paths = "deny"
 allow_attributes = "deny"
-cast_possible_truncation = "allow"
-cast_sign_loss = "allow"
 dbg_macro = "deny"
-error_impl_error = "allow"
 expect_used = "deny"
-future_not_send = "allow"
 infinite_loop = "deny"
-literal_string_with_formatting_args = "allow"
-missing_docs_in_private_items = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-module_name_repetitions = "allow"
-needless_pass_by_value = "allow"
 panic = "deny"
 print_stderr = "deny"
 print_stdout = "deny"
 rc_mutex = "deny"
 rest_pat_in_fully_bound_structs = "deny"
 self_named_module_files = "deny"
-significant_drop_tightening = "allow"
 str_to_string = "deny"
-tests_outside_test_module = "allow"
 todo = "deny"
-too_many_lines = "allow"
 unimplemented = "deny"
 unwrap_used = "deny"

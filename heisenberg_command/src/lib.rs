@@ -11,6 +11,7 @@ pub mod inactive_code;
 mod issue;
 mod issue_location;
 mod issue_position;
+mod issue_section;
 mod module_inclusion;
 mod narrowing;
 mod running_analysis;

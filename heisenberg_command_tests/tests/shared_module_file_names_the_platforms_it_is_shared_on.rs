@@ -17,17 +17,17 @@ fn shared_module_file_names_the_platforms_it_is_shared_on() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: SharedModuleFile - tests/gated/mod.rs - Module file belongs to 2 modules\n  \
-            crate::gated in module_file_shared_on_some_platforms example \"demo\"\n  \
+        Ok("SharedModuleFile: 3 violations\n\
+            A file included as several modules has no single owner. Give each module its own file.\n\
+            \n\
+            - tests/gated/mod.rs: Module file belongs to 2 modules\n      \
+            crate::gated in module_file_shared_on_some_platforms example \"demo\"\n      \
             crate::gated in module_file_shared_on_some_platforms test \"first\"\n\
-            \n\
-            ERROR: SharedModuleFile - tests/platform/mod.rs - Module file belongs to 2 modules (only on x86_64-pc-windows-msvc)\n  \
-            crate::platform in module_file_shared_on_some_platforms example \"demo\"\n  \
+            - tests/platform/mod.rs: Module file belongs to 2 modules (only on x86_64-pc-windows-msvc)\n      \
+            crate::platform in module_file_shared_on_some_platforms example \"demo\"\n      \
             crate::platform in module_file_shared_on_some_platforms test \"first\"\n\
-            \n\
-            ERROR: SharedModuleFile - tests/support/mod.rs - Module file belongs to 2 modules\n  \
-            crate::support in module_file_shared_on_some_platforms example \"demo\"\n  \
+            - tests/support/mod.rs: Module file belongs to 2 modules\n      \
+            crate::support in module_file_shared_on_some_platforms example \"demo\"\n      \
             crate::support in module_file_shared_on_some_platforms test \"first\"\n\
             \n\
             ------------------------------\n\
@@ -35,8 +35,7 @@ fn shared_module_file_names_the_platforms_it_is_shared_on() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 3 crate targets, 9 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 6 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

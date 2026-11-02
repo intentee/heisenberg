@@ -25,6 +25,10 @@ pub struct ModuleDependencies<'project> {
 }
 
 impl ModuleDependencies<'_> {
+    /// # Errors
+    ///
+    /// Returns [`ModuleDependenciesError`] when the host does not report its available
+    /// parallelism, or when a name resolution thread cannot be started or panics.
     pub fn extract(&mut self) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         let members = self.members();
 

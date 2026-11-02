@@ -24,6 +24,12 @@ pub enum PackageViolation {
         file: String,
         setting: String,
     },
+    LintAllowedInManifest {
+        lint: String,
+        manifest: String,
+        package: String,
+        tool: String,
+    },
     PackageDependencyCycle {
         manifest: String,
         packages: Vec<String>,
@@ -47,6 +53,7 @@ impl PackageViolation {
             | Self::ClippyTestAllowanceMissing { file, .. }
             | Self::ClippyConfigurationMissing { manifest: file, .. }
             | Self::ClippyLintNotDenied { manifest: file, .. }
+            | Self::LintAllowedInManifest { manifest: file, .. }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
             | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. } => file,
@@ -60,10 +67,41 @@ impl PackageViolation {
             Self::ClippyConfigurationMissing { .. } => "ClippyConfigurationMissing",
             Self::ClippyLintNotDenied { .. } => "ClippyLintNotDenied",
             Self::ClippyTestAllowanceMissing { .. } => "ClippyTestAllowanceMissing",
+            Self::LintAllowedInManifest { .. } => "LintAllowedInManifest",
             Self::PackageDependencyCycle { .. } => "PackageDependencyCycle",
             Self::PackageDependsOnItself { .. } => "PackageDependsOnItself",
             Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
                 "TestsOnlyPackageWithoutTestLibraries"
+            }
+        }
+    }
+
+    #[must_use]
+    pub const fn purpose(&self) -> &'static str {
+        match self {
+            Self::ClippyConfigurationAmbiguous { .. } => {
+                "Clippy reads only one of clippy.toml and .clippy.toml, so keeping both hides which applies. Keep one of them."
+            }
+            Self::ClippyConfigurationMissing { .. } => {
+                "Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart. Add a clippy.toml with the test allowances."
+            }
+            Self::ClippyLintNotDenied { .. } => {
+                "Production code reports failures as typed errors instead of panicking. Deny the lint in the package's [lints.clippy] table."
+            }
+            Self::ClippyTestAllowanceMissing { .. } => {
+                "Tests may fail fast with expect, unwrap and panic. Set the allowance to true in the clippy configuration."
+            }
+            Self::LintAllowedInManifest { .. } => {
+                "Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports."
+            }
+            Self::PackageDependencyCycle { .. } => {
+                "Dev-dependency cycles build a package twice and blur which package owns what. Break the cycle."
+            }
+            Self::PackageDependsOnItself { .. } => {
+                "A package depending on itself is built twice and blurs what it owns. Remove the self-dependency."
+            }
+            Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
+                "A separate tests package is justified only by test-only libraries. Move the tests into the tests directory of the package they test."
             }
         }
     }
@@ -91,6 +129,15 @@ impl Display for PackageViolation {
                     "Clippy configuration does not set {setting} = true"
                 )
             }
+            Self::LintAllowedInManifest {
+                lint,
+                package,
+                tool,
+                ..
+            } => write!(
+                formatter,
+                "Package {package} allows {lint} in its {tool} lints"
+            ),
             Self::PackageDependencyCycle { packages, .. } => write!(
                 formatter,
                 "Packages {} depend on each other through dev-dependencies",

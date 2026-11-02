@@ -17,6 +17,10 @@ pub struct HeisenbergCheck<'check> {
 }
 
 impl HeisenbergCheck<'_> {
+    /// # Errors
+    ///
+    /// Returns [`TestHarnessError::CargoHome`] when `HEISENBERG_CARGO_HOME` cannot be read,
+    /// and [`TestHarnessError::Arguments`] when the arguments are rejected.
     pub fn command(&self, sysroot: &Path) -> Result<HeisenbergCommand, TestHarnessError> {
         env::var(CARGO_HOME_VARIABLE)
             .map_err(TestHarnessError::CargoHome)
@@ -35,10 +39,16 @@ impl HeisenbergCheck<'_> {
             })
     }
 
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::toolchain_command`].
     pub fn run(&self) -> Result<CheckOutcome, TestHarnessError> {
         self.run_in(&BTreeMap::new())
     }
 
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::toolchain_command`].
     pub fn run_in(
         &self,
         environment: &BTreeMap<OsString, OsString>,
@@ -47,6 +57,10 @@ impl HeisenbergCheck<'_> {
             .map(|command| CheckOutcome::of(&command, environment))
     }
 
+    /// # Errors
+    ///
+    /// Returns [`TestHarnessError::Sysroot`] when `HEISENBERG_SYSROOT` cannot be read, and
+    /// the errors of [`Self::command`].
     pub fn toolchain_command(&self) -> Result<HeisenbergCommand, TestHarnessError> {
         env::var(SYSROOT_VARIABLE)
             .map_err(TestHarnessError::Sysroot)

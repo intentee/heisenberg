@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::source_location::SourceLocation;
@@ -14,6 +15,7 @@ use crate::cycle_shape::CycleShape;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::inactive_code::InactiveCode;
 use crate::issue::Issue;
+use crate::issue_section::IssueSection;
 use crate::module_inclusion::ModuleInclusion;
 use crate::shared_file::SharedFile;
 use crate::shared_file_tree::SharedFileTree;
@@ -21,6 +23,34 @@ use crate::target_analysis::TargetAnalysis;
 use crate::violation_occurrences::ViolationOccurrences;
 
 const SEPARATOR: &str = "------------------------------";
+
+fn shared_module_file_issues(
+    shared_files: &BTreeMap<
+        &str,
+        BTreeMap<ModuleInclusion, BTreeMap<SupportedTarget, ModuleFileAnalysis>>,
+    >,
+) -> Vec<Issue> {
+    let tree = SharedFileTree {
+        files: shared_files,
+    };
+    let mut subtrees: BTreeMap<SharedFile<'_>, BTreeSet<String>> = BTreeMap::new();
+
+    for (file, inclusions) in shared_files {
+        let root = tree.root(SharedFile { file, inclusions });
+        let submodule_files = subtrees.entry(root).or_default();
+
+        if root.file != *file {
+            submodule_files.insert((*file).to_owned());
+        }
+    }
+
+    subtrees
+        .into_iter()
+        .map(|(root, submodule_files)| {
+            Issue::new_shared_module_file(root.file, root.inclusions.clone(), submodule_files)
+        })
+        .collect()
+}
 
 pub struct CheckReport {
     pub analyses: Vec<TargetAnalysis>,
@@ -33,9 +63,14 @@ impl CheckReport {
         let issues = self.issues();
         let contexts_by_file = self.contexts_by_file();
         let mut lines: Vec<String> = Vec::new();
+        let mut sections: BTreeMap<&'static str, NonEmpty<&Issue>> = BTreeMap::new();
 
         for issue in &issues {
-            lines.extend(issue.lines(&contexts_by_file));
+            NonEmpty::push_into(&mut sections, issue.issue_type(), issue);
+        }
+
+        for (issue_type, issues) in &sections {
+            lines.extend(IssueSection { issue_type, issues }.lines(&contexts_by_file));
             lines.push(String::new());
         }
 
@@ -178,35 +213,14 @@ impl CheckReport {
                 .map(|(shape, reported)| Issue::new_cycle(shape, reported)),
         );
 
-        let tree = SharedFileTree {
-            files: &shared_files,
-        };
+        issues.extend(shared_module_file_issues(&shared_files));
 
-        let mut subtrees: BTreeMap<SharedFile<'_>, BTreeSet<String>> = BTreeMap::new();
-
-        for (file, inclusions) in &shared_files {
-            let root = tree.root(SharedFile { file, inclusions });
-            let submodule_files = subtrees.entry(root).or_default();
-
-            if root.file != *file {
-                submodule_files.insert((*file).to_owned());
-            }
-        }
-
-        for (root, submodule_files) in subtrees {
-            issues.push(Issue::new_shared_module_file(
-                root.file,
-                root.inclusions.clone(),
-                submodule_files,
-            ));
-        }
-
-        for region in &(InactiveCode {
+        for focus in (InactiveCode {
             analyses: &self.analyses,
         })
-        .regions()
+        .foci()
         {
-            issues.push(Issue::new_inactive_code(region));
+            issues.push(Issue::new_inactive_code(focus));
         }
 
         for violation in &self.package_violations {

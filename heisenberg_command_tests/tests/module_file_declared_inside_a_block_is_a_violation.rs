@@ -17,8 +17,10 @@ fn module_file_declared_inside_a_block_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ModuleFileInsideBlock - src/lib.rs:3:9 - Module file declared inside a block is not analysed\n    \
+        Ok("ModuleFileInsideBlock: 1 violation\n\
+            A module file declared inside a block is outside the analysed module tree. Declare the module at module level.\n\
+            \n\
+            - src/lib.rs:3:9: Module file declared inside a block is not analysed\n        \
             mod hidden;\n\
             \n\
             ------------------------------\n\
@@ -26,8 +28,7 @@ fn module_file_declared_inside_a_block_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

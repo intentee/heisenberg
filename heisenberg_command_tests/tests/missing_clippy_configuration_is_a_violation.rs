@@ -17,16 +17,17 @@ fn missing_clippy_configuration_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ClippyConfigurationMissing - Cargo.toml - Package clippy_configuration_missing has no clippy.toml or .clippy.toml within the workspace\n\
+        Ok("ClippyConfigurationMissing: 1 violation\n\
+            Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart. Add a clippy.toml with the test allowances.\n\
+            \n\
+            - Cargo.toml: Package clippy_configuration_missing has no clippy.toml or .clippy.toml within the workspace\n\
             \n\
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

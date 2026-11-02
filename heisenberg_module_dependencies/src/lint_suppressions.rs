@@ -1,5 +1,4 @@
 use std::convert::Infallible;
-use std::iter::once;
 use std::ops::ControlFlow;
 
 use ra_ap_cfg::CfgOptions;
@@ -14,8 +13,8 @@ use ra_ap_syntax::SyntaxToken;
 use ra_ap_syntax::T;
 use ra_ap_syntax::ast;
 
+use heisenberg_project_model::clippy_lint_selector::ClippyLintSelector;
 use heisenberg_project_model::constants::CLIPPY_DENIED_LINTS;
-use heisenberg_project_model::constants::CLIPPY_DENIED_LINTS_GROUP;
 use heisenberg_project_model::constants::CLIPPY_TOOL;
 
 use crate::visit_active_metas::visit_active_metas;
@@ -43,11 +42,10 @@ fn lint_paths(tree: &ast::TokenTree) -> Vec<Vec<String>> {
 }
 
 fn is_required_lint(path: &[String]) -> bool {
-    CLIPPY_DENIED_LINTS
-        .iter()
-        .flat_map(|lint| once(lint.name).chain(lint.former_names.iter().copied()))
-        .chain(once(CLIPPY_DENIED_LINTS_GROUP))
-        .any(|name| path == [CLIPPY_TOOL, name])
+    matches!(path, [tool, name] if tool == CLIPPY_TOOL
+        && CLIPPY_DENIED_LINTS
+            .iter()
+            .any(|lint| ClippyLintSelector { name }.selects(lint)))
 }
 
 pub struct LintSuppressions<'suppressions, 'database> {

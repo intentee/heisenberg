@@ -17,14 +17,14 @@ fn non_constant_public_item_in_the_constants_module_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: NonConstantInConstantsModule - src/constants.rs:5:12 - Constants module holds a public item that is not a constant\n\
+        Ok("NonConstantInConstantsModule: 3 violations\n\
+            The constants module is the single home of public constants. Move every other public item out of it.\n\
+            \n\
+            - src/constants.rs:5:12: Constants module holds a public item that is not a constant\n    \
             pub struct Unit;\n\
-            \n\
-            ERROR: NonConstantInConstantsModule - src/constants.rs:7:8 - Constants module holds a public item that is not a constant\n\
+            - src/constants.rs:7:8: Constants module holds a public item that is not a constant\n    \
             pub fn helper() -> u8 {\n\
-            \n\
-            ERROR: NonConstantInConstantsModule - src/constants.rs:11:12 - Constants module holds a public item that is not a constant\n\
+            - src/constants.rs:11:12: Constants module holds a public item that is not a constant\n    \
             pub static COUNTER: u8 = 0;\n\
             \n\
             ------------------------------\n\
@@ -32,8 +32,7 @@ fn non_constant_public_item_in_the_constants_module_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

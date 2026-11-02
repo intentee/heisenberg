@@ -6,7 +6,6 @@ use heisenberg_module_cycles::cycle_site::cycle_site;
 use heisenberg_module_cycles::cycle_witness::CycleWitness;
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_cycles::sibling_edge::SiblingEdge;
-use heisenberg_module_graph::inactive_region::InactiveRegion;
 use heisenberg_module_graph::line_position::LinePosition;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
@@ -25,6 +24,8 @@ use crate::narrowing::Narrowing;
 use crate::shared_file_inclusions::SharedFileInclusions;
 use crate::target_narrowing::TargetNarrowing;
 use crate::violation_occurrences::ViolationOccurrences;
+
+const CONTINUATION_INDENT: &str = "    ";
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Issue {
@@ -64,7 +65,7 @@ impl Issue {
     }
 
     #[must_use]
-    pub fn new_inactive_code(InactiveRegion { focus, .. }: &InactiveRegion) -> Self {
+    pub fn new_inactive_code(focus: &SourceLocation) -> Self {
         Self::CodeActiveOnNoTarget {
             focus: focus.clone(),
         }
@@ -171,17 +172,19 @@ impl Issue {
             Self::CodeActiveOnNoTarget { .. } | Self::Package(_) => String::new(),
         };
 
-        iter::once(format!(
-            "ERROR: {} - {location} - {}{narrowing}",
-            self.issue_type(),
-            self.message()
-        ))
-        .chain(match &location.position {
-            IssuePosition::Line(LinePosition { source_line, .. }) => Some(source_line.clone()),
-            IssuePosition::WholeFile => None,
-        })
-        .chain(self.details())
-        .collect()
+        iter::once(format!("- {location}: {}{narrowing}", self.message()))
+            .chain(
+                match &location.position {
+                    IssuePosition::Line(LinePosition { source_line, .. }) => {
+                        Some(source_line.clone())
+                    }
+                    IssuePosition::WholeFile => None,
+                }
+                .into_iter()
+                .chain(self.details())
+                .map(|line| format!("{CONTINUATION_INDENT}{line}")),
+            )
+            .collect()
     }
 
     #[must_use]
@@ -212,6 +215,23 @@ impl Issue {
                 format!("Module file belongs to {} modules", inclusions.len())
             }
             Self::Violation { violation, .. } => violation.kind.to_string(),
+        }
+    }
+
+    #[must_use]
+    pub const fn purpose(&self) -> &'static str {
+        match self {
+            Self::CodeActiveOnNoTarget { .. } => {
+                "Code active on no supported target is never built or analysed. Remove it, or make it active on a supported target."
+            }
+            Self::ModuleCycle { .. } => {
+                "Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers."
+            }
+            Self::Package(violation) => violation.purpose(),
+            Self::SharedModuleFile { .. } => {
+                "A file included as several modules has no single owner. Give each module its own file."
+            }
+            Self::Violation { violation, .. } => violation.kind.purpose(),
         }
     }
 }

@@ -17,11 +17,12 @@ fn public_associated_constant_of_an_inherent_impl_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: PublicAssociatedConstant - src/constants.rs:4:15 - Public associated constant belongs in crate::constants as a free constant\n    \
-            pub const CEILING: u8 = 10;\n\
+        Ok("PublicAssociatedConstant: 2 violations\n\
+            Public constants have a single home, crate::constants. Move the constant there as a free constant.\n\
             \n\
-            ERROR: PublicAssociatedConstant - src/limits.rs:4:15 - Public associated constant belongs in crate::constants as a free constant\n    \
+            - src/constants.rs:4:15: Public associated constant belongs in crate::constants as a free constant\n        \
+            pub const CEILING: u8 = 10;\n\
+            - src/limits.rs:4:15: Public associated constant belongs in crate::constants as a free constant\n        \
             pub const MINIMUM: u8 = 1;\n\
             \n\
             ------------------------------\n\
@@ -29,8 +30,7 @@ fn public_associated_constant_of_an_inherent_impl_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

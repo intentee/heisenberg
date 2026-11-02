@@ -17,8 +17,10 @@ fn missing_module_file_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: UnresolvedModule - src/lib.rs:1:9 - Module file is unresolved\n\
+        Ok("UnresolvedModule: 1 violation\n\
+            Every name must resolve for the analysis to be complete. Create the module file or remove the declaration.\n\
+            \n\
+            - src/lib.rs:1:9: Module file is unresolved\n    \
             pub mod missing;\n\
             \n\
             ------------------------------\n\
@@ -26,8 +28,7 @@ fn missing_module_file_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -17,26 +17,22 @@ fn item_without_a_mapped_definition_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: UnmappedItem - src/lib.rs:3:15 - Item cannot be mapped to its definition\n        \
+        Ok("UnmappedItem: 7 violations\n\
+            An item that cannot be mapped to its definition leaves the analysis incomplete. Write it so it maps to a definition.\n\
+            \n\
+            - src/lib.rs:3:15: Item cannot be mapped to its definition\n            \
             const SIZE: usize = 3;\n\
-            \n\
-            ERROR: UnmappedItem - src/lib.rs:7:22 - Item cannot be mapped to its definition\n        \
+            - src/lib.rs:7:22: Item cannot be mapped to its definition\n            \
             extern crate core as base;\n\
-            \n\
-            ERROR: UnmappedItem - src/lib.rs:11:16 - Item cannot be mapped to its definition\n        \
+            - src/lib.rs:11:16: Item cannot be mapped to its definition\n            \
             struct Count;\n\
-            \n\
-            ERROR: UnmappedItem - src/lib.rs:12:14 - Item cannot be mapped to its definition\n        \
+            - src/lib.rs:12:14: Item cannot be mapped to its definition\n            \
             impl Count {\n\
-            \n\
-            ERROR: UnmappedItem - src/lib.rs:18:13 - Item cannot be mapped to its definition\n        \
+            - src/lib.rs:18:13: Item cannot be mapped to its definition\n            \
             mod widths {\n\
-            \n\
-            ERROR: UnmappedItem - src/lib.rs:26:18 - Item cannot be mapped to its definition\n        \
+            - src/lib.rs:26:18: Item cannot be mapped to its definition\n            \
             const fn total(extra: usize) -> usize {\n\
-            \n\
-            ERROR: UnmappedItem - src/lib.rs:33:15 - Item cannot be mapped to its definition\n        \
+            - src/lib.rs:33:15: Item cannot be mapped to its definition\n            \
             trait Measured {\n\
             \n\
             ------------------------------\n\
@@ -44,8 +40,7 @@ fn item_without_a_mapped_definition_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

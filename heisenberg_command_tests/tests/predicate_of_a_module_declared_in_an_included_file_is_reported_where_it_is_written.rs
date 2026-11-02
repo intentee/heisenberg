@@ -17,8 +17,10 @@ fn predicate_of_a_module_declared_in_an_included_file_is_reported_where_it_is_wr
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: NegatedConfiguration - src/limits.rs:1:1 - Configuration predicate negates a feature, test or debug_assertions\n\
+        Ok("NegatedConfiguration: 1 violation\n\
+            Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
+            \n\
+            - src/limits.rs:1:1: Configuration predicate negates a feature, test or debug_assertions\n    \
             #![cfg_attr(not(test), allow(dead_code))]\n\
             \n\
             ------------------------------\n\
@@ -26,8 +28,7 @@ fn predicate_of_a_module_declared_in_an_included_file_is_reported_where_it_is_wr
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

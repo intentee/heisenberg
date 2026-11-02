@@ -17,7 +17,10 @@ fn glob_import_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ERROR: GlobImport - src/lib.rs:3:5 - Glob import\n\
+        Ok("GlobImport: 1 violation\n\
+            Glob imports hide where names come from. Import each name explicitly.\n\
+            \n\
+            - src/lib.rs:3:5: Glob import\n    \
             use inner::*;\n\
             \n\
             ------------------------------\n\

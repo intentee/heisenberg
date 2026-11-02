@@ -40,6 +40,10 @@ pub struct ResolvedProject {
 }
 
 impl ResolvedProject {
+    /// # Errors
+    ///
+    /// Returns [`ProjectModelError`] when the cfg tables, the metadata documents or the
+    /// rust-analyzer workspace of `target` cannot be built.
     pub fn load(&self, target: SupportedTarget) -> Result<LoadedProject, ProjectModelError> {
         TargetCfg::parse(target).and_then(
             |TargetCfg {

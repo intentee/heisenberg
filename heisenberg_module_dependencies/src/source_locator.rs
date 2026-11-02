@@ -1,8 +1,12 @@
 use ra_ap_hir::FileRangeWrapper;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::SourceDatabase;
+use ra_ap_ide_db::line_index;
+use ra_ap_ide_db::line_index::LineCol;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_paths::Utf8Path;
+use ra_ap_syntax::TextRange;
+use ra_ap_syntax::TextSize;
 use ra_ap_vfs::FileId;
 use ra_ap_vfs::Vfs;
 
@@ -17,39 +21,32 @@ pub struct SourceLocator<'project> {
 }
 
 impl SourceLocator<'_> {
+    pub fn file(&self, file_id: FileId) -> String {
+        WorkspacePath {
+            root: AsRef::<Utf8Path>::as_ref(self.workspace_root),
+        }
+        .relative(Utf8Path::new(&self.vfs.file_path(file_id).to_string()))
+    }
+
     pub fn locate(
         &self,
         FileRangeWrapper { file_id, range }: FileRangeWrapper<FileId>,
     ) -> SourceLocation {
-        let file_path = self.vfs.file_path(file_id).to_string();
         let text = self.database.file_text(file_id).text(self.database);
-        let start = usize::from(range.start());
-        let mut line: u32 = 1;
-        let mut column: u32 = 1;
-
-        for (_, character) in text
-            .char_indices()
-            .take_while(|(offset, _)| *offset < start)
-        {
-            if character == '\n' {
-                line += 1;
-                column = 1;
-            } else {
-                column += 1;
-            }
-        }
+        let offset = range.start();
+        let LineCol { line, col } = line_index(self.database, file_id).line_col(offset);
+        let line_start = offset - TextSize::from(col);
 
         SourceLocation {
-            file: WorkspacePath {
-                root: AsRef::<Utf8Path>::as_ref(self.workspace_root),
-            }
-            .relative(Utf8Path::new(&file_path)),
+            file: self.file(file_id),
             position: LinePosition {
-                column,
-                line,
-                source_line: text
+                column: text[TextRange::new(line_start, offset)]
+                    .chars()
+                    .fold(1, |column, _| column + 1),
+                line: line + 1,
+                source_line: text[usize::from(line_start)..]
                     .lines()
-                    .nth(line as usize - 1)
+                    .next()
                     .unwrap_or_default()
                     .to_owned(),
             },

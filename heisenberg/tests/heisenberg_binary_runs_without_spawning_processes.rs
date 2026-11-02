@@ -1,36 +1,28 @@
-use std::env;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use std::str;
+
+use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
+use heisenberg_test_harness::heisenberg_binary::HeisenbergBinary;
 
 #[test]
 fn heisenberg_binary_runs_without_spawning_processes() {
-    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures");
+    let fixture = FixtureWorkspace {
+        name: "process_free_check",
+    }
+    .path();
     let cargo_home = Path::new(env!("CARGO_TARGET_TMPDIR")).join("cargo_home");
 
     fs::create_dir_all(&cargo_home).expect("the cargo home must be created");
 
-    let mut command = Command::new(env!("CARGO_BIN_EXE_heisenberg"));
-
-    command.env_clear().env("PATH", "");
-
-    if let Some(profile_file) = env::var_os("LLVM_PROFILE_FILE") {
-        command.env("LLVM_PROFILE_FILE", profile_file);
+    let output = HeisenbergBinary {
+        cargo_home: &cargo_home,
+        executable: Path::new(env!("CARGO_BIN_EXE_heisenberg")),
+        sysroot: &fixture.join("sysroot"),
+        workspace: &fixture.join("workspace"),
     }
-
-    let output = command
-        .arg("check")
-        .arg("--cargo-home")
-        .arg(&cargo_home)
-        .arg("--sysroot")
-        .arg(fixtures.join("sysroot"))
-        .arg("--workspace")
-        .arg(fixtures.join("workspace"))
-        .output()
-        .expect("the heisenberg binary must start");
+    .run()
+    .expect("the heisenberg binary must start");
 
     assert_eq!(str::from_utf8(&output.stderr), Ok(""));
     assert_eq!(

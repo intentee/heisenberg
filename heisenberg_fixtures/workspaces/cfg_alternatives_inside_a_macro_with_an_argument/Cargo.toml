@@ -1,0 +1,11 @@
+[package]
+name = "cfg_alternatives_inside_a_macro_with_an_argument"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

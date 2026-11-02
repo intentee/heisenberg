@@ -11,6 +11,9 @@ pub struct AnalysisThreads<'scope, 'environment> {
 }
 
 impl<'scope> AnalysisThreads<'scope, '_> {
+    /// # Errors
+    ///
+    /// Returns [`AnalysisThreadsError::Spawn`] when the operating system cannot start the thread.
     pub fn spawn<TResult: Send + 'scope>(
         &self,
         work: impl FnOnce() -> TResult + Send + 'scope,

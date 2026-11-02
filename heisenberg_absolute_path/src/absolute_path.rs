@@ -9,6 +9,9 @@ pub struct AbsolutePath {
 }
 
 impl AbsolutePath {
+    /// # Errors
+    ///
+    /// Returns [`AbsolutePathError::RelativePath`] when `value` is not an absolute path.
     pub fn parse(value: &str) -> Result<Self, AbsolutePathError> {
         AbsPathBuf::try_from(Utf8PathBuf::from(value))
             .map(|path| Self { path })

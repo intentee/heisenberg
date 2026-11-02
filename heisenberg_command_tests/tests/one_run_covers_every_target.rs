@@ -17,23 +17,24 @@ fn one_run_covers_every_target() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ModuleCycle - src/first.rs:4:24 - Parts of crate depend on each other\n    \
-            pub fn second() -> crate::second::Second {\n  \
-            crate::first -> crate::second:\n    \
-            crate::first uses crate::second at src/first.rs:4:24\n    \
-            crate::first uses crate::second at src/first.rs:5:9\n  \
-            crate::second -> crate::first:\n    \
-            crate::second uses crate::first at src/second.rs:4:23\n    \
-            crate::second uses crate::first at src/second.rs:5:9\n\
+        Ok("ModuleCycle: 2 violations\n\
+            Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
-            ERROR: ModuleCycle - src/fourth.rs:4:23 - Parts of crate depend on each other\n    \
-            pub fn third() -> crate::third::Third {\n  \
-            crate::fourth -> crate::third:\n    \
-            crate::fourth uses crate::third at src/fourth.rs:4:23\n    \
-            crate::fourth uses crate::third at src/fourth.rs:5:9\n  \
-            crate::third -> crate::fourth:\n    \
-            crate::third uses crate::fourth at src/third.rs:4:24\n    \
+            - src/first.rs:4:24: Parts of crate depend on each other\n        \
+            pub fn second() -> crate::second::Second {\n      \
+            crate::first -> crate::second:\n        \
+            crate::first uses crate::second at src/first.rs:4:24\n        \
+            crate::first uses crate::second at src/first.rs:5:9\n      \
+            crate::second -> crate::first:\n        \
+            crate::second uses crate::first at src/second.rs:4:23\n        \
+            crate::second uses crate::first at src/second.rs:5:9\n\
+            - src/fourth.rs:4:23: Parts of crate depend on each other\n        \
+            pub fn third() -> crate::third::Third {\n      \
+            crate::fourth -> crate::third:\n        \
+            crate::fourth uses crate::third at src/fourth.rs:4:23\n        \
+            crate::fourth uses crate::third at src/fourth.rs:5:9\n      \
+            crate::third -> crate::fourth:\n        \
+            crate::third uses crate::fourth at src/third.rs:4:24\n        \
             crate::third uses crate::fourth at src/third.rs:5:9\n\
             \n\
             ------------------------------\n\
@@ -41,8 +42,7 @@ fn one_run_covers_every_target() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 5 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

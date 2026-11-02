@@ -24,6 +24,11 @@ pub struct ProjectModel {
 }
 
 impl ProjectModel {
+    /// # Errors
+    ///
+    /// Returns [`ProjectModelError`] when the environment, the cargo workspace, its
+    /// dependencies, its crate roots or the standard library cannot be resolved the way
+    /// the analysis requires.
     pub fn resolve(&self) -> Result<ResolvedProject, ProjectModelError> {
         let environment = utf8_environment(&self.environment)?;
         let project = CargoPackages {
@@ -33,14 +38,6 @@ impl ProjectModel {
             workspace_directory: &self.workspace_directory,
         }
         .resolve()?;
-
-        if project.workspace.root != self.workspace_directory {
-            return Err(ProjectModelError::NotTheWorkspaceRoot {
-                workspace_directory: self.workspace_directory.clone().into(),
-                workspace_root: project.workspace.root.into(),
-            });
-        }
-
         let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
 
         for MemberTarget { crate_target, root } in &project.member_targets {

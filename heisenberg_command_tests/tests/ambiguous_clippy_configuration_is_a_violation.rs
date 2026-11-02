@@ -17,16 +17,17 @@ fn ambiguous_clippy_configuration_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(
-            "ERROR: ClippyConfigurationAmbiguous - clippy.toml - Directory holds both clippy.toml and .clippy.toml\n\
+        Ok("ClippyConfigurationAmbiguous: 1 violation\n\
+            Clippy reads only one of clippy.toml and .clippy.toml, so keeping both hides which applies. Keep one of them.\n\
+            \n\
+            - clippy.toml: Directory holds both clippy.toml and .clippy.toml\n\
             \n\
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
-        )
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

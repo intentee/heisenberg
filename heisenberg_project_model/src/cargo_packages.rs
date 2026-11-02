@@ -62,6 +62,15 @@ impl CargoPackages<'_> {
             }
         })?;
 
+        if self.role == CargoWorkspaceRole::Project
+            && workspace.root() != AsRef::<Path>::as_ref(self.workspace_directory)
+        {
+            return Err(ProjectModelError::NotTheWorkspaceRoot {
+                workspace_directory: self.workspace_directory.to_path_buf().into(),
+                workspace_root: workspace.root().to_path_buf(),
+            });
+        }
+
         if let Some(member) = workspace
             .members()
             .find(|member| !member.root().starts_with(workspace.root()))
