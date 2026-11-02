@@ -10,3 +10,6 @@ rust-version = "1"
 expect_used = "deny"
 panic = "deny"
 unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]

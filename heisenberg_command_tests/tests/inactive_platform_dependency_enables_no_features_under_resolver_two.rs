@@ -33,7 +33,7 @@ fn inactive_platform_dependency_enables_no_features_under_resolver_two() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

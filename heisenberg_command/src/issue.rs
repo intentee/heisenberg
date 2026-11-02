@@ -32,6 +32,10 @@ pub enum Issue {
     CodeActiveOnNoTarget {
         focus: SourceLocation,
     },
+    DuplicatedFunctionBody {
+        copies: NonEmpty<SourceLocation>,
+        targets: BTreeSet<SupportedTarget>,
+    },
     ModuleCycle {
         container: ModulePath,
         reported: BTreeSet<AnalysisContext>,
@@ -61,6 +65,20 @@ impl Issue {
             container: container.clone(),
             reported,
             witnesses: witnesses.clone(),
+        }
+    }
+
+    #[must_use]
+    pub fn new_duplicated_function_body(
+        NonEmpty { first, others }: &NonEmpty<&SourceLocation>,
+        targets: BTreeSet<SupportedTarget>,
+    ) -> Self {
+        Self::DuplicatedFunctionBody {
+            copies: NonEmpty {
+                first: (*first).clone(),
+                others: others.iter().map(|copy| (*copy).clone()).collect(),
+            },
+            targets,
         }
     }
 
@@ -117,6 +135,11 @@ impl Issue {
                     },
                 )
                 .collect(),
+            Self::DuplicatedFunctionBody { copies, .. } => copies
+                .others
+                .iter()
+                .map(|copy| format!("  duplicate at {copy}"))
+                .collect(),
             Self::SharedModuleFile { inclusions, .. } => inclusions.lines(),
             Self::Violation {
                 occurrences: ViolationOccurrences { folded, .. },
@@ -133,6 +156,7 @@ impl Issue {
     pub const fn issue_type(&self) -> &'static str {
         match self {
             Self::CodeActiveOnNoTarget { .. } => "CodeActiveOnNoTarget",
+            Self::DuplicatedFunctionBody { .. } => "DuplicatedFunctionBody",
             Self::ModuleCycle { .. } => "ModuleCycle",
             Self::Package(violation) => violation.issue_type(),
             Self::SharedModuleFile { .. } => "SharedModuleFile",
@@ -169,6 +193,14 @@ impl Issue {
                 }
                 .to_string()
             }
+            Self::DuplicatedFunctionBody { targets, .. } => TargetNarrowing {
+                all: &analysed
+                    .map(|AnalysisContext { target, .. }| *target)
+                    .chain(targets.iter().copied())
+                    .collect(),
+                targets,
+            }
+            .to_string(),
             Self::CodeActiveOnNoTarget { .. } | Self::Package(_) => String::new(),
         };
 
@@ -191,6 +223,9 @@ impl Issue {
     pub fn location(&self) -> IssueLocation {
         match self {
             Self::CodeActiveOnNoTarget { focus } => IssueLocation::new_position(focus),
+            Self::DuplicatedFunctionBody { copies, .. } => {
+                IssueLocation::new_position(&copies.first)
+            }
             Self::ModuleCycle { witnesses, .. } => {
                 IssueLocation::new_position(cycle_site(witnesses))
             }
@@ -203,7 +238,8 @@ impl Issue {
     #[must_use]
     pub fn message(&self) -> String {
         match self {
-            Self::CodeActiveOnNoTarget { .. } => "Code is active on no supported target".to_owned(),
+            Self::CodeActiveOnNoTarget { .. } => "Code is active on no declared target".to_owned(),
+            Self::DuplicatedFunctionBody { .. } => "Function body is duplicated".to_owned(),
             Self::ModuleCycle { container, .. } => {
                 format!("Parts of {container} depend on each other")
             }
@@ -222,7 +258,10 @@ impl Issue {
     pub const fn purpose(&self) -> &'static str {
         match self {
             Self::CodeActiveOnNoTarget { .. } => {
-                "Code active on no supported target is never built or analysed. Remove it, or make it active on a supported target."
+                "Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target."
+            }
+            Self::DuplicatedFunctionBody { .. } => {
+                "Duplicated code drifts apart when one copy changes. Keep one function and call it from every place that needs it."
             }
             Self::ModuleCycle { .. } => {
                 "Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers."

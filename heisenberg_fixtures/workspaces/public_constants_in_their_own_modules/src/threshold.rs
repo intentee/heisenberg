@@ -1,0 +1,1 @@
+pub const ALPHA_MASK_THRESHOLD: f32 = 0.5;

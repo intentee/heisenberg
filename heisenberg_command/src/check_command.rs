@@ -17,11 +17,12 @@ use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
 use heisenberg_project_model::constants::CARGO_MANIFEST_FILE;
-use heisenberg_project_model::constants::SUPPORTED_TARGETS;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::project_model_error::ProjectModelError;
+use heisenberg_project_model::resolved_project::ResolvedProject;
+use heisenberg_project_model::supported_target::SupportedTarget;
 
 use crate::check_report::CheckReport;
 use crate::constants::SUPPORTED_RUST_VERSION;
@@ -31,6 +32,37 @@ use crate::target_analysis::TargetAnalysis;
 
 fn project_model_failure(error: ProjectModelError) -> Vec<HeisenbergCommandError> {
     vec![HeisenbergCommandError::ProjectModel(error)]
+}
+
+fn analysed(
+    project: &ResolvedProject,
+    target: SupportedTarget,
+) -> Result<TargetAnalysis, HeisenbergCommandError> {
+    project
+        .load(target)
+        .map_err(Box::new)
+        .map_err(error_context(
+            target,
+            HeisenbergCommandError::TargetProjectModel,
+        ))
+        .and_then(|mut loaded| {
+            ModuleDependencies {
+                project: &mut loaded,
+            }
+            .extract()
+            .map_err(error_context(
+                target,
+                HeisenbergCommandError::ModuleDependencies,
+            ))
+        })
+        .map(|graphs| TargetAnalysis {
+            cycles: graphs
+                .iter()
+                .flat_map(|graph| ModuleCycles { graph }.find())
+                .collect(),
+            graphs,
+            target,
+        })
 }
 
 fn empty_libraries(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
@@ -54,6 +86,26 @@ fn empty_libraries(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
         .into_iter()
         .filter(|(_, is_empty)| *is_empty)
         .map(|(package, _)| package.to_owned())
+        .collect()
+}
+
+fn joined(
+    running: Vec<Result<RunningAnalysis<'_>, HeisenbergCommandError>>,
+) -> Vec<Result<TargetAnalysis, HeisenbergCommandError>> {
+    running
+        .into_iter()
+        .map(|analysis| {
+            analysis.and_then(|RunningAnalysis { handle, target }| {
+                handle
+                    .join()
+                    .map_err(PanicPayload)
+                    .map_err(error_context(
+                        target,
+                        HeisenbergCommandError::AnalysisPanicked,
+                    ))
+                    .and_then(identity)
+            })
+        })
         .collect()
 }
 
@@ -107,56 +159,22 @@ impl CheckCommand {
             scope(|scope| {
                 let threads = AnalysisThreads { scope };
 
-                SUPPORTED_TARGETS
-                    .map(|target| {
-                        threads
-                            .spawn(move || {
-                                project
-                                    .load(target)
-                                    .map_err(Box::new)
-                                    .map_err(error_context(
-                                        target,
-                                        HeisenbergCommandError::TargetProjectModel,
-                                    ))
-                                    .and_then(|mut loaded| {
-                                        ModuleDependencies {
-                                            project: &mut loaded,
-                                        }
-                                        .extract()
-                                        .map_err(
-                                            error_context(
-                                                target,
-                                                HeisenbergCommandError::ModuleDependencies,
-                                            ),
-                                        )
-                                    })
-                                    .map(|graphs| TargetAnalysis {
-                                        cycles: graphs
-                                            .iter()
-                                            .flat_map(|graph| ModuleCycles { graph }.find())
-                                            .collect(),
-                                        graphs,
-                                        target,
-                                    })
-                            })
-                            .map_err(error_context(
-                                target,
-                                HeisenbergCommandError::AnalysisThread,
-                            ))
-                            .map(|handle| RunningAnalysis { handle, target })
-                    })
-                    .map(|analysis| {
-                        analysis.and_then(|RunningAnalysis { handle, target }| {
-                            handle
-                                .join()
-                                .map_err(PanicPayload)
+                joined(
+                    project
+                        .targets
+                        .iter()
+                        .copied()
+                        .map(|target| {
+                            threads
+                                .spawn(move || analysed(project, target))
                                 .map_err(error_context(
                                     target,
-                                    HeisenbergCommandError::AnalysisPanicked,
+                                    HeisenbergCommandError::AnalysisThread,
                                 ))
-                                .and_then(identity)
+                                .map(|handle| RunningAnalysis { handle, target })
                         })
-                    })
+                        .collect(),
+                )
             })
             .into_iter()
             .partition_result();

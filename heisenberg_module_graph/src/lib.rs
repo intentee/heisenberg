@@ -5,6 +5,7 @@ pub mod crate_target;
 pub mod crate_target_kind;
 pub mod folded_finding;
 pub mod folded_finding_kind;
+pub mod function_body;
 pub mod inactive_focus;
 pub mod line_position;
 pub mod module_dependency;

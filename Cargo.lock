@@ -2515,6 +2515,7 @@ dependencies = [
  "ra_ap_paths",
  "ra_ap_project_model",
  "ra_ap_vfs",
+ "serde",
  "serde_json",
  "thiserror",
  "toml",

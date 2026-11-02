@@ -6,6 +6,6 @@ impl First {
     }
 
     pub fn third() -> crate::third::Third {
-        crate::third::Third
+        crate::second::Second::third()
     }
 }

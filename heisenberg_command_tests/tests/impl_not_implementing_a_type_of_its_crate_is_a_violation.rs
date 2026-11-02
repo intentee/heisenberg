@@ -18,11 +18,11 @@ fn impl_not_implementing_a_type_of_its_crate_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ImplWithoutLocalType: 2 violations\n\
-            Behavior belongs with the type that owns it, so impls do not extend foreign types. Implement for a type of this crate, or write a blanket impl beside its trait.\n\
+            Behavior belongs with the type or trait that owns it, so impls do not extend foreign types. Implement it for a type of this crate, convert from a type of this crate, or write a blanket or trait-object impl beside its trait.\n\
             \n\
-            - src/greeting.rs:5:19: Impl block does not implement a struct, enum or union of this crate\n    \
+            - src/greeting.rs:5:19: Impl block belongs to no type or trait of this crate\n    \
             impl Greeting for String {\n\
-            - src/local.rs:11:19: Impl block does not implement a struct, enum or union of this crate\n    \
+            - src/local.rs:11:19: Impl block belongs to no type or trait of this crate\n    \
             impl Greeting for Vec<Local> {\n\
             \n\
             ------------------------------\n\
@@ -30,7 +30,7 @@ fn impl_not_implementing_a_type_of_its_crate_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -17,24 +17,19 @@ fn negated_predicate_of_a_configured_out_module_file_is_reported_at_its_declarat
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("CodeActiveOnNoTarget: 1 violation\n\
-            Code active on no supported target is never built or analysed. Remove it, or make it active on a supported target.\n\
-            \n\
-            - src/lib.rs:1:9: Code is active on no supported target\n    \
-            pub mod gated;\n\
-            \n\
-            NegatedConfiguration: 1 violation\n\
+        Ok("NegatedConfiguration: 1 violation\n\
             Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
             \n\
             - src/lib.rs:1:9: Configuration predicate negates a feature, test or debug_assertions\n    \
-            pub mod gated;\n\
+            pub mod gated;\n      \
+            code active on no declared target at src/lib.rs:1:9\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            1 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

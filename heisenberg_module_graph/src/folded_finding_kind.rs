@@ -2,4 +2,5 @@
 pub enum FoldedFindingKind {
     FailingExpansion,
     ImplBlock,
+    InactiveCode,
 }

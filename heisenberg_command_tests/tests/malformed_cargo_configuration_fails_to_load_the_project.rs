@@ -27,7 +27,7 @@ fn malformed_cargo_configuration_fails_to_load_the_project() {
              |\n\
              1 | [build\n  \
              |       ^\n\
-             unclosed table, expected `]`\n\n",
+             unclosed table, expected `]`\n",
             workspace.join("Cargo.toml").display(),
             workspace.join(".cargo").join("config.toml").display()
         )

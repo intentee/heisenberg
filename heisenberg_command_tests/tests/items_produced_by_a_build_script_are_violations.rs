@@ -18,11 +18,11 @@ fn items_produced_by_a_build_script_are_violations() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("CodeActiveOnNoTarget: 2 violations\n\
-            Code active on no supported target is never built or analysed. Remove it, or make it active on a supported target.\n\
+            Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target.\n\
             \n\
-            - src/lib.rs:5:9: Code is active on no supported target\n    \
+            - src/lib.rs:5:9: Code is active on no declared target\n    \
             pub mod configured {\n\
-            - src/lib.rs:10:14: Code is active on no supported target\n    \
+            - src/lib.rs:10:14: Code is active on no declared target\n    \
             macro_rules! configured_macro {\n\
             \n\
             FailedMacroExpansion: 1 violation\n\
@@ -59,7 +59,7 @@ fn items_produced_by_a_build_script_are_violations() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

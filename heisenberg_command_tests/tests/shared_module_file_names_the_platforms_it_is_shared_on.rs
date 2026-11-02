@@ -35,7 +35,7 @@ fn shared_module_file_names_the_platforms_it_is_shared_on() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 3 crate targets, 9 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 6 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -37,6 +38,7 @@ pub struct ResolvedProject {
     pub library: FeatureGraph,
     pub project: FeatureGraph,
     pub sysroot: AbsPathBuf,
+    pub targets: BTreeSet<SupportedTarget>,
 }
 
 impl ResolvedProject {
@@ -67,6 +69,7 @@ impl ResolvedProject {
     ) -> Result<CargoWorkspace, ProjectModelError> {
         self.project
             .build(StandardFeatures::All, platform)
+            .map_err(Box::new)
             .map_err(ProjectModelError::ProjectFeatureResolution)
             .and_then(|build| {
                 self.project
@@ -177,6 +180,7 @@ impl ResolvedProject {
 
         self.library
             .build(StandardFeatures::Default, platform)
+            .map_err(Box::new)
             .map_err(ProjectModelError::LibraryFeatureResolution)
             .and_then(|build| {
                 self.library

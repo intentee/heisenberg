@@ -3,9 +3,13 @@ use std::collections::BTreeSet;
 
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
+use heisenberg_module_graph::folded_finding::FoldedFinding;
+use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
+use heisenberg_module_graph::function_body::FunctionBody;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
+use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::supported_target::SupportedTarget;
 
@@ -20,6 +24,8 @@ use crate::module_inclusion::ModuleInclusion;
 use crate::shared_file::SharedFile;
 use crate::shared_file_tree::SharedFileTree;
 use crate::target_analysis::TargetAnalysis;
+use crate::target_fingerprint::TargetFingerprint;
+use crate::target_function_body::TargetFunctionBody;
 use crate::violation_occurrences::ViolationOccurrences;
 
 const SEPARATOR: &str = "------------------------------";
@@ -97,7 +103,7 @@ impl CheckReport {
                 }),
         );
         lines.push(format!(
-            "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace for every supported target"
+            "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace for every declared target"
         ));
 
         lines.join("\n") + "\n"
@@ -130,6 +136,92 @@ impl CheckReport {
         }
 
         contexts_by_file
+    }
+
+    fn duplicated_function_body_issues(&self) -> Vec<Issue> {
+        let bodies: BTreeSet<TargetFunctionBody<'_>> = self
+            .analyses
+            .iter()
+            .flat_map(|TargetAnalysis { graphs, target, .. }| {
+                graphs
+                    .iter()
+                    .flat_map(|graph| &graph.function_bodies)
+                    .map(|body| TargetFunctionBody {
+                        body,
+                        target: *target,
+                    })
+            })
+            .collect();
+        let mut copies: BTreeMap<TargetFingerprint<'_>, NonEmpty<&SourceLocation>> =
+            BTreeMap::new();
+
+        for TargetFunctionBody {
+            body:
+                FunctionBody {
+                    fingerprint,
+                    location,
+                },
+            target,
+        } in &bodies
+        {
+            NonEmpty::push_into(
+                &mut copies,
+                TargetFingerprint {
+                    fingerprint,
+                    target: *target,
+                },
+                location,
+            );
+        }
+
+        let mut duplicates: BTreeMap<&NonEmpty<&SourceLocation>, BTreeSet<SupportedTarget>> =
+            BTreeMap::new();
+
+        for (TargetFingerprint { target, .. }, group) in &copies {
+            if !group.others.is_empty() {
+                duplicates.entry(group).or_default().insert(*target);
+            }
+        }
+
+        duplicates
+            .into_iter()
+            .map(|(group, targets)| Issue::new_duplicated_function_body(group, targets))
+            .collect()
+    }
+
+    fn inactive_code_issues<'report>(
+        &'report self,
+        violations: &mut BTreeMap<&'report Violation, ViolationOccurrences>,
+    ) -> Vec<Issue> {
+        let mut issues = Vec::new();
+
+        for (focus, negations) in (InactiveCode {
+            analyses: &self.analyses,
+        })
+        .foci()
+        {
+            let negated: Vec<&mut ViolationOccurrences> = violations
+                .iter_mut()
+                .filter(|(violation, _)| {
+                    violation.kind == ViolationKind::NegatedConfiguration
+                        && negations.contains(&&violation.location)
+                })
+                .map(|(_, occurrences)| occurrences)
+                .collect();
+
+            if negated.is_empty() {
+                issues.push(Issue::new_inactive_code(focus));
+            }
+
+            for occurrences in negated {
+                occurrences.folded.insert(FoldedFinding {
+                    kind: FoldedFindingKind::InactiveCode,
+                    location: focus.clone(),
+                });
+            }
+        }
+
+        issues
     }
 
     fn issues(&self) -> Vec<Issue> {
@@ -203,6 +295,8 @@ impl CheckReport {
 
         let mut issues = Vec::new();
 
+        issues.extend(self.inactive_code_issues(&mut violations));
+
         for (violation, occurrences) in violations {
             issues.push(Issue::new_violation(violation, occurrences));
         }
@@ -214,14 +308,7 @@ impl CheckReport {
         );
 
         issues.extend(shared_module_file_issues(&shared_files));
-
-        for focus in (InactiveCode {
-            analyses: &self.analyses,
-        })
-        .foci()
-        {
-            issues.push(Issue::new_inactive_code(focus));
-        }
+        issues.extend(self.duplicated_function_body_issues());
 
         for violation in &self.package_violations {
             issues.push(Issue::new_package(violation));

@@ -32,7 +32,7 @@ fn path_resolved_inside_a_dependency_macro_closes_a_cycle_at_the_call() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 4 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

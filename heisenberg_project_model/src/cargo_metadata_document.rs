@@ -8,12 +8,15 @@ use cargo::workspace::Target;
 use cargo::workspace::Workspace;
 use serde_json::from_value;
 use serde_json::to_value;
+use toml::Table;
+use toml::Value;
 
 use heisenberg_error_context::error_context::error_context;
 
 use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::dependency_document::DependencyDocument;
 use crate::dependency_kind_document::DependencyKindDocument;
+use crate::lints_source::LintsSource;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::workspace_document::WorkspaceDocument;
@@ -62,6 +65,16 @@ impl CargoMetadataDocument<'_, '_> {
                                 .as_ref()
                                 .map(|lints| lints.lints.clone())
                                 .unwrap_or_default(),
+                            lints_source: if package
+                                .manifest()
+                                .original_toml()
+                                .and_then(|original| original.lints.as_ref())
+                                .is_some_and(|lints| lints.workspace)
+                            {
+                                LintsSource::Workspace
+                            } else {
+                                LintsSource::Package
+                            },
                             metadata,
                         })
                     })
@@ -92,6 +105,11 @@ impl CargoMetadataDocument<'_, '_> {
                     .members()
                     .map(|member| member.package_id().to_spec().to_string())
                     .collect(),
+                metadata: self
+                    .workspace
+                    .custom_metadata()
+                    .cloned()
+                    .unwrap_or_else(|| Value::Table(Table::new())),
                 root,
                 target_directory,
             })

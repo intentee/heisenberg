@@ -20,9 +20,34 @@ use crate::constants::CARGO_ENVIRONMENT_TABLE;
 use crate::constants::CLIPPY_ARGUMENTS_VARIABLE;
 use crate::constants::CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE;
 use crate::constants::NIGHTLY_BOOTSTRAP_VARIABLE;
+use crate::constants::SUPPORTED_TARGETS;
+use crate::supported_target::SupportedTarget;
 
 #[derive(Debug, Error)]
 pub enum ProjectModelError {
+    #[error("`{manifest_path}` declares the target `{target}` more than once")]
+    DuplicateTarget {
+        manifest_path: AbsPathBuf,
+        target: String,
+    },
+    #[error("the [workspace.metadata.heisenberg] settings of `{manifest_path}` are invalid")]
+    HeisenbergSettingsInvalid {
+        manifest_path: AbsPathBuf,
+        #[source]
+        source: Box<de::Error>,
+    },
+    #[error("`{manifest_path}` declares no [workspace.metadata.heisenberg] settings")]
+    HeisenbergSettingsMissing { manifest_path: AbsPathBuf },
+    #[error("`{manifest_path}` declares no targets in [workspace.metadata.heisenberg]")]
+    NoTargets { manifest_path: AbsPathBuf },
+    #[error(
+        "`{target}` in `{manifest_path}` is not a supported target; the supported targets are {}",
+        SUPPORTED_TARGETS.map(SupportedTarget::triple).join(", ")
+    )]
+    UnknownTarget {
+        manifest_path: AbsPathBuf,
+        target: String,
+    },
     #[error("the cargo configuration of `{manifest_path}` cannot be loaded")]
     CargoConfiguration {
         manifest_path: PathBuf,
@@ -52,7 +77,7 @@ pub enum ProjectModelError {
     ClippyConfigurationInvalid {
         path: PathBuf,
         #[source]
-        source: de::Error,
+        source: Box<de::Error>,
     },
     #[error("the clippy configuration `{path}` cannot be read")]
     ClippyConfigurationUnreadable {
@@ -117,11 +142,11 @@ pub enum ProjectModelError {
     )]
     LibraryCfgTable(#[source] ParseError),
     #[error("guppy cannot resolve the standard library features for the target")]
-    LibraryFeatureResolution(#[source] errors::Error),
+    LibraryFeatureResolution(#[source] Box<errors::Error>),
     #[error("cargo_metadata rejects the standard library metadata document built for the target")]
     LibraryMetadata(#[source] error::Error),
     #[error("guppy rejects the standard library metadata document")]
-    LibraryPackageGraph(#[source] errors::Error),
+    LibraryPackageGraph(#[source] Box<errors::Error>),
     #[error("rust-analyzer rejects the standard library rust-project.json document")]
     LibraryProjectJson(#[source] error::Error),
     #[error("rust-analyzer returns no standard library workspace for `{library_directory}`")]
@@ -147,7 +172,7 @@ pub enum ProjectModelError {
         workspace_root: PathBuf,
     },
     #[error("guppy cannot resolve the project features for the target")]
-    ProjectFeatureResolution(#[source] errors::Error),
+    ProjectFeatureResolution(#[source] Box<errors::Error>),
     #[error("cargo_metadata rejects the project metadata document built for the target")]
     ProjectMetadata(#[source] error::Error),
     #[error("the environment variable name {0:?} is not UTF-8")]
@@ -169,7 +194,7 @@ pub enum ProjectModelError {
     #[error("cargo_metadata cannot read the metadata cargo produces for package `{}`", .0.context)]
     PackageMetadata(#[source] ContextualError<String, error::Error>),
     #[error("guppy rejects the project metadata document")]
-    ProjectPackageGraph(#[source] errors::Error),
+    ProjectPackageGraph(#[source] Box<errors::Error>),
     #[error("crate root `{crate_root}` belongs to both {first} and {second}")]
     SharedCrateRoot {
         crate_root: PathBuf,

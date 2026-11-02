@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 
 use ra_ap_cfg::CfgExpr;
@@ -13,8 +14,10 @@ use ra_ap_hir::Impl;
 use ra_ap_hir::InFile;
 use ra_ap_hir::MacroKind;
 use ra_ap_hir::Module;
+use ra_ap_hir::ModuleDef;
 use ra_ap_hir::ModuleId;
 use ra_ap_hir::Semantics;
+use ra_ap_hir::Type;
 use ra_ap_hir_def::visibility::visibility_from_ast;
 use ra_ap_hir_expand::Lookup;
 use ra_ap_hir_expand::MacroDefKind;
@@ -30,6 +33,7 @@ use ra_ap_syntax::TextRange;
 use ra_ap_syntax::TextSize;
 use ra_ap_syntax::WalkEvent;
 use ra_ap_syntax::ast;
+use ra_ap_syntax::ast::HasGenericArgs as _;
 use ra_ap_syntax::ast::HasVisibility as _;
 use ra_ap_vfs::FileId;
 
@@ -50,6 +54,7 @@ use crate::adt_violation::AdtViolation;
 use crate::code_tokens::code_tokens;
 use crate::configured_node::ConfiguredNode;
 use crate::constants_module::ConstantsModule;
+use crate::file_local_item::FileLocalItem;
 use crate::impl_home::ImplHome;
 use crate::implemented_type::ImplementedType;
 use crate::is_module_inside_block::is_module_inside_block;
@@ -61,6 +66,7 @@ use crate::lint_suppressions::LintSuppressions;
 use crate::macro_expansion::MacroExpansion;
 use crate::module_paths::ModulePaths;
 use crate::negated_configuration::NegatedConfiguration;
+use crate::original_file_id::original_file_id;
 use crate::outside_visibility::OutsideVisibility;
 use crate::path_reference::PathReference;
 use crate::path_reference_outcome::PathReferenceOutcome;
@@ -264,6 +270,7 @@ impl ModuleWalk<'_, '_> {
     fn inactive(
         &self,
         node: &SyntaxNode,
+        negations: BTreeSet<SourceLocation>,
         CrateModuleGraph {
             walked_code:
                 WalkedCode {
@@ -288,6 +295,7 @@ impl ModuleWalk<'_, '_> {
         if self.token_origin.is_own_file(focus.file_id) {
             inactive_foci.insert(InactiveFocus {
                 location: self.locator.locate(focus),
+                negations,
                 token_starts: tokens
                     .iter()
                     .filter(|token| focus_range.contains_range(token.text_range()))
@@ -454,33 +462,55 @@ impl ModuleWalk<'_, '_> {
         origin: &SubtreeOrigin,
     ) -> Option<Violation> {
         let database = self.semantics.db;
-        let written_in = self
-            .semantics
-            .hir_file_for(implementation.syntax())
-            .original_file(database)
-            .file_id(database);
+        let written_in = original_file_id(
+            database,
+            self.semantics.hir_file_for(implementation.syntax()),
+        );
         let location = self.locate_focus(implementation.syntax(), origin);
+        let trait_arguments: Vec<Type<'_>> = implementation
+            .trait_()
+            .and_then(|written_trait| ast::PathType::cast(written_trait.syntax().clone()))
+            .and_then(|path_type| path_type.path())
+            .and_then(|path| path.segment())
+            .and_then(|segment| segment.generic_arg_list())
+            .into_iter()
+            .flat_map(|arguments| arguments.generic_args())
+            .filter_map(|argument| ast::TypeArg::cast(argument.syntax().clone()))
+            .filter_map(|argument| argument.ty())
+            .filter_map(|written_type| self.semantics.resolve_type(&written_type))
+            .collect();
 
         match (ImplementedType {
             database,
             implementation: definition,
             krate: self.krate,
         })
-        .home()
+        .home(&trait_arguments)
         {
-            ImplHome::LocalType { file } | ImplHome::LocalTraitBlanket { file }
+            ImplHome::LocalType { file }
+            | ImplHome::LocalTraitBlanket { file }
+            | ImplHome::LocalTraitObject { file }
+            | ImplHome::LocalTypeArgument { file }
                 if file == written_in =>
             {
                 None
             }
-            ImplHome::LocalType { file } => Some(Violation {
-                kind: ViolationKind::MisplacedImpl {
-                    type_file: self.locator.file(file),
+            ImplHome::LocalType { file } | ImplHome::LocalTypeArgument { file } => {
+                Some(Violation {
+                    kind: ViolationKind::MisplacedImpl {
+                        type_file: self.locator.file(file),
+                    },
+                    location,
+                })
+            }
+            ImplHome::LocalTraitBlanket { file } => Some(Violation {
+                kind: ViolationKind::MisplacedBlanketImpl {
+                    trait_file: self.locator.file(file),
                 },
                 location,
             }),
-            ImplHome::LocalTraitBlanket { file } => Some(Violation {
-                kind: ViolationKind::MisplacedBlanketImpl {
+            ImplHome::LocalTraitObject { file } => Some(Violation {
+                kind: ViolationKind::MisplacedTraitObjectImpl {
                     trait_file: self.locator.file(file),
                 },
                 location,
@@ -497,17 +527,20 @@ impl ModuleWalk<'_, '_> {
         configured: &ConfiguredNode<'_>,
         origin: &SubtreeOrigin,
         CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
-    ) {
-        violations.extend(
-            configured
-                .negated_attributes()
-                .iter()
-                .filter(|attribute| !self.token_origin.is_foreign_text(attribute.syntax()))
-                .map(|attribute| Violation {
-                    kind: ViolationKind::NegatedConfiguration,
-                    location: self.locate(attribute.syntax(), origin),
-                }),
-        );
+    ) -> BTreeSet<SourceLocation> {
+        let negations: BTreeSet<SourceLocation> = configured
+            .negated_attributes()
+            .iter()
+            .filter(|attribute| !self.token_origin.is_foreign_text(attribute.syntax()))
+            .map(|attribute| self.locate(attribute.syntax(), origin))
+            .collect();
+
+        violations.extend(negations.iter().map(|location| Violation {
+            kind: ViolationKind::NegatedConfiguration,
+            location: location.clone(),
+        }));
+
+        negations
     }
 
     fn non_doc_comments(
@@ -619,7 +652,11 @@ impl ModuleWalk<'_, '_> {
         items: &[ast::Item],
         origin: &SubtreeOrigin,
         CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
-        TestTargetFindings { impl_blocks, types }: &mut TestTargetFindings,
+        TestTargetFindings {
+            accepted,
+            impl_blocks,
+            types,
+        }: &mut TestTargetFindings,
     ) {
         for item in items {
             let violation = Violation {
@@ -627,7 +664,21 @@ impl ModuleWalk<'_, '_> {
                 location: self.locate_focus(item.syntax(), origin),
             };
 
-            if let Some(adt) = (ItemAdt {
+            if let ItemDefinition::ModuleDef(definition) = ItemDefinition::new(item, self.semantics)
+                && (FileLocalItem {
+                    definition,
+                    file_id: original_file_id(
+                        self.semantics.db,
+                        self.semantics.hir_file_for(item.syntax()),
+                    ),
+                    semantics: self.semantics,
+                })
+                .is_file_local()
+            {
+                if let ModuleDef::Adt(adt) = definition {
+                    accepted.push(adt);
+                }
+            } else if let Some(adt) = (ItemAdt {
                 item,
                 semantics: self.semantics,
             })
@@ -759,7 +810,7 @@ impl ModuleWalk<'_, '_> {
                         options: self.options,
                     };
 
-                    self.negated_attributes(&configured, &subtree.origin, graph);
+                    let negations = self.negated_attributes(&configured, &subtree.origin, graph);
 
                     let predicate = self.inactive_code.get(&InFile::new(
                         self.semantics.hir_file_for(&node),
@@ -768,18 +819,23 @@ impl ModuleWalk<'_, '_> {
 
                     if configured.is_disabled() {
                         preorder.skip_subtree();
-                        self.inactive(&node, graph);
+                        self.inactive(&node, negations, graph);
                     } else if let Some(expression) = predicate {
                         preorder.skip_subtree();
 
+                        let mut predicate_negations = BTreeSet::new();
+
                         if (NegatedConfiguration { expression }).is_negated() {
+                            let location = self.locate_focus(&node, &subtree.origin);
+
                             graph.configured_out_negations.negations.insert(Violation {
                                 kind: ViolationKind::NegatedConfiguration,
-                                location: self.locate_focus(&node, &subtree.origin),
+                                location: location.clone(),
                             });
+                            predicate_negations.insert(location);
                         }
 
-                        self.inactive(&node, graph);
+                        self.inactive(&node, predicate_negations, graph);
                     } else {
                         self.activate(&node, graph);
                         self.lint_suppressions(&node, &subtree.origin, graph);

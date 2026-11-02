@@ -18,7 +18,7 @@ fn clippy_lint_under_a_former_name_is_that_lint() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 1 violation\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the package's [lints.clippy] table.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses.\n\
             \n\
             - Cargo.toml: Package clippy_lint_under_a_former_name does not deny clippy::unwrap_used\n\
             \n\
@@ -32,7 +32,7 @@ fn clippy_lint_under_a_former_name_is_that_lint() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -1,0 +1,14 @@
+[package]
+name = "declared_macos_and_linux_targets"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]

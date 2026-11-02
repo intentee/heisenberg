@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use toml::Value;
 
 use crate::clippy_configuration_file::ClippyConfigurationFile;
@@ -20,13 +22,13 @@ fn member_violations(
     } = member;
     let name = metadata.name.to_string();
     let manifest = member.relative_manifest(workspace_path);
+    let table = member.lint_table(workspace_path);
     let mut violations: Vec<PackageViolation> = CLIPPY_DENIED_LINTS
         .iter()
         .filter(|lint| !ClippyLintLevel { lint, lints }.is_denied())
         .map(|lint| PackageViolation::ClippyLintNotDenied {
             lint: lint.name.to_owned(),
-            manifest: manifest.clone(),
-            package: name.clone(),
+            table: table.clone(),
         })
         .collect();
 
@@ -82,6 +84,13 @@ impl ClippyRequirements<'_> {
                 .map(|configuration| member_violations(package, configuration, &workspace_path))
             })
             .collect::<Result<Vec<Vec<PackageViolation>>, ProjectModelError>>()
-            .map(|violations| violations.into_iter().flatten().collect())
+            .map(|violations| {
+                violations
+                    .into_iter()
+                    .flatten()
+                    .collect::<BTreeSet<PackageViolation>>()
+                    .into_iter()
+                    .collect()
+            })
     }
 }

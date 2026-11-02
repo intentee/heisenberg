@@ -16,6 +16,7 @@ pub enum ViolationKind {
     ModuleFileInsideBlock,
     MisplacedBlanketImpl { trait_file: String },
     MisplacedImpl { type_file: String },
+    MisplacedTraitObjectImpl { trait_file: String },
     NegatedConfiguration,
     NonConstantInConstantsModule,
     NonDocComment,
@@ -46,6 +47,7 @@ impl ViolationKind {
             Self::ModuleFileInsideBlock => "ModuleFileInsideBlock",
             Self::MisplacedBlanketImpl { .. } => "MisplacedBlanketImpl",
             Self::MisplacedImpl { .. } => "MisplacedImpl",
+            Self::MisplacedTraitObjectImpl { .. } => "MisplacedTraitObjectImpl",
             Self::NegatedConfiguration => "NegatedConfiguration",
             Self::NonConstantInConstantsModule => "NonConstantInConstantsModule",
             Self::NonDocComment => "NonDocComment",
@@ -82,7 +84,7 @@ impl ViolationKind {
                 "An invalid macro definition produces no code to analyse. Fix the definition."
             }
             Self::ImplWithoutLocalType => {
-                "Behavior belongs with the type that owns it, so impls do not extend foreign types. Implement for a type of this crate, or write a blanket impl beside its trait."
+                "Behavior belongs with the type or trait that owns it, so impls do not extend foreign types. Implement it for a type of this crate, convert from a type of this crate, or write a blanket or trait-object impl beside its trait."
             }
             Self::LintSuppression => {
                 "Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports."
@@ -95,6 +97,9 @@ impl ViolationKind {
             }
             Self::MisplacedImpl { .. } => {
                 "All behavior of a type is read in one place, the file that defines it. Move the impl block into that file."
+            }
+            Self::MisplacedTraitObjectImpl { .. } => {
+                "A trait object's behavior belongs beside its trait. Move the impl into the file that defines the trait."
             }
             Self::NegatedConfiguration => {
                 "Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively."
@@ -155,7 +160,7 @@ impl Display for ViolationKind {
             Self::GlobImport => formatter.write_str("Glob import"),
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
-                .write_str("Impl block does not implement a struct, enum or union of this crate"),
+                .write_str("Impl block belongs to no type or trait of this crate"),
             Self::LintSuppression => formatter.write_str("Attribute suppresses lints"),
             Self::ModuleFileInsideBlock => {
                 formatter.write_str("Module file declared inside a block is not analysed")
@@ -165,6 +170,9 @@ impl Display for ViolationKind {
             }
             Self::MisplacedImpl { type_file } => {
                 write!(formatter, "Impl block belongs in {type_file}")
+            }
+            Self::MisplacedTraitObjectImpl { trait_file } => {
+                write!(formatter, "Impl block on a trait object belongs in {trait_file}")
             }
             Self::NegatedConfiguration => formatter.write_str(
                 "Configuration predicate negates a feature, test or debug_assertions",

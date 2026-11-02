@@ -9,12 +9,14 @@ use heisenberg_module_graph::crate_target::CrateTarget;
 
 use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
+use crate::declared_targets::declared_targets;
 use crate::feature_graph::FeatureGraph;
 use crate::library_directory::library_directory;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_project::ResolvedProject;
 use crate::utf8_environment::utf8_environment;
+use crate::workspace_manifest::workspace_manifest;
 
 pub struct ProjectModel {
     pub cargo_home: AbsPathBuf,
@@ -38,6 +40,10 @@ impl ProjectModel {
             workspace_directory: &self.workspace_directory,
         }
         .resolve()?;
+        let targets = declared_targets(
+            &project.workspace.metadata,
+            &workspace_manifest(&self.workspace_directory),
+        )?;
         let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
 
         for MemberTarget { crate_target, root } in &project.member_targets {
@@ -73,14 +79,17 @@ impl ProjectModel {
         .resolve()?;
 
         FeatureGraph::new(project)
+            .map_err(Box::new)
             .map_err(ProjectModelError::ProjectPackageGraph)
             .and_then(|project| {
                 FeatureGraph::new(library)
+                    .map_err(Box::new)
                     .map_err(ProjectModelError::LibraryPackageGraph)
                     .map(|library| ResolvedProject {
                         library,
                         project,
                         sysroot: self.sysroot.clone(),
+                        targets,
                     })
             })
     }

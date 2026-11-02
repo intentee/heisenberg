@@ -7,6 +7,7 @@ use ra_ap_hir::Crate;
 use ra_ap_hir::FileRangeWrapper;
 use ra_ap_hir::HirFileId;
 use ra_ap_hir::InFile;
+use ra_ap_hir::Module;
 use ra_ap_hir::Semantics;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::EditionedFileId;
@@ -20,6 +21,7 @@ use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
 use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
+use heisenberg_module_graph::function_body::FunctionBody;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
@@ -29,6 +31,7 @@ use heisenberg_module_graph::walked_code::WalkedCode;
 use crate::covering_ancestors::CoveringAncestors;
 use crate::crate_module_files::crate_module_files;
 use crate::diagnostic_violation::DiagnosticViolation;
+use crate::function_fingerprint::FunctionFingerprint;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
 use crate::module_paths::ModulePaths;
@@ -85,6 +88,7 @@ impl CrateExtraction<'_, '_> {
             configured_out_negations: ConfiguredOutNegations::default(),
             crate_target: self.crate_target.clone(),
             dependencies: BTreeSet::new(),
+            function_bodies: self.function_bodies(&modules),
             modules: modules
                 .iter()
                 .map(|module| module_paths.path(*module))
@@ -146,6 +150,48 @@ impl CrateExtraction<'_, '_> {
         }
 
         graph
+    }
+
+    fn function_bodies(&self, modules: &[Module]) -> BTreeSet<FunctionBody> {
+        let database = self.semantics.db;
+
+        modules
+            .iter()
+            .filter_map(|module| module.as_source_file_id(database))
+            .flat_map(|source_file_id| {
+                self.semantics
+                    .parse(source_file_id)
+                    .syntax()
+                    .descendants()
+                    .filter_map(ast::Fn::cast)
+                    .collect::<Vec<ast::Fn>>()
+            })
+            .filter(|function| {
+                function
+                    .body()
+                    .and_then(|body| body.stmt_list())
+                    .is_some_and(|statements| {
+                        statements.statements().next().is_some() || statements.tail_expr().is_some()
+                    })
+                    && self.semantics.to_def(function).is_some()
+            })
+            .map(|function| FunctionBody {
+                fingerprint: FunctionFingerprint {
+                    function: &function,
+                    krate: self.krate,
+                    locator: self.locator,
+                    semantics: self.semantics,
+                }
+                .tokens(),
+                location: self.locator.locate(
+                    ItemFocus {
+                        node: function.syntax(),
+                        semantics: self.semantics,
+                    }
+                    .original_range(),
+                ),
+            })
+            .collect()
     }
 
     fn written_call(&self, display: FileRangeWrapper<FileId>) -> SourceLocation {

@@ -1,4 +1,4 @@
-struct Recorder;
+pub struct Recorder;
 
 #[cfg(unix)]
 impl Recorder {

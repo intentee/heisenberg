@@ -19,6 +19,8 @@ mod shared_file;
 mod shared_file_inclusions;
 mod shared_file_tree;
 pub mod target_analysis;
+mod target_fingerprint;
+mod target_function_body;
 mod target_list;
 mod target_narrowing;
 mod violation_occurrences;

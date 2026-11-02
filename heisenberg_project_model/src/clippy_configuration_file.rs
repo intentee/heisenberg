@@ -14,7 +14,7 @@ fn parse(file: Utf8PathBuf, text: &str) -> Result<ClippyConfigurationFile, Proje
         Ok(settings) => Ok(ClippyConfigurationFile::Present { file, settings }),
         Err(source) => Err(ProjectModelError::ClippyConfigurationInvalid {
             path: file.into_std_path_buf(),
-            source,
+            source: Box::new(source),
         }),
     }
 }

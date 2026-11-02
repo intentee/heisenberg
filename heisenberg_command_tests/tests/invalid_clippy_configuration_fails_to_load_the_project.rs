@@ -29,8 +29,9 @@ fn invalid_clippy_configuration_fails_to_load_the_project() {
         Ok(format!(
             "error: the project cannot be loaded\n\
              error: the clippy configuration `{}` is not valid TOML\n\
-             error: {parse_error}\n",
-            configuration.display()
+             error: {}\n",
+            configuration.display(),
+            parse_error.to_string().trim_end()
         )
         .as_str())
     );

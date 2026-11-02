@@ -14,6 +14,7 @@ HEISENBERG_CRATES := \
 	heisenberg_project_model
 RUST_SYSROOT := $(shell rustc --print sysroot)
 SUPPORTED_TARGETS := \
+	aarch64-apple-darwin \
 	x86_64-pc-windows-msvc \
 	x86_64-unknown-linux-gnu
 TARGET_CFG_TABLES := \

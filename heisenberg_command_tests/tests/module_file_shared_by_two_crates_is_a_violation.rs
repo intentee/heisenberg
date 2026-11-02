@@ -29,7 +29,7 @@ fn module_file_shared_by_two_crates_is_a_violation() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 3 crate targets, 5 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 5 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

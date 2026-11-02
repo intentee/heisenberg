@@ -29,7 +29,7 @@ fn impl_block_of_a_flagged_type_is_part_of_its_issue() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

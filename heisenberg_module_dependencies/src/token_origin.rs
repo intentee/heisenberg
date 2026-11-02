@@ -10,6 +10,7 @@ use ra_ap_syntax::TextRange;
 use ra_ap_vfs::FileId;
 
 use crate::code_tokens::code_tokens;
+use crate::original_file_id::original_file_id;
 
 pub struct TokenOrigin<'origin, 'database> {
     pub own_files: &'origin BTreeSet<FileId>,
@@ -39,7 +40,7 @@ impl TokenOrigin<'_, '_> {
 
         file_id.macro_file().map_or_else(
             || FileRangeWrapper {
-                file_id: file_id.original_file(database).file_id(database),
+                file_id: original_file_id(database, file_id),
                 range,
             },
             |call| {

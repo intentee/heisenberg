@@ -20,8 +20,8 @@ fn impl_block_on_one_platform_is_part_of_its_type_issue() {
         Ok("NonTestItemInTestTarget: 1 violation\n\
             Integration test files hold only tests. Move helpers and fixtures into a library crate.\n\
             \n\
-            - tests/recording.rs:1:8: Integration test target holds an item that is neither a test, a constant nor an import\n    \
-            struct Recorder;\n      \
+            - tests/recording.rs:1:12: Integration test target holds an item that is neither a test, a constant nor an import\n    \
+            pub struct Recorder;\n      \
             impl block at tests/recording.rs:4:6\n\
             \n\
             ------------------------------\n\
@@ -29,7 +29,7 @@ fn impl_block_on_one_platform_is_part_of_its_type_issue() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

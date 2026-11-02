@@ -22,7 +22,7 @@ fn every_target_kind_is_analysed() {
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 6 crate targets, 6 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 6 crate targets, 6 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n")
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);
 }

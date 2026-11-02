@@ -18,6 +18,11 @@ impl Display for FoldedFinding {
                 write!(formatter, "expansion failing at {}", self.location)
             }
             FoldedFindingKind::ImplBlock => write!(formatter, "impl block at {}", self.location),
+            FoldedFindingKind::InactiveCode => write!(
+                formatter,
+                "code active on no declared target at {}",
+                self.location
+            ),
         }
     }
 }

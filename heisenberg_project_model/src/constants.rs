@@ -1,7 +1,8 @@
 use crate::clippy_lint::ClippyLint;
 use crate::supported_target::SupportedTarget;
 
-pub const SUPPORTED_TARGETS: [SupportedTarget; 2] = [
+pub const SUPPORTED_TARGETS: [SupportedTarget; 3] = [
+    SupportedTarget::AArch64AppleDarwin,
     SupportedTarget::X86_64PcWindowsMsvc,
     SupportedTarget::X86_64UnknownLinuxGnu,
 ];
@@ -48,6 +49,8 @@ pub const CLIPPY_TEST_ALLOWANCES: [&str; 3] = [
 ];
 
 pub const CLIPPY_TOOL: &str = "clippy";
+
+pub const HEISENBERG_SETTINGS_KEY: &str = "heisenberg";
 
 pub const LINT_NAME_SEPARATOR: &str = "_";
 

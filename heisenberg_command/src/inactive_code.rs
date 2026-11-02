@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use heisenberg_module_graph::inactive_focus::InactiveFocus;
@@ -12,40 +13,42 @@ pub struct InactiveCode<'code> {
 
 impl InactiveCode<'_> {
     #[must_use]
-    pub fn foci(&self) -> BTreeSet<&SourceLocation> {
+    pub fn foci(&self) -> BTreeMap<&SourceLocation, BTreeSet<&SourceLocation>> {
         let walked: Vec<&WalkedCode> = self
             .analyses
             .iter()
             .flat_map(|analysis| &analysis.graphs)
             .map(|graph| &graph.walked_code)
             .collect();
+        let mut foci: BTreeMap<&SourceLocation, BTreeSet<&SourceLocation>> = BTreeMap::new();
 
-        walked
-            .iter()
-            .flat_map(|code| &code.inactive_foci)
-            .filter(
-                |InactiveFocus {
-                     location,
-                     token_starts,
-                 }| {
-                    walked
-                        .iter()
-                        .filter(|code| code.files.contains(&location.file))
-                        .all(
-                            |WalkedCode {
-                                 active_tokens,
-                                 inactive_tokens,
-                                 ..
-                             }| {
-                                token_starts.iter().all(|start| {
-                                    inactive_tokens.contains(&location.file, *start)
-                                        && !active_tokens.contains(&location.file, *start)
-                                })
-                            },
-                        )
-                },
-            )
-            .map(|InactiveFocus { location, .. }| location)
-            .collect()
+        for InactiveFocus {
+            location,
+            negations,
+            token_starts,
+        } in walked.iter().flat_map(|code| &code.inactive_foci)
+        {
+            let is_dead_everywhere = walked
+                .iter()
+                .filter(|code| code.files.contains(&location.file))
+                .all(
+                    |WalkedCode {
+                         active_tokens,
+                         inactive_tokens,
+                         ..
+                     }| {
+                        token_starts.iter().all(|start| {
+                            inactive_tokens.contains(&location.file, *start)
+                                && !active_tokens.contains(&location.file, *start)
+                        })
+                    },
+                );
+
+            if is_dead_everywhere {
+                foci.entry(location).or_default().extend(negations);
+            }
+        }
+
+        foci
     }
 }
