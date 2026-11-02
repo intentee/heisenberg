@@ -39,15 +39,20 @@ impl Display for Narrowing<'_> {
         if self.reported == self.base {
             Ok(())
         } else {
-            let base_targets = targets_by_crate(self.base);
-
             write!(
                 formatter,
                 " (only in {})",
                 targets_by_crate(self.reported)
                     .into_iter()
                     .map(|(crate_target, targets)| {
-                        if targets == base_targets[crate_target] {
+                        let base_targets: BTreeSet<SupportedTarget> = self
+                            .base
+                            .iter()
+                            .filter(|context| context.crate_target == *crate_target)
+                            .map(|context| context.target)
+                            .collect();
+
+                        if targets == base_targets {
                             crate_target.to_string()
                         } else {
                             format!("{crate_target} on {}", TargetList { targets: &targets })

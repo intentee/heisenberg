@@ -1,0 +1,15 @@
+[package]
+name = "unstable_feature_in_the_cargo_configuration"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+tool = { path = "tool", artifact = "bin" }
+
+[workspace]
+members = ["tool"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

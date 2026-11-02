@@ -3,19 +3,21 @@ use ra_ap_hir::Module;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::PathResolution;
 use ra_ap_hir::Semantics;
+use ra_ap_hir_expand::name::AsName;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstNode;
-use ra_ap_syntax::SyntaxKind;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
-use crate::import_binding::ImportBinding;
+use crate::module_paths::ModulePaths;
 use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::referenced_modules::ReferencedModules;
 use crate::token_origin::TokenOrigin;
+use crate::unresolved_import_binding::UnresolvedImportBinding;
 
 pub struct PathReference<'reference, 'database> {
     pub krate: Crate,
+    pub module_paths: &'reference ModulePaths<'database>,
     pub path: &'reference ast::Path,
     pub scope: &'reference SyntaxNode,
     pub semantics: &'reference Semantics<'database, RootDatabase>,
@@ -23,23 +25,16 @@ pub struct PathReference<'reference, 'database> {
 }
 
 impl PathReference<'_, '_> {
-    #[expect(
-        clippy::expect_used,
-        reason = "rust-analyzer knows the scope of every node of a parsed source file or macro expansion"
-    )]
     pub fn outcome(&self) -> PathReferenceOutcome {
-        let database = self.semantics.db;
-        let from = self
-            .semantics
-            .scope(self.path.syntax())
-            .expect("the path belongs to a parsed source file or macro expansion")
-            .module()
-            .nearest_non_block_module(database);
-
         match self.semantics.resolve_path(self.path) {
-            Some(PathResolution::Def(definition)) => self.dependency(from, definition),
+            Some(PathResolution::Def(definition)) => self
+                .semantics
+                .scope(self.path.syntax())
+                .map_or(PathReferenceOutcome::Unresolved, |scope| {
+                    self.dependency(scope.module(), definition)
+                }),
             Some(_) => PathReferenceOutcome::Irrelevant,
-            None if self.is_attribute_name()
+            None if self.names_an_attribute_or_a_macro_call()
                 || self.is_type_anchor()
                 || self.token_origin.is_foreign_text(self.path.syntax()) =>
             {
@@ -60,26 +55,31 @@ impl PathReference<'_, '_> {
             other => other.module(database),
         };
 
+        let from = self.module_paths.path(from);
+
         target
-            .map(|module| module.nearest_non_block_module(database))
-            .filter(|to| to.krate(database) == self.krate && *to != from)
+            .filter(|to| to.krate(database) == self.krate)
+            .map(|to| self.module_paths.path(to))
+            .filter(|to| *to != from)
             .map_or(PathReferenceOutcome::Irrelevant, |to| {
                 PathReferenceOutcome::Dependency(ReferencedModules { from, to })
             })
-    }
-
-    fn is_attribute_name(&self) -> bool {
-        self.path
-            .syntax()
-            .ancestors()
-            .find(|ancestor| ancestor.kind() != SyntaxKind::PATH)
-            .is_some_and(|ancestor| ast::Meta::can_cast(ancestor.kind()))
     }
 
     fn is_type_anchor(&self) -> bool {
         self.path
             .segment()
             .is_some_and(|segment| segment.type_anchor().is_some())
+    }
+
+    fn names_an_attribute_or_a_macro_call(&self) -> bool {
+        self.path
+            .syntax()
+            .ancestors()
+            .find(|ancestor| !ast::Path::can_cast(ancestor.kind()))
+            .is_some_and(|ancestor| {
+                ast::Meta::can_cast(ancestor.kind()) || ast::MacroCall::can_cast(ancestor.kind())
+            })
     }
 
     fn qualified(&self, qualifier: &ast::Path) -> PathReferenceOutcome {
@@ -105,18 +105,21 @@ impl PathReference<'_, '_> {
     }
 
     fn single_segment(&self) -> PathReferenceOutcome {
-        if self
+        let bound_by_unresolved_import = self
             .path
             .segment()
             .and_then(|segment| segment.name_ref())
             .is_some_and(|name| {
-                ImportBinding {
-                    krate: self.krate,
-                    semantics: self.semantics,
-                }
-                .imports_from_another_crate(self.scope, &name)
-            })
-        {
+                self.semantics.scope(self.scope).is_some_and(|scope| {
+                    UnresolvedImportBinding {
+                        name: &name.as_name(),
+                        scope: &scope,
+                    }
+                    .binds()
+                })
+            });
+
+        if bound_by_unresolved_import {
             PathReferenceOutcome::Irrelevant
         } else {
             PathReferenceOutcome::Unresolved

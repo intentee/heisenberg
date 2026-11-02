@@ -7,8 +7,5 @@ version.workspace = true
 clap = { workspace = true }
 heisenberg_command = { workspace = true }
 
-[dev-dependencies]
-heisenberg_fixtures = { workspace = true }
-
 [lints]
 workspace = true

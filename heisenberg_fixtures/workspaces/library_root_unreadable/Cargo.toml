@@ -4,6 +4,11 @@ edition = "2024"
 version = "0.1.0"
 
 [lib]
-path = "src/missing.rs"
+path = "src/lib"
 
 [workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

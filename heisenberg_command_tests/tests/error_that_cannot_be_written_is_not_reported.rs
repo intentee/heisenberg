@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::File;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
@@ -19,7 +20,11 @@ fn error_that_cannot_be_written_is_not_reported() {
     }
     .toolchain_command()
     .expect("the arguments must parse")
-    .run(&mut read_only_output, &mut read_only_errors);
+    .run(
+        &BTreeMap::new(),
+        &mut read_only_output,
+        &mut read_only_errors,
+    );
 
     assert_eq!(status, HeisenbergExitStatus::ErrorNotReported);
 }

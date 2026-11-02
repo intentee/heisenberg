@@ -1,6 +1,6 @@
-use ra_ap_hir::Module;
+use heisenberg_module_graph::module_path::ModulePath;
 
 pub struct ReferencedModules {
-    pub from: Module,
-    pub to: Module,
+    pub from: ModulePath,
+    pub to: ModulePath,
 }

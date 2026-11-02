@@ -1,0 +1,14 @@
+[package]
+name = "package_depending_on_itself"
+edition = "2024"
+version = "0.1.0"
+
+[dev-dependencies]
+package_depending_on_itself = { path = "." }
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

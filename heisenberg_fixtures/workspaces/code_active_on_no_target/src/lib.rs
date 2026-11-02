@@ -3,3 +3,4 @@ pub mod mac;
 pub mod never;
 #[cfg(windows)]
 pub mod windows_only;
+pub mod configured_out;

@@ -18,11 +18,15 @@ fn failed_macro_expansion_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: FailedMacroExpansion - src/lib.rs:1:10 - Macro expansion failed\n\
-            include!(\"missing.rs\");\n\
+            "ERROR: FailedMacroExpansion - src/lib.rs:1:1 - Macro expansion failed\n\
+            include!(\"missing.rs\");\n  \
+            expansion failing at src/lib.rs:1:10\n\
+            \n\
+            ERROR: FailedMacroExpansion - src/lib.rs:3:3 - Macro expansion failed\n\
+            #[derive(core::marker::CoerceShared)]\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            2 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\

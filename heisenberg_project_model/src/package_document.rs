@@ -1,10 +1,17 @@
-use std::path::PathBuf;
+use cargo_metadata::Package;
+use cargo_util_schemas::manifest::TomlLints;
 
-use serde_json::Value;
+use crate::dependency_document::DependencyDocument;
+use crate::workspace_path::WorkspacePath;
 
 pub struct PackageDocument {
-    pub id: String,
-    pub json: Value,
-    pub manifest_path: PathBuf,
-    pub name: String,
+    pub dependencies: Vec<DependencyDocument>,
+    pub lints: TomlLints,
+    pub metadata: Package,
+}
+
+impl PackageDocument {
+    pub fn relative_manifest(&self, workspace_path: &WorkspacePath<'_>) -> String {
+        workspace_path.relative(&self.metadata.manifest_path)
+    }
 }

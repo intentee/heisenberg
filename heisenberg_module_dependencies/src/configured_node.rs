@@ -2,12 +2,12 @@ use std::ops::ControlFlow;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
-use ra_ap_hir_expand::attrs::expand_cfg_attr;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
 use crate::negated_configuration::NegatedConfiguration;
+use crate::visit_active_metas::visit_active_metas;
 
 pub struct ConfiguredNode<'node> {
     pub node: &'node SyntaxNode,
@@ -15,38 +15,18 @@ pub struct ConfiguredNode<'node> {
 }
 
 impl ConfiguredNode<'_> {
-    pub fn enabled_items(&self) -> Vec<ast::Item> {
-        self.node
-            .children()
-            .filter_map(ast::Item::cast)
-            .filter(|item| {
-                !ConfiguredNode {
-                    node: item.syntax(),
-                    options: self.options,
-                }
-                .is_disabled()
-            })
-            .collect()
-    }
-
     pub fn is_disabled(&self) -> bool {
-        ast::AnyHasAttrs::cast(self.node.clone()).is_some_and(|owner| {
-            expand_cfg_attr(
-                ast::attrs_including_inner(&owner),
-                || self.options,
-                |meta, _| match meta {
-                    ast::Meta::CfgMeta(cfg)
-                        if cfg.cfg_predicate().is_some_and(|predicate| {
-                            self.options.check(&CfgExpr::parse_from_ast(predicate)) == Some(false)
-                        }) =>
-                    {
-                        ControlFlow::Break(())
-                    }
-                    _ => ControlFlow::Continue(()),
-                },
-            )
-            .is_some()
+        visit_active_metas(self.node, self.options, |meta| match meta {
+            ast::Meta::CfgMeta(cfg)
+                if cfg.cfg_predicate().is_some_and(|predicate| {
+                    self.options.check(&CfgExpr::parse_from_ast(predicate)) == Some(false)
+                }) =>
+            {
+                ControlFlow::Break(())
+            }
+            _ => ControlFlow::Continue(()),
         })
+        .is_some()
     }
 
     pub fn negated_attributes(&self) -> Vec<ast::Attr> {

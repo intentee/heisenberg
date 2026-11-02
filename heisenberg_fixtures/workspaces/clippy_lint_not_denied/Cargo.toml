@@ -1,0 +1,10 @@
+[package]
+name = "clippy_lint_not_denied"
+edition = "2024"
+version = "0.1.0"
+
+[lints.clippy]
+expect_used = "warn"
+unwrap_used = "deny"
+
+[workspace]

@@ -18,7 +18,7 @@ fn invalid_macro_definition_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: InvalidMacroDefinition - src/lib.rs:1:1 - Macro definition is invalid\n\
+            "ERROR: InvalidMacroDefinition - src/lib.rs:1:14 - Macro definition is invalid\n\
             macro_rules! invalid_definition {\n\
             \n\
             ------------------------------\n\

@@ -18,13 +18,13 @@ fn non_constant_public_item_in_the_constants_module_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: NonConstantInConstantsModule - src/constants.rs:5:1 - Constants module holds a public item that is not a constant\n\
+            "ERROR: NonConstantInConstantsModule - src/constants.rs:5:12 - Constants module holds a public item that is not a constant\n\
             pub struct Unit;\n\
             \n\
-            ERROR: NonConstantInConstantsModule - src/constants.rs:7:1 - Constants module holds a public item that is not a constant\n\
+            ERROR: NonConstantInConstantsModule - src/constants.rs:7:8 - Constants module holds a public item that is not a constant\n\
             pub fn helper() -> u8 {\n\
             \n\
-            ERROR: NonConstantInConstantsModule - src/constants.rs:11:1 - Constants module holds a public item that is not a constant\n\
+            ERROR: NonConstantInConstantsModule - src/constants.rs:11:12 - Constants module holds a public item that is not a constant\n\
             pub static COUNTER: u8 = 0;\n\
             \n\
             ------------------------------\n\

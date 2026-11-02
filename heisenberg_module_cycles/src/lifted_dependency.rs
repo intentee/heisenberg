@@ -2,12 +2,11 @@ use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_path::ModulePath;
 
 use crate::module_unit::ModuleUnit;
+use crate::sibling_edge::SiblingEdge;
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct LiftedDependency {
     pub container: ModulePath,
-    pub from: ModuleUnit,
-    pub to: ModuleUnit,
+    pub edge: SiblingEdge,
 }
 
 impl LiftedDependency {
@@ -16,8 +15,10 @@ impl LiftedDependency {
         let container = from.common_ancestor(to);
 
         Self {
-            from: ModuleUnit::within(&container, from),
-            to: ModuleUnit::within(&container, to),
+            edge: SiblingEdge {
+                from: ModuleUnit::within(&container, from),
+                to: ModuleUnit::within(&container, to),
+            },
             container,
         }
     }

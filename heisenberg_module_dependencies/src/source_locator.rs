@@ -1,9 +1,8 @@
-use std::path::Path;
-
 use ra_ap_hir::FileRangeWrapper;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::SourceDatabase;
 use ra_ap_paths::AbsPathBuf;
+use ra_ap_paths::Utf8Path;
 use ra_ap_vfs::FileId;
 use ra_ap_vfs::Vfs;
 
@@ -18,39 +17,39 @@ pub struct SourceLocator<'project> {
 }
 
 impl SourceLocator<'_> {
-    #[expect(
-        clippy::expect_used,
-        reason = "rust-analyzer loads every source file from a real path"
-    )]
     pub fn locate(
         &self,
         FileRangeWrapper { file_id, range }: FileRangeWrapper<FileId>,
     ) -> SourceLocation {
-        let absolute = self
-            .vfs
-            .file_path(file_id)
-            .as_path()
-            .expect("rust-analyzer loaded the source file from a real path");
+        let file_path = self.vfs.file_path(file_id).to_string();
         let text = self.database.file_text(file_id).text(self.database);
-        let prefix = &text[..usize::from(range.start())];
-        let line_start = prefix.rfind('\n').map_or(0, |newline| newline + 1);
+        let start = usize::from(range.start());
+        let mut line: u32 = 1;
+        let mut column: u32 = 1;
+
+        for (_, character) in text
+            .char_indices()
+            .take_while(|(offset, _)| *offset < start)
+        {
+            if character == '\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+        }
 
         SourceLocation {
             file: WorkspacePath {
-                root: self.workspace_root.as_ref(),
+                root: AsRef::<Utf8Path>::as_ref(self.workspace_root),
             }
-            .relative(AsRef::<Path>::as_ref(absolute)),
+            .relative(Utf8Path::new(&file_path)),
             position: LinePosition {
-                column: prefix
-                    .chars()
-                    .rev()
-                    .take_while(|character| *character != '\n')
-                    .count() as u32
-                    + 1,
-                line: prefix.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1,
-                source_line: text[line_start..]
+                column,
+                line,
+                source_line: text
                     .lines()
-                    .next()
+                    .nth(line as usize - 1)
                     .unwrap_or_default()
                     .to_owned(),
             },

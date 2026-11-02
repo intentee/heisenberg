@@ -18,7 +18,7 @@ fn unresolved_extern_crate_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: UnresolvedExternCrate - src/lib.rs:1:1 - Extern crate is unresolved\n\
+            "ERROR: UnresolvedExternCrate - src/lib.rs:1:14 - Extern crate is unresolved\n\
             extern crate missing_dependency;\n\
             \n\
             ------------------------------\n\

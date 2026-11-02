@@ -2402,7 +2402,14 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "heisenberg_command",
- "heisenberg_fixtures",
+]
+
+[[package]]
+name = "heisenberg_absolute_path"
+version = "0.1.0"
+dependencies = [
+ "ra_ap_paths",
+ "thiserror",
 ]
 
 [[package]]
@@ -2410,6 +2417,7 @@ name = "heisenberg_analysis_threads"
 version = "0.1.0"
 dependencies = [
  "ra_ap_stdx",
+ "thiserror",
 ]
 
 [[package]]
@@ -2417,12 +2425,14 @@ name = "heisenberg_command"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "heisenberg_absolute_path",
  "heisenberg_analysis_threads",
+ "heisenberg_error_context",
  "heisenberg_module_cycles",
  "heisenberg_module_dependencies",
  "heisenberg_module_graph",
  "heisenberg_project_model",
- "ra_ap_paths",
+ "itertools",
  "thiserror",
 ]
 
@@ -2433,18 +2443,30 @@ dependencies = [
  "heisenberg_command",
  "heisenberg_fixtures",
  "heisenberg_test_harness",
+ "toml",
 ]
+
+[[package]]
+name = "heisenberg_error_context"
+version = "0.1.0"
 
 [[package]]
 name = "heisenberg_fixtures"
 version = "0.1.0"
 
 [[package]]
+name = "heisenberg_graph_cycles"
+version = "0.1.0"
+dependencies = [
+ "petgraph",
+]
+
+[[package]]
 name = "heisenberg_module_cycles"
 version = "0.1.0"
 dependencies = [
+ "heisenberg_graph_cycles",
  "heisenberg_module_graph",
- "petgraph",
 ]
 
 [[package]]
@@ -2452,16 +2474,19 @@ name = "heisenberg_module_dependencies"
 version = "0.1.0"
 dependencies = [
  "heisenberg_analysis_threads",
+ "heisenberg_error_context",
  "heisenberg_module_graph",
  "heisenberg_project_model",
  "ra_ap_cfg",
  "ra_ap_hir",
+ "ra_ap_hir_def",
  "ra_ap_hir_expand",
  "ra_ap_ide_db",
  "ra_ap_intern",
  "ra_ap_paths",
  "ra_ap_syntax",
  "ra_ap_vfs",
+ "thiserror",
 ]
 
 [[package]]
@@ -2474,21 +2499,23 @@ version = "0.1.0"
 dependencies = [
  "cargo",
  "cargo-platform",
+ "cargo-util-schemas",
  "cargo-util-terminal",
  "cargo_metadata",
  "guppy",
+ "heisenberg_error_context",
+ "heisenberg_graph_cycles",
  "heisenberg_module_graph",
- "petgraph",
  "ra_ap_cfg",
  "ra_ap_ide_db",
  "ra_ap_intern",
  "ra_ap_load-cargo",
  "ra_ap_paths",
  "ra_ap_project_model",
- "ra_ap_syntax",
  "ra_ap_vfs",
  "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -2497,6 +2524,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "heisenberg_command",
+ "thiserror",
 ]
 
 [[package]]

@@ -1,19 +1,16 @@
 use cargo::resolver::ResolveBehavior;
 use guppy::graph::cargo::CargoResolverVersion;
-use serde_json::from_value;
-use serde_json::json;
 
 pub struct ResolverVersion {
     pub behavior: ResolveBehavior,
 }
 
 impl ResolverVersion {
-    #[expect(
-        clippy::expect_used,
-        reason = "guppy deserializes every resolver version that cargo reports"
-    )]
-    pub fn to_guppy(&self) -> CargoResolverVersion {
-        from_value(json!(self.behavior.to_manifest()))
-            .expect("guppy knows every resolver version cargo reports")
+    pub const fn to_guppy(&self) -> CargoResolverVersion {
+        match self.behavior {
+            ResolveBehavior::V1 => CargoResolverVersion::V1,
+            ResolveBehavior::V2 => CargoResolverVersion::V2,
+            ResolveBehavior::V3 => CargoResolverVersion::V3,
+        }
     }
 }

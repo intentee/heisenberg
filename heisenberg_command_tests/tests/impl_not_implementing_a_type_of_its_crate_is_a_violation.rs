@@ -18,13 +18,13 @@ fn impl_not_implementing_a_type_of_its_crate_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: ImplWithoutLocalType - src/counting.rs:5:1 - Impl block does not implement a struct, enum or union of this crate\n\
+            "ERROR: ImplWithoutLocalType - src/counting.rs:5:40 - Impl block does not implement a struct, enum or union of this crate\n\
             impl<TIterator: Iterator> Counting for TIterator {\n\
             \n\
-            ERROR: ImplWithoutLocalType - src/greeting.rs:5:1 - Impl block does not implement a struct, enum or union of this crate\n\
+            ERROR: ImplWithoutLocalType - src/greeting.rs:5:19 - Impl block does not implement a struct, enum or union of this crate\n\
             impl Greeting for String {\n\
             \n\
-            ERROR: ImplWithoutLocalType - src/local.rs:11:1 - Impl block does not implement a struct, enum or union of this crate\n\
+            ERROR: ImplWithoutLocalType - src/local.rs:11:19 - Impl block does not implement a struct, enum or union of this crate\n\
             impl Greeting for Vec<Local> {\n\
             \n\
             ------------------------------\n\

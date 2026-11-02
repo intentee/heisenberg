@@ -12,6 +12,7 @@ use serde_json::from_value;
 use serde_json::json;
 
 use crate::library_crate::LibraryCrate;
+use crate::project_model_error::ProjectModelError;
 
 const LIBRARY_TARGET_KINDS: [TargetKind; 6] = [
     TargetKind::CDyLib,
@@ -28,11 +29,7 @@ pub struct LibraryProjectJson<'library> {
 }
 
 impl LibraryProjectJson<'_> {
-    #[expect(
-        clippy::expect_used,
-        reason = "rust-analyzer reads the rust-project.json document Heisenberg builds from cargo metadata"
-    )]
-    pub fn project_json(&self) -> ProjectJson {
+    pub fn project_json(&self) -> Result<ProjectJson, ProjectModelError> {
         let libraries: Vec<LibraryCrate<'_>> = self
             .metadata
             .packages
@@ -60,10 +57,9 @@ impl LibraryProjectJson<'_> {
             .iter()
             .map(|library| self.crate_json(library, &indices))
             .collect();
-        let data: ProjectJsonData = from_value(json!({"crates": crates}))
-            .expect("rust-analyzer reads rust-project.json documents");
-
-        ProjectJson::new(None, self.library_directory, data)
+        from_value::<ProjectJsonData>(json!({"crates": crates}))
+            .map_err(ProjectModelError::LibraryProjectJson)
+            .map(|data| ProjectJson::new(None, self.library_directory, data))
     }
 
     fn crate_json(

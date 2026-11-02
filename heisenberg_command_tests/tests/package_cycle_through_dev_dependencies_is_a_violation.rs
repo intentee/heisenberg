@@ -18,7 +18,7 @@ fn package_cycle_through_dev_dependencies_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: PackageDependencyCycle - alpha/Cargo.toml - Packages alpha, beta depend on each other through dev-dependencies\n\
+            "ERROR: PackageDependencyCycle - alpha/Cargo.toml - Packages alpha v0.1.0, beta v0.1.0 depend on each other through dev-dependencies\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

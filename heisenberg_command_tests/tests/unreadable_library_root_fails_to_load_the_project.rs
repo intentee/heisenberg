@@ -7,27 +7,27 @@ use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn unreadable_library_root_fails_to_load_the_project() {
-    let workspace = FixtureWorkspace {
-        name: "library_root_unreadable",
-    }
-    .path();
-    let library_root = workspace.join("src").join("missing.rs");
-    let read_error = fs::read(&library_root).expect_err("the fixture has no library root");
-    let outcome = HeisenbergCheck {
-        workspace: &workspace,
-    }
-    .run()
-    .expect("the arguments must parse");
+    for name in ["library_root_is_a_directory", "library_root_unreadable"] {
+        let workspace = FixtureWorkspace { name }.path();
+        let library_root = workspace.join("src").join("lib");
+        let read_error =
+            fs::read(&library_root).expect_err("the fixture library root cannot be read");
+        let outcome = HeisenbergCheck {
+            workspace: &workspace,
+        }
+        .run()
+        .expect("the arguments must parse");
 
-    assert_eq!(
-        str::from_utf8(&outcome.errors),
-        Ok(format!(
-            "error: the project cannot be loaded\n\
-             error: the library root `{}` cannot be read\n\
-             error: {read_error}\n",
-            library_root.display()
-        )
-        .as_str())
-    );
-    assert_eq!(outcome.status, HeisenbergExitStatus::Failure);
+        assert_eq!(
+            str::from_utf8(&outcome.errors),
+            Ok(format!(
+                "error: the project cannot be loaded\n\
+                 error: the crate root `{}` cannot be read\n\
+                 error: {read_error}\n",
+                library_root.display()
+            )
+            .as_str())
+        );
+        assert_eq!(outcome.status, HeisenbergExitStatus::Failure);
+    }
 }

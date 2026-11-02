@@ -1,191 +1,152 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::fs::read_to_string;
-use std::path::Path;
 
-use petgraph::algo::tarjan_scc;
-use petgraph::graphmap::DiGraphMap;
-use ra_ap_syntax::Edition;
-use ra_ap_syntax::SourceFile;
-use ra_ap_syntax::ast::HasModuleItem;
+use cargo::workspace::dependency::DepKind;
 
+use heisenberg_graph_cycles::cycle_components::CycleComponents;
+use heisenberg_graph_cycles::graph_edge::GraphEdge;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
-use crate::dependency_kind::DependencyKind;
 use crate::member_target::MemberTarget;
-use crate::node_document::NodeDocument;
 use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
-use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
-use crate::workspace_path::WorkspacePath;
 
 pub struct PackageRules<'rules> {
+    pub empty_libraries: &'rules BTreeSet<String>,
     pub resolved: &'rules ResolvedPackages,
 }
 
 impl PackageRules<'_> {
-    pub fn violations(&self) -> Result<Vec<PackageViolation>, ProjectModelError> {
-        let mut violations = self.dependency_cycles();
+    #[must_use]
+    pub fn violations(&self) -> Vec<PackageViolation> {
+        let mut violations: BTreeSet<PackageViolation> =
+            self.dependency_cycles().into_iter().collect();
 
-        violations.extend(self.tests_without_test_libraries()?);
-        violations.sort();
+        violations.extend(self.tests_without_test_libraries());
 
-        Ok(violations)
+        violations.into_iter().collect()
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "cargo resolves dev-dependencies only for workspace members, so every package cycle runs through a member"
-    )]
     fn dependency_cycles(&self) -> Vec<PackageViolation> {
-        let names = self.names();
-        let manifests = self.member_manifests();
-        let mut graph: DiGraphMap<&str, ()> = DiGraphMap::new();
+        let workspace_path = self.resolved.workspace_path();
+        let cycles = CycleComponents::new(self.resolved.packages.iter().flat_map(|package| {
+            package.dependencies.iter().map(|dependency| GraphEdge {
+                from: package.metadata.id.repr.as_str(),
+                to: dependency.package_id.as_str(),
+            })
+        }));
+        let component_of = cycles.component_of();
+        let members_by_name: BTreeMap<&str, &PackageDocument> = self
+            .resolved
+            .members()
+            .map(|member| (member.metadata.name.as_str(), member))
+            .collect();
+        let mut first_members: BTreeMap<&BTreeSet<&str>, &PackageDocument> = BTreeMap::new();
 
-        for node in &self.resolved.nodes {
-            graph.add_node(&node.id);
-
-            for dependency in &node.dependencies {
-                graph.add_edge(&node.id, &dependency.package_id, ());
+        for member in members_by_name.values() {
+            if let Some(component) = component_of.get(member.metadata.id.repr.as_str()) {
+                first_members.entry(*component).or_insert(*member);
             }
         }
 
-        tarjan_scc(&graph)
+        first_members
             .into_iter()
-            .filter(|component| {
-                component.len() > 1 || component.iter().any(|id| graph.contains_edge(id, id))
-            })
-            .map(|component| {
-                let packages: BTreeSet<String> =
-                    component.iter().map(|id| names[id].to_owned()).collect();
-                PackageViolation::PackageDependencyCycle {
-                    manifest: component
-                        .iter()
-                        .filter(|id| manifests.contains_key(*id))
-                        .min_by_key(|id| names[*id])
-                        .map(|id| manifests[*id].clone())
-                        .expect("a dev-dependency cycle runs through a workspace member"),
-                    packages: packages.into_iter().collect(),
+            .map(|(component, member)| {
+                let manifest = member.relative_manifest(&workspace_path);
+                let mut packages: Vec<String> = self
+                    .resolved
+                    .packages
+                    .iter()
+                    .filter(|package| component.contains(package.metadata.id.repr.as_str()))
+                    .map(|package| {
+                        format!("{} v{}", package.metadata.name, package.metadata.version)
+                    })
+                    .collect();
+
+                packages.sort();
+
+                match <[String; 1]>::try_from(packages) {
+                    Ok([package]) => PackageViolation::PackageDependsOnItself { manifest, package },
+                    Err(packages) => {
+                        PackageViolation::PackageDependencyCycle { manifest, packages }
+                    }
                 }
             })
             .collect()
     }
 
-    fn is_empty_library(root: &Path) -> Result<bool, ProjectModelError> {
-        let text =
-            read_to_string(root).map_err(|source| ProjectModelError::LibraryRootUnreadable {
-                path: root.to_path_buf(),
-                source,
-            })?;
-
-        Ok(SourceFile::parse(&text, Edition::CURRENT)
-            .tree()
-            .items()
-            .next()
-            .is_none())
-    }
-
-    fn member_manifests(&self) -> BTreeMap<&str, String> {
-        let workspace_path = WorkspacePath {
-            root: &self.resolved.workspace_root,
-        };
-
-        self.resolved
-            .packages
-            .iter()
-            .filter(|PackageDocument { id, .. }| self.resolved.workspace.members.contains(id))
-            .map(
-                |PackageDocument {
-                     id, manifest_path, ..
-                 }| (id.as_str(), workspace_path.relative(manifest_path)),
-            )
-            .collect()
-    }
-
-    fn names(&self) -> BTreeMap<&str, &str> {
-        self.resolved
-            .packages
-            .iter()
-            .map(|package| (package.id.as_str(), package.name.as_str()))
-            .collect()
-    }
-
-    fn tests_without_test_libraries(&self) -> Result<Vec<PackageViolation>, ProjectModelError> {
-        let manifests = self.member_manifests();
-        let names = self.names();
-        let members: BTreeSet<&str> = self
+    fn is_tests_only_with_an_empty_library(
+        &self,
+        PackageDocument { metadata, .. }: &PackageDocument,
+    ) -> bool {
+        let name = metadata.name.as_str();
+        let targets: Vec<&MemberTarget> = self
             .resolved
-            .workspace
-            .members
+            .member_targets
             .iter()
-            .map(String::as_str)
+            .filter(|target| target.crate_target.package_name == name)
             .collect();
-        let nodes: BTreeMap<&str, &NodeDocument> = self
-            .resolved
-            .nodes
+        let others: Vec<&&MemberTarget> = targets
             .iter()
-            .map(|node| (node.id.as_str(), node))
+            .filter(|target| target.crate_target.kind != CrateTargetKind::IntegrationTest)
             .collect();
-        let mut targets: BTreeMap<&str, Vec<&MemberTarget>> = BTreeMap::new();
-        let mut violations = Vec::new();
 
-        for member_target in &self.resolved.member_targets {
-            targets
-                .entry(member_target.crate_target.package_name.as_str())
-                .or_default()
-                .push(member_target);
-        }
+        others.len() < targets.len()
+            && matches!(others.as_slice(), [library] if library.crate_target.kind == CrateTargetKind::Library)
+            && self.empty_libraries.contains(name)
+    }
 
-        for member in &members {
-            let package_targets = &targets[names[member]];
-            let others: Vec<&&MemberTarget> = package_targets
-                .iter()
-                .filter(|target| target.crate_target.kind != CrateTargetKind::IntegrationTest)
-                .collect();
+    fn tests_without_test_libraries(&self) -> Vec<PackageViolation> {
+        let workspace_path = self.resolved.workspace_path();
+        let members: Vec<&PackageDocument> = self.resolved.members().collect();
 
-            if others.len() < package_targets.len()
-                && others.len() == 1
-                && others[0].crate_target.kind == CrateTargetKind::Library
-                && Self::is_empty_library(&others[0].root)?
-            {
-                let dependencies: BTreeSet<&str> = nodes[member]
+        members
+            .iter()
+            .filter(|member| self.is_tests_only_with_an_empty_library(member))
+            .filter_map(|member| {
+                let dependencies: BTreeSet<&str> = member
                     .dependencies
                     .iter()
                     .map(|dependency| dependency.package_id.as_str())
                     .collect();
-                let destinations: Vec<String> = dependencies
+                let destinations: BTreeMap<&str, String> = members
                     .iter()
-                    .filter(|candidate| members.contains(*candidate))
+                    .filter(|candidate| dependencies.contains(candidate.metadata.id.repr.as_str()))
                     .filter(|candidate| {
-                        let available: BTreeSet<&str> = nodes[*candidate]
+                        let available: BTreeSet<&str> = candidate
                             .dependencies
                             .iter()
                             .filter(|dependency| {
-                                dependency.kinds.contains(&DependencyKind::Normal)
-                                    || dependency.kinds.contains(&DependencyKind::Development)
+                                dependency.has_kind(DepKind::Normal)
+                                    || dependency.has_kind(DepKind::Development)
                             })
                             .map(|dependency| dependency.package_id.as_str())
                             .collect();
 
                         dependencies
                             .iter()
-                            .filter(|dependency| dependency != candidate)
+                            .filter(|dependency| {
+                                **dependency != candidate.metadata.id.repr.as_str()
+                            })
                             .all(|dependency| available.contains(dependency))
                     })
-                    .map(|candidate| names[candidate].to_owned())
+                    .map(|candidate| {
+                        (
+                            candidate.metadata.id.repr.as_str(),
+                            candidate.metadata.name.to_string(),
+                        )
+                    })
                     .collect();
 
-                if !destinations.is_empty() {
-                    violations.push(PackageViolation::TestsOnlyPackageWithoutTestLibraries {
-                        destinations,
-                        manifest: manifests[member].clone(),
-                        package: names[member].to_owned(),
-                    });
-                }
-            }
-        }
-
-        Ok(violations)
+                (!destinations.is_empty()).then(|| {
+                    PackageViolation::TestsOnlyPackageWithoutTestLibraries {
+                        destinations: destinations.into_values().collect(),
+                        manifest: member.relative_manifest(&workspace_path),
+                        package: member.metadata.name.to_string(),
+                    }
+                })
+            })
+            .collect()
     }
 }

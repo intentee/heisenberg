@@ -8,3 +8,8 @@ base = { path = "../base" }
 
 [dev-dependencies]
 harness = { path = "../harness" }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

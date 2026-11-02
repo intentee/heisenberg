@@ -1,0 +1,10 @@
+[package]
+name = "same_priority"
+edition = "2024"
+version = "0.1.0"
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+restriction = { level = "allow", priority = 0 }
+unwrap_used = "deny"

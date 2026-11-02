@@ -1,8 +1,8 @@
-use serde_json::Value;
+use ra_ap_paths::AbsPathBuf;
 
 pub struct WorkspaceDocument {
     pub default_members: Vec<String>,
     pub members: Vec<String>,
-    pub root: Value,
-    pub target_directory: Value,
+    pub root: AbsPathBuf,
+    pub target_directory: AbsPathBuf,
 }

@@ -4,4 +4,5 @@ use crate::source_location::SourceLocation;
 pub struct InactiveRegion {
     pub start: SourceLocation,
     pub end: SourceLocation,
+    pub focus: SourceLocation,
 }

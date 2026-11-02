@@ -18,15 +18,9 @@ fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: SharedModuleFile - tests/support/first_part.rs - Module file belongs to 2 modules\n  \
-            crate::support::first_part in shared_module_file_closing_a_cycle test \"first\"\n  \
-            crate::support::first_part in shared_module_file_closing_a_cycle test \"second\"\n\
-            \n\
-            ERROR: NonTestItemInTestTarget - tests/support/first_part.rs:1:1 - Integration test target holds an item that is neither a test, a constant nor an import\n\
-            pub struct FirstPart;\n\
-            \n\
-            ERROR: NonTestItemInTestTarget - tests/support/first_part.rs:3:1 - Integration test target holds an item that is neither a test, a constant nor an import\n\
-            impl FirstPart {\n\
+            "ERROR: NonTestItemInTestTarget - tests/support/first_part.rs:1:12 - Integration test target holds an item that is neither a test, a constant nor an import\n\
+            pub struct FirstPart;\n  \
+            impl block at tests/support/first_part.rs:3:6\n\
             \n\
             ERROR: ModuleCycle - tests/support/first_part.rs:5:9 - Parts of crate::support depend on each other\n        \
             super::second_part::SecondPart::back();\n  \
@@ -37,20 +31,17 @@ fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
             \n\
             ERROR: SharedModuleFile - tests/support/mod.rs - Module file belongs to 2 modules\n  \
             crate::support in shared_module_file_closing_a_cycle test \"first\"\n  \
-            crate::support in shared_module_file_closing_a_cycle test \"second\"\n\
+            crate::support in shared_module_file_closing_a_cycle test \"second\"\n  \
+            files of its submodules:\n    \
+            tests/support/first_part.rs\n    \
+            tests/support/second_part.rs\n\
             \n\
-            ERROR: SharedModuleFile - tests/support/second_part.rs - Module file belongs to 2 modules\n  \
-            crate::support::second_part in shared_module_file_closing_a_cycle test \"first\"\n  \
-            crate::support::second_part in shared_module_file_closing_a_cycle test \"second\"\n\
-            \n\
-            ERROR: NonTestItemInTestTarget - tests/support/second_part.rs:1:1 - Integration test target holds an item that is neither a test, a constant nor an import\n\
-            pub struct SecondPart;\n\
-            \n\
-            ERROR: NonTestItemInTestTarget - tests/support/second_part.rs:3:1 - Integration test target holds an item that is neither a test, a constant nor an import\n\
-            impl SecondPart {\n\
+            ERROR: NonTestItemInTestTarget - tests/support/second_part.rs:1:12 - Integration test target holds an item that is neither a test, a constant nor an import\n\
+            pub struct SecondPart;\n  \
+            impl block at tests/support/second_part.rs:3:6\n\
             \n\
             ------------------------------\n\
-            8 errors found\n\
+            4 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 3 crate targets, 9 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 9 modules\n\

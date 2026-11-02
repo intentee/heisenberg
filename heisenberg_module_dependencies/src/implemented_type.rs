@@ -1,3 +1,4 @@
+use ra_ap_hir::Adt;
 use ra_ap_hir::Crate;
 use ra_ap_hir::HasSource;
 use ra_ap_hir::Impl;
@@ -11,7 +12,7 @@ pub struct ImplementedType<'database> {
 }
 
 impl ImplementedType<'_> {
-    pub fn file(&self) -> Option<FileId> {
+    pub fn adt(&self) -> Option<Adt> {
         let Self {
             database,
             implementation,
@@ -23,6 +24,12 @@ impl ImplementedType<'_> {
             .strip_references()
             .as_adt()
             .filter(|adt| adt.module(database).krate(database) == krate)
+    }
+
+    pub fn file(&self) -> Option<FileId> {
+        let database = self.database;
+
+        self.adt()
             .and_then(|adt| adt.source(database))
             .map(|source| source.file_id.original_file(database).file_id(database))
     }

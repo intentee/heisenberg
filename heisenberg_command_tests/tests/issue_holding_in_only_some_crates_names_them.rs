@@ -23,7 +23,7 @@ fn issue_holding_in_only_some_crates_names_them() {
             crate::support in issue_narrowed_to_some_crates test \"first\"\n  \
             crate::support in issue_narrowed_to_some_crates test \"second\"\n\
             \n\
-            ERROR: NonTestItemInTestTarget - tests/support/mod.rs:1:1 - Integration test target holds an item that is neither a test, a constant nor an import (only in issue_narrowed_to_some_crates test \"first\"; issue_narrowed_to_some_crates test \"second\")\n\
+            ERROR: NonTestItemInTestTarget - tests/support/mod.rs:1:8 - Integration test target holds an item that is neither a test, a constant nor an import (only in issue_narrowed_to_some_crates test \"first\"; issue_narrowed_to_some_crates test \"second\")\n\
             pub fn helper() {}\n\
             \n\
             ------------------------------\n\

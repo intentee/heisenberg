@@ -10,3 +10,8 @@ shared = { path = "shared" }
 renamed = { package = "shared", path = "shared" }
 
 [workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

@@ -8,3 +8,8 @@ wrapping = { path = "wrapping" }
 
 [workspace]
 exclude = ["wrapping"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

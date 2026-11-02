@@ -1,15 +1,16 @@
 use std::path::Path;
 
 use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
+use heisenberg_test_harness::test_harness_error::TestHarnessError;
 
 #[test]
 fn relative_workspace_path_is_a_usage_error() {
-    let error = HeisenbergCheck {
+    let Err(TestHarnessError::Arguments(error)) = (HeisenbergCheck {
         workspace: Path::new("relative"),
-    }
-    .run()
-    .err()
-    .expect("a relative workspace path must be rejected");
+    })
+    .run() else {
+        panic!("a relative workspace path must be rejected");
+    };
 
     assert_eq!(
         error.to_string(),

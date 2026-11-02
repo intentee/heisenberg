@@ -1,0 +1,2 @@
+[env]
+clippy_args = "-Aclippy::expect_used"

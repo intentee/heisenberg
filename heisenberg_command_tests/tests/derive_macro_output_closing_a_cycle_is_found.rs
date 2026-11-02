@@ -1,0 +1,38 @@
+use std::str;
+
+use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
+use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
+
+#[test]
+fn derive_macro_output_closing_a_cycle_is_found() {
+    let outcome = HeisenbergCheck {
+        workspace: &FixtureWorkspace {
+            name: "derive_macro_output_closing_a_cycle",
+        }
+        .path(),
+    }
+    .run()
+    .expect("the arguments must parse");
+
+    assert_eq!(
+        str::from_utf8(&outcome.output),
+        Ok(
+            "ERROR: ModuleCycle - src/first.rs:1:3 - Parts of crate depend on each other\n\
+            #[derive(described)]\n  \
+            crate::first -> crate::second:\n    \
+            crate::first uses crate::second at src/first.rs:1:3\n  \
+            crate::second -> crate::first:\n    \
+            crate::second uses crate::first at src/second.rs:2:19\n    \
+            crate::second uses crate::first at src/second.rs:3:9\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every supported target\n"
+        )
+    );
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
+}

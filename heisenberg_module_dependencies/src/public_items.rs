@@ -1,14 +1,15 @@
 use ra_ap_cfg::CfgOptions;
 use ra_ap_hir::HasVisibility;
+use ra_ap_hir::ModuleDef;
 use ra_ap_hir::Semantics;
-use ra_ap_hir::Visibility;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
-use ra_ap_syntax::ast::HasVisibility as _;
 
-use crate::configured_node::ConfiguredNode;
+use crate::defined_items::DefinedItems;
+use crate::item_definition::ItemDefinition;
+use crate::outside_visibility::OutsideVisibility;
 
 pub struct PublicItems<'items, 'database> {
     pub container: &'items SyntaxNode,
@@ -18,41 +19,54 @@ pub struct PublicItems<'items, 'database> {
 
 impl PublicItems<'_, '_> {
     pub fn non_constant(&self) -> Vec<ast::Item> {
-        ConfiguredNode {
-            node: self.container,
+        self.defined_in(self.container)
+            .into_iter()
+            .flat_map(|item| match &item {
+                ast::Item::ExternBlock(block) => block
+                    .extern_item_list()
+                    .map_or_else(Vec::new, |list| self.defined_in(list.syntax())),
+                _ => vec![item],
+            })
+            .filter(|item| self.is_public_non_constant(item))
+            .collect()
+    }
+
+    fn defined_in(&self, container: &SyntaxNode) -> Vec<ast::Item> {
+        DefinedItems {
+            container,
             options: self.options,
+            semantics: self.semantics,
         }
-        .enabled_items()
-        .into_iter()
-        .filter(|item| self.is_public_non_constant(item))
-        .collect()
+        .items()
     }
 
     fn is_public_non_constant(&self, item: &ast::Item) -> bool {
         match item {
-            ast::Item::AsmExpr(_)
-            | ast::Item::Const(_)
-            | ast::Item::ExternBlock(_)
-            | ast::Item::ExternCrate(_)
-            | ast::Item::Impl(_)
-            | ast::Item::MacroCall(_)
-            | ast::Item::Module(_)
-            | ast::Item::Use(_) => false,
-            ast::Item::MacroRules(definition) => self
-                .semantics
-                .to_macro_def(&ast::Macro::MacroRules(definition.clone()))
-                .is_some_and(|definition| {
-                    definition.visibility(self.semantics.db) == Visibility::Public
-                }),
-            ast::Item::Enum(_)
-            | ast::Item::Fn(_)
-            | ast::Item::MacroDef(_)
-            | ast::Item::Static(_)
-            | ast::Item::Struct(_)
-            | ast::Item::Trait(_)
-            | ast::Item::TypeAlias(_)
-            | ast::Item::Union(_) => ast::AnyHasVisibility::cast(item.syntax().clone())
-                .is_some_and(|definition| definition.visibility().is_some()),
+            ast::Item::Const(_) | ast::Item::Module(_) => false,
+            _ => match ItemDefinition::new(item, self.semantics) {
+                ItemDefinition::ModuleDef(definition) => {
+                    if matches!(item, ast::Item::MacroRules(_)) {
+                        definition.visibility(self.semantics.db).is_public()
+                    } else {
+                        self.reaches_outside(definition)
+                    }
+                }
+                ItemDefinition::Const(_)
+                | ItemDefinition::ExternBlock
+                | ItemDefinition::ExternCrate(_)
+                | ItemDefinition::Impl(_)
+                | ItemDefinition::Module(_)
+                | ItemDefinition::NotDefining
+                | ItemDefinition::Unmapped => false,
+            },
         }
+    }
+
+    fn reaches_outside(&self, definition: ModuleDef) -> bool {
+        let database = self.semantics.db;
+
+        definition.module(database).is_some_and(|module| {
+            OutsideVisibility { database }.reaches_outside(definition.visibility(database), module)
+        })
     }
 }

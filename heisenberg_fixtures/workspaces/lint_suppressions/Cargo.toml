@@ -1,0 +1,15 @@
+[package]
+name = "lint_suppressions"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+generator = { path = "generator" }
+
+[workspace]
+exclude = ["generator"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

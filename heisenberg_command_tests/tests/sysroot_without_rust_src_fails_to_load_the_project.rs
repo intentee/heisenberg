@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::str;
 
@@ -26,6 +27,7 @@ fn sysroot_without_rust_src_fails_to_load_the_project() {
         }
         .command(&workspace)
         .expect("the arguments must parse"),
+        &BTreeMap::new(),
     );
 
     assert_eq!(

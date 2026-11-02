@@ -1,0 +1,11 @@
+[package]
+name = "derive_attribute_on_a_test_target_function"
+edition = "2024"
+version = "0.1.0"
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace]

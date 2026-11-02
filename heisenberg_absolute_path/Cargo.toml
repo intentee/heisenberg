@@ -1,0 +1,11 @@
+[package]
+name = "heisenberg_absolute_path"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+ra_ap_paths = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

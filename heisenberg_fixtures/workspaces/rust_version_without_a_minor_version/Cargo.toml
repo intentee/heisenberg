@@ -1,0 +1,12 @@
+[package]
+name = "rust_version_without_a_minor_version"
+edition = "2015"
+version = "0.1.0"
+rust-version = "1"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

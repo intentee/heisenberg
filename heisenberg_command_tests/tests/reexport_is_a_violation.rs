@@ -14,10 +14,10 @@ fn reexport_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ERROR: Reexport - src/lib.rs:3:1 - Re-export\n\
+        Ok("ERROR: Reexport - src/lib.rs:3:9 - Re-export\n\
             pub use inner::Inner;\n\
             \n\
-            ERROR: Reexport - src/lib.rs:5:1 - Re-export\n\
+            ERROR: Reexport - src/lib.rs:5:18 - Re-export\n\
             pub extern crate std as standard;\n\
             \n\
             ------------------------------\n\

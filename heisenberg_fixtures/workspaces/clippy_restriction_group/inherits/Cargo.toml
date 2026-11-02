@@ -1,0 +1,7 @@
+[package]
+name = "inherits"
+edition = "2024"
+version = "0.1.0"
+
+[lints]
+workspace = true

@@ -8,3 +8,8 @@ shaped = { path = "shaped" }
 
 [workspace]
 exclude = ["shaped"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

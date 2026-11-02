@@ -5,3 +5,8 @@ version = "0.1.0"
 
 [dependencies]
 bottom = { path = "../bottom" }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
 use std::str;
@@ -23,7 +24,7 @@ fn report_that_cannot_be_written_fails() {
     }
     .toolchain_command()
     .expect("the arguments must parse")
-    .run(&mut read_only_output, &mut errors);
+    .run(&BTreeMap::new(), &mut read_only_output, &mut errors);
 
     assert_eq!(
         str::from_utf8(&errors),

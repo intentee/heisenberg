@@ -1,0 +1,10 @@
+[package]
+name = "forbidden"
+edition = "2024"
+version = "0.1.0"
+
+[lints.clippy]
+expect_used = "forbid"
+panic = "forbid"
+restriction = { level = "allow", priority = 1 }
+unwrap_used = "forbid"

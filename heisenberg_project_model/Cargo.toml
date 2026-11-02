@@ -6,21 +6,23 @@ version.workspace = true
 [dependencies]
 cargo = { workspace = true }
 cargo-platform = { workspace = true }
+cargo-util-schemas = { workspace = true }
 cargo-util-terminal = { workspace = true }
 cargo_metadata = { workspace = true }
 guppy = { workspace = true }
+heisenberg_error_context = { workspace = true }
+heisenberg_graph_cycles = { workspace = true }
 heisenberg_module_graph = { workspace = true }
-petgraph = { workspace = true }
 ra_ap_cfg = { workspace = true }
 ra_ap_ide_db = { workspace = true }
 ra_ap_intern = { workspace = true }
 ra_ap_load-cargo = { workspace = true }
 ra_ap_paths = { workspace = true }
 ra_ap_project_model = { workspace = true }
-ra_ap_syntax = { workspace = true }
 ra_ap_vfs = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+toml = { workspace = true }
 
 [lints]
 workspace = true

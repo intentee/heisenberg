@@ -12,3 +12,8 @@ shared = { path = "shared", features = ["cyclic"] }
 [workspace]
 exclude = ["shared"]
 resolver = "1"
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

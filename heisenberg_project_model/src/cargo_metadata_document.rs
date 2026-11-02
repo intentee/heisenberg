@@ -4,13 +4,16 @@ use cargo::GlobalContext;
 use cargo::resolver::Resolve;
 use cargo::workspace::Package;
 use cargo::workspace::PackageId;
+use cargo::workspace::Target;
 use cargo::workspace::Workspace;
-use serde_json::Value;
-use serde_json::json;
+use serde_json::from_value;
+use serde_json::to_value;
 
-use crate::cargo_dependency_kind::CargoDependencyKind;
+use heisenberg_error_context::error_context::error_context;
+
+use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::dependency_document::DependencyDocument;
-use crate::node_document::NodeDocument;
+use crate::dependency_kind_document::DependencyKindDocument;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::workspace_document::WorkspaceDocument;
@@ -23,98 +26,106 @@ pub struct CargoMetadataDocument<'document, 'context> {
 }
 
 impl CargoMetadataDocument<'_, '_> {
-    pub fn nodes(&self) -> Result<Vec<NodeDocument>, ProjectModelError> {
+    pub fn packages(&self) -> Result<Vec<PackageDocument>, ProjectModelError> {
+        let libraries: BTreeMap<PackageId, &Target> = self
+            .packages
+            .iter()
+            .filter_map(|(package_id, package)| {
+                package
+                    .targets()
+                    .iter()
+                    .find(|target| target.is_lib())
+                    .map(|library| (*package_id, library))
+            })
+            .collect();
+
         self.packages
-            .keys()
-            .map(|package_id| {
-                Ok(NodeDocument {
-                    dependencies: self.dependencies(*package_id)?,
-                    id: package_id.to_spec().to_string(),
-                })
+            .iter()
+            .map(|(package_id, package)| {
+                self.dependencies(*package_id, &libraries)
+                    .and_then(|dependencies| {
+                        to_value(package.serialized(
+                            self.context.cli_unstable(),
+                            self.workspace.unstable_features(),
+                        ))
+                        .and_then(from_value)
+                        .map_err(error_context(
+                            package_id.to_string(),
+                            ProjectModelError::PackageMetadata,
+                        ))
+                        .map(|metadata| PackageDocument {
+                            dependencies,
+                            lints: package
+                                .manifest()
+                                .normalized_toml()
+                                .lints
+                                .as_ref()
+                                .map(|lints| lints.lints.clone())
+                                .unwrap_or_default(),
+                            metadata,
+                        })
+                    })
             })
             .collect()
     }
 
-    pub fn packages(&self) -> Vec<PackageDocument> {
-        self.packages
-            .values()
-            .map(|package| PackageDocument {
-                id: package.package_id().to_spec().to_string(),
-                json: json!(package.serialized(
-                    self.context.cli_unstable(),
-                    self.workspace.unstable_features()
-                )),
-                manifest_path: package.manifest_path().to_path_buf(),
-                name: package.name().to_string(),
+    pub fn workspace(&self) -> Result<WorkspaceDocument, ProjectModelError> {
+        absolute_utf8_path(
+            self.workspace.root().to_path_buf(),
+            ProjectModelError::NonUtf8WorkspaceRoot,
+            ProjectModelError::RelativeWorkspaceRoot,
+        )
+        .and_then(|root| {
+            absolute_utf8_path(
+                self.workspace.target_dir().into_path_unlocked(),
+                ProjectModelError::NonUtf8TargetDirectory,
+                ProjectModelError::RelativeTargetDirectory,
+            )
+            .map(|target_directory| WorkspaceDocument {
+                default_members: self
+                    .workspace
+                    .default_members()
+                    .map(|member| member.package_id().to_spec().to_string())
+                    .collect(),
+                members: self
+                    .workspace
+                    .members()
+                    .map(|member| member.package_id().to_spec().to_string())
+                    .collect(),
+                root,
+                target_directory,
             })
-            .collect()
-    }
-
-    pub fn workspace(&self) -> WorkspaceDocument {
-        WorkspaceDocument {
-            default_members: self
-                .workspace
-                .default_members()
-                .map(|member| member.package_id().to_spec().to_string())
-                .collect(),
-            members: self
-                .workspace
-                .members()
-                .map(|member| member.package_id().to_spec().to_string())
-                .collect(),
-            root: json!(self.workspace.root()),
-            target_directory: json!(self.workspace.target_dir().as_path_unlocked()),
-        }
+        })
     }
 
     fn dependencies(
         &self,
         package_id: PackageId,
+        libraries: &BTreeMap<PackageId, &Target>,
     ) -> Result<Vec<DependencyDocument>, ProjectModelError> {
         self.resolve
             .deps(package_id)
             .filter_map(|(dependency_id, dependencies)| {
-                self.packages
-                    .get(&dependency_id)
-                    .and_then(|dependency| {
-                        dependency.targets().iter().find(|target| target.is_lib())
-                    })
-                    .map(|library| {
-                        let mut dep_kinds: Vec<Value> = dependencies
-                            .iter()
-                            .map(|dependency| {
-                                json!({"kind": dependency.kind(), "target": dependency.platform()})
-                            })
-                            .collect();
-
-                        dep_kinds.sort_by_key(Value::to_string);
-                        dep_kinds.dedup();
-
-                        self.resolve
-                            .extern_crate_name_and_dep_name(package_id, dependency_id, library)
-                            .map(|(extern_crate_name, _)| DependencyDocument {
-                                json: json!({
-                                    "dep_kinds": dep_kinds,
-                                    "name": extern_crate_name.as_str(),
-                                    "pkg": dependency_id.to_spec().to_string(),
-                                }),
-                                kinds: dependencies
-                                    .iter()
-                                    .map(|dependency| {
-                                        CargoDependencyKind {
-                                            kind: dependency.kind(),
-                                        }
-                                        .dependency_kind()
-                                    })
-                                    .collect(),
-                                package_id: dependency_id.to_spec().to_string(),
-                            })
-                            .map_err(|source| ProjectModelError::ExternCrateName {
-                                dependency: dependency_id.to_string(),
-                                package: package_id.to_string(),
-                                source: source.into(),
-                            })
-                    })
+                libraries.get(&dependency_id).map(|library| {
+                    self.resolve
+                        .extern_crate_name_and_dep_name(package_id, dependency_id, library)
+                        .map(|(extern_crate_name, _)| DependencyDocument {
+                            extern_crate_name: extern_crate_name.to_string(),
+                            kinds: dependencies
+                                .iter()
+                                .map(|dependency| DependencyKindDocument {
+                                    kind: dependency.kind(),
+                                    platform: dependency.platform().cloned(),
+                                })
+                                .collect(),
+                            package_id: dependency_id.to_spec().to_string(),
+                        })
+                        .map_err(|source| ProjectModelError::ExternCrateName {
+                            dependency: dependency_id.to_string(),
+                            package: package_id.to_string(),
+                            source: source.into(),
+                        })
+                })
             })
             .collect()
     }

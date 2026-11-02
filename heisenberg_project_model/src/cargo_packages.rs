@@ -1,44 +1,59 @@
 use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 use cargo::GlobalContext;
 use cargo::ops::resolve_ws;
+use cargo::util::data_structures::HashMap;
 use cargo::workspace::Package;
 use cargo::workspace::PackageId;
 use cargo::workspace::Workspace;
 use cargo_util_terminal::Shell;
+use ra_ap_paths::AbsPath;
 
-use crate::cargo_feature_gate::CargoFeatureGate;
+use crate::cargo_configuration_overrides::CargoConfigurationOverrides;
 use crate::cargo_metadata_document::CargoMetadataDocument;
+use crate::cargo_workspace_role::CargoWorkspaceRole;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
 use crate::resolver_version::ResolverVersion;
+use crate::workspace_manifest::workspace_manifest;
 use crate::workspace_member_targets::WorkspaceMemberTargets;
 
 pub struct CargoPackages<'request> {
-    pub cargo_feature_gate: CargoFeatureGate,
     pub cargo_home: &'request Path,
-    pub workspace_directory: &'request Path,
+    pub environment: &'request HashMap<String, String>,
+    pub role: CargoWorkspaceRole,
+    pub workspace_directory: &'request AbsPath,
 }
 
 impl CargoPackages<'_> {
     pub fn resolve(&self) -> Result<ResolvedPackages, ProjectModelError> {
-        let manifest_path = self.workspace_directory.join("Cargo.toml");
+        let manifest_path: PathBuf = workspace_manifest(self.workspace_directory).into();
         let mut context = GlobalContext::new(
             Shell::from_write(Box::new(io::sink())),
-            self.workspace_directory.to_path_buf(),
+            self.workspace_directory.to_path_buf().into(),
             self.cargo_home.to_path_buf(),
         );
 
+        context.set_env(self.environment.clone());
+        context.nightly_features_allowed = self.role == CargoWorkspaceRole::Library;
         context
             .configure(0, true, None, true, true, true, &None, &[], &[])
+            .and_then(|()| context.values().and(Ok(())))
             .map_err(|source| ProjectModelError::CargoConfiguration {
                 manifest_path: manifest_path.clone(),
                 source: source.into(),
             })?;
-        context.nightly_features_allowed =
-            matches!(self.cargo_feature_gate, CargoFeatureGate::Nightly);
+
+        if self.role == CargoWorkspaceRole::Project {
+            CargoConfigurationOverrides {
+                context: &context,
+                manifest_path: &manifest_path,
+            }
+            .reject()?;
+        }
 
         let mut workspace = Workspace::new(&manifest_path, &context).map_err(|source| {
             ProjectModelError::CargoWorkspace {
@@ -83,19 +98,22 @@ impl CargoPackages<'_> {
             workspace: &workspace,
         };
 
-        Ok(ResolvedPackages {
-            member_targets: WorkspaceMemberTargets {
-                workspace: &workspace,
-            }
-            .collect(),
-            resolver: ResolverVersion {
-                behavior: workspace.resolve_behavior(),
-            }
-            .to_guppy(),
-            nodes: document.nodes()?,
-            packages: document.packages(),
-            workspace: document.workspace(),
-            workspace_root: workspace.root().to_path_buf(),
+        document.workspace().and_then(|workspace_document| {
+            document.packages().and_then(|package_documents| {
+                WorkspaceMemberTargets {
+                    workspace: &workspace,
+                }
+                .collect()
+                .map(|member_targets| ResolvedPackages {
+                    member_targets,
+                    packages: package_documents,
+                    resolver: ResolverVersion {
+                        behavior: workspace.resolve_behavior(),
+                    }
+                    .to_guppy(),
+                    workspace: workspace_document,
+                })
+            })
         })
     }
 }

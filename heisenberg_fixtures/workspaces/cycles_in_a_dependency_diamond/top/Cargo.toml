@@ -6,3 +6,8 @@ version = "0.1.0"
 [dependencies]
 left = { path = "../left" }
 right = { path = "../right" }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

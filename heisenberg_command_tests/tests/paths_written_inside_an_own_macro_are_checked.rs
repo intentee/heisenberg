@@ -18,8 +18,8 @@ fn paths_written_inside_an_own_macro_are_checked() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: CodeActiveOnNoTarget - src/lib.rs:1:1 - Code is active on no supported target\n\
-            #[cfg(generated)]\n\
+            "ERROR: CodeActiveOnNoTarget - src/lib.rs:2:9 - Code is active on no supported target\n\
+            pub mod configured {\n\
             \n\
             ERROR: UnresolvedPath - src/lib.rs:13:17 - Path is unresolved\n    \
             let _item = configured_item!();\n\

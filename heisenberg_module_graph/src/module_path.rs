@@ -51,6 +51,13 @@ impl ModulePath {
             segments: self.segments.iter().take(shared_length).cloned().collect(),
         }
     }
+
+    #[must_use]
+    pub fn parent(&self) -> Option<Self> {
+        self.segments.split_last().map(|(_, parent)| Self {
+            segments: parent.to_vec(),
+        })
+    }
 }
 
 impl Display for ModulePath {

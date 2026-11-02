@@ -18,10 +18,10 @@ fn impl_outside_the_file_of_its_struct_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: MisplacedImpl - src/second.rs:4:1 - Impl block belongs in src/first.rs\n\
+            "ERROR: MisplacedImpl - src/second.rs:4:6 - Impl block belongs in src/first.rs\n\
             impl First {\n\
             \n\
-            ERROR: MisplacedImpl - src/second.rs:10:1 - Impl block belongs in src/first.rs\n\
+            ERROR: MisplacedImpl - src/second.rs:10:19 - Impl block belongs in src/first.rs\n\
             impl Greeting for First {\n\
             \n\
             ------------------------------\n\

@@ -1,0 +1,14 @@
+[package]
+name = "unparsable_expansion_of_a_dependency_macro_call"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+macros = { path = "macros" }
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

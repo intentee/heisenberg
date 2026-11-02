@@ -8,3 +8,8 @@ runtime = { path = "runtime" }
 
 [workspace]
 exclude = ["runtime"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

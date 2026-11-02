@@ -1,0 +1,7 @@
+[package]
+name = "heisenberg_error_context"
+edition.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true

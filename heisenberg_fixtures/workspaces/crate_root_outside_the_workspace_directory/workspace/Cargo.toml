@@ -1,0 +1,14 @@
+[package]
+name = "crate_root_outside_the_workspace_directory"
+edition = "2024"
+version = "0.1.0"
+
+[lib]
+path = "../outside/lib.rs"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

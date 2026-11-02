@@ -1,11 +1,17 @@
 use std::collections::BTreeSet;
 
-use serde_json::Value;
+use cargo::workspace::dependency::DepKind;
 
-use crate::dependency_kind::DependencyKind;
+use crate::dependency_kind_document::DependencyKindDocument;
 
 pub struct DependencyDocument {
-    pub json: Value,
-    pub kinds: BTreeSet<DependencyKind>,
+    pub extern_crate_name: String,
+    pub kinds: BTreeSet<DependencyKindDocument>,
     pub package_id: String,
+}
+
+impl DependencyDocument {
+    pub fn has_kind(&self, kind: DepKind) -> bool {
+        self.kinds.iter().any(|document| document.kind == kind)
+    }
 }

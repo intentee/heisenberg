@@ -1,10 +1,10 @@
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 
-use crate::module_unit::ModuleUnit;
+use crate::non_empty::NonEmpty;
+use crate::sibling_edge::SiblingEdge;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CycleWitness {
-    pub dependencies: Vec<ModuleDependency>,
-    pub from: ModuleUnit,
-    pub to: ModuleUnit,
+    pub dependencies: NonEmpty<ModuleDependency>,
+    pub edge: SiblingEdge,
 }

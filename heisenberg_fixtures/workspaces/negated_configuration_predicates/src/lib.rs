@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "optional"), allow(dead_code))]
+
 pub struct Configured;
 
 impl Configured {

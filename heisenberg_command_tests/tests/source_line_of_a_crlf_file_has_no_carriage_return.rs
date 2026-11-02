@@ -23,7 +23,7 @@ fn source_line_of_a_crlf_file_has_no_carriage_return() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: AdditionalPublicItem - src/items.rs:3:1 - Module already has a public item\n\
+            "ERROR: AdditionalPublicItem - src/items.rs:3:8 - Module already has a public item\n\
             pub fn second() {}\n\
             \n\
             ------------------------------\n\

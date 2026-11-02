@@ -3,8 +3,11 @@
 CARGO_HOME ?= $(HOME)/.cargo
 HEISENBERG_CRATES := \
 	heisenberg \
+	heisenberg_absolute_path \
 	heisenberg_analysis_threads \
 	heisenberg_command \
+	heisenberg_error_context \
+	heisenberg_graph_cycles \
 	heisenberg_module_cycles \
 	heisenberg_module_dependencies \
 	heisenberg_module_graph \
@@ -81,10 +84,13 @@ test.coverage: fetch node_modules/.package-lock.json $(TARGET_CFG_TABLES)
 	npx rust-coverage-check target/llvm-cov.json \
 		--workspace-root $(CURDIR) \
 		--gated heisenberg=100 \
+		--gated heisenberg_absolute_path=100 \
 		--gated heisenberg_analysis_threads=100 \
 		--gated heisenberg_command=100 \
 		--gated heisenberg_command_tests=100 \
+		--gated heisenberg_error_context=100 \
 		--gated heisenberg_fixtures=100 \
+		--gated heisenberg_graph_cycles=100 \
 		--gated heisenberg_module_cycles=100 \
 		--gated heisenberg_module_dependencies=100 \
 		--gated heisenberg_module_graph=100 \

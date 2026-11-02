@@ -18,7 +18,7 @@ fn missing_module_file_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: UnresolvedModule - src/lib.rs:1:1 - Module file is unresolved\n\
+            "ERROR: UnresolvedModule - src/lib.rs:1:9 - Module file is unresolved\n\
             pub mod missing;\n\
             \n\
             ------------------------------\n\

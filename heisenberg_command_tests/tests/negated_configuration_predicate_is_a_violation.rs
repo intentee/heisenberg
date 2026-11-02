@@ -18,20 +18,23 @@ fn negated_configuration_predicate_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: NegatedConfiguration - src/lib.rs:4:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            "ERROR: NegatedConfiguration - src/lib.rs:1:1 - Configuration predicate negates a feature, test or debug_assertions\n\
+            #![cfg_attr(not(feature = \"optional\"), allow(dead_code))]\n\
+            \n\
+            ERROR: NegatedConfiguration - src/lib.rs:6:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
             #[cfg(any(windows, not(feature = \"optional\")))]\n\
             \n\
-            ERROR: NegatedConfiguration - src/lib.rs:7:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            ERROR: NegatedConfiguration - src/lib.rs:9:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
             #[cfg_attr(not(test), must_use)]\n\
             \n\
-            ERROR: NegatedConfiguration - src/lib.rs:12:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            ERROR: NegatedConfiguration - src/lib.rs:14:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
             #[cfg(any(windows, all(unix, not(debug_assertions))))]\n\
             \n\
-            ERROR: NegatedConfiguration - src/lib.rs:15:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
+            ERROR: NegatedConfiguration - src/lib.rs:17:5 - Configuration predicate negates a feature, test or debug_assertions\n    \
             #[cfg_attr(unix, cfg(not(feature = \"optional\")))]\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            5 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\

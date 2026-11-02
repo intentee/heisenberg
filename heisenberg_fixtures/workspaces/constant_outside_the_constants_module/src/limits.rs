@@ -7,8 +7,6 @@ pub(crate) const SHARED: u8 = 4;
 pub struct Limits;
 
 impl Limits {
-    pub const MINIMUM: u8 = 1;
-
     const STEP: u8 = 2;
 
     pub fn total() -> u8 {

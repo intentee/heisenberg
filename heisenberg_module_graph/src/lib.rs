@@ -1,7 +1,10 @@
+pub mod configured_out_negations;
 pub mod constants;
 pub mod crate_module_graph;
 pub mod crate_target;
 pub mod crate_target_kind;
+pub mod folded_finding;
+pub mod folded_finding_kind;
 pub mod inactive_region;
 pub mod line_position;
 pub mod module_dependency;
@@ -11,3 +14,5 @@ pub mod shared_module_file;
 pub mod source_location;
 pub mod violation;
 pub mod violation_kind;
+pub mod violation_set;
+pub mod walked_code;

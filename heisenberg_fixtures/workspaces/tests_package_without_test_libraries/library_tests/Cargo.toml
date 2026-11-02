@@ -7,3 +7,8 @@ version = "0.1.0"
 base = { path = "../base" }
 harness = { path = "../harness" }
 library = { path = "../library" }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

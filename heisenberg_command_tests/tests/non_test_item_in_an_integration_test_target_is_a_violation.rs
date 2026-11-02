@@ -18,10 +18,10 @@ fn non_test_item_in_an_integration_test_target_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(
-            "ERROR: NonTestItemInTestTarget - tests/mixed.rs:4:5 - Integration test target holds an item that is neither a test, a constant nor an import\n    \
+            "ERROR: NonTestItemInTestTarget - tests/mixed.rs:4:12 - Integration test target holds an item that is neither a test, a constant nor an import\n    \
             pub fn helper() -> super::Library {\n\
             \n\
-            ERROR: NonTestItemInTestTarget - tests/mixed.rs:9:1 - Integration test target holds an item that is neither a test, a constant nor an import\n\
+            ERROR: NonTestItemInTestTarget - tests/mixed.rs:9:4 - Integration test target holds an item that is neither a test, a constant nor an import\n\
             fn root_helper() -> Library {\n\
             \n\
             ------------------------------\n\

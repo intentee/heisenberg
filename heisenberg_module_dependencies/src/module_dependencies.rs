@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::iter::once;
 
 use ra_ap_hir::Crate;
@@ -7,11 +8,15 @@ use ra_ap_ide_db::base_db::Crate as DatabaseCrate;
 use ra_ap_ide_db::base_db::all_crates;
 use ra_ap_ide_db::base_db::salsa::Durability;
 use ra_ap_ide_db::base_db::set_all_crates_with_durability;
+use ra_ap_vfs::FileId;
 
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_project_model::loaded_project::LoadedProject;
 
 use crate::crate_extraction::CrateExtraction;
+use crate::crate_module_files::crate_module_files;
+use crate::member_crate::MemberCrate;
+use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::name_resolution_priming::NameResolutionPriming;
 use crate::source_locator::SourceLocator;
 
@@ -20,36 +25,21 @@ pub struct ModuleDependencies<'project> {
 }
 
 impl ModuleDependencies<'_> {
-    #[must_use]
-    pub fn extract(&mut self) -> Vec<CrateModuleGraph> {
+    pub fn extract(&mut self) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         let members = self.members();
 
         NameResolutionPriming {
             database: &self.project.database,
-            members: &members,
-        }
-        .prime();
-
-        let crates_sharing_files = self.crates_sharing_files(&members);
-        let mut graphs = self.graphs(
-            &members
+            members: &members
                 .iter()
-                .copied()
-                .filter(|krate| !crates_sharing_files.contains(krate))
+                .map(|member| member.krate)
                 .collect::<Vec<Crate>>(),
-        );
-
-        for krate in crates_sharing_files {
-            self.put_first(krate);
-            graphs.extend(self.graphs(&[krate]));
         }
-
-        graphs.sort();
-
-        graphs
+        .prime()
+        .map(|()| self.member_graphs(&members))
     }
 
-    fn crates_sharing_files(&self, members: &[Crate]) -> Vec<Crate> {
+    fn crates_sharing_files(&self, members: &[MemberCrate]) -> Vec<MemberCrate> {
         let database = &self.project.database;
 
         attach_db(database, || {
@@ -57,9 +47,8 @@ impl ModuleDependencies<'_> {
 
             members
                 .iter()
-                .copied()
-                .filter(|krate| {
-                    krate.modules(database).iter().any(|module| {
+                .filter(|member| {
+                    member.krate.modules(database).iter().any(|module| {
                         module
                             .as_source_file_id(database)
                             .is_some_and(|source_file_id| {
@@ -70,11 +59,16 @@ impl ModuleDependencies<'_> {
                             })
                     })
                 })
+                .cloned()
                 .collect()
         })
     }
 
-    fn graphs(&self, crates: &[Crate]) -> Vec<CrateModuleGraph> {
+    fn graphs(
+        &self,
+        members: &[MemberCrate],
+        workspace_files: &BTreeSet<FileId>,
+    ) -> Vec<CrateModuleGraph> {
         let project = &*self.project;
         let database = &project.database;
 
@@ -86,37 +80,68 @@ impl ModuleDependencies<'_> {
                 workspace_root: &project.workspace_root,
             };
 
-            crates
+            members
                 .iter()
-                .filter_map(|krate| {
-                    project
-                        .member_targets
-                        .get(project.vfs.file_path(krate.root_file(database)))
-                        .map(|crate_target| {
-                            CrateExtraction {
-                                crate_target,
-                                krate: *krate,
-                                locator: &locator,
-                                semantics: &semantics,
-                            }
-                            .graph()
-                        })
-                })
+                .map(
+                    |MemberCrate {
+                         crate_target,
+                         krate,
+                     }| {
+                        CrateExtraction {
+                            crate_target,
+                            krate: *krate,
+                            locator: &locator,
+                            semantics: &semantics,
+                            workspace_files,
+                        }
+                        .graph()
+                    },
+                )
                 .collect()
         })
     }
 
-    fn members(&self) -> Vec<Crate> {
+    fn member_graphs(&mut self, members: &[MemberCrate]) -> Vec<CrateModuleGraph> {
+        let crates_sharing_files = self.crates_sharing_files(members);
+        let workspace_files = self.workspace_files(members);
+        let mut graphs = self.graphs(
+            &members
+                .iter()
+                .filter(|member| {
+                    !crates_sharing_files
+                        .iter()
+                        .any(|sharing| sharing.krate == member.krate)
+                })
+                .cloned()
+                .collect::<Vec<MemberCrate>>(),
+            &workspace_files,
+        );
+
+        for member in crates_sharing_files {
+            self.put_first(member.krate);
+            graphs.extend(self.graphs(&[member], &workspace_files));
+        }
+
+        graphs.sort();
+
+        graphs
+    }
+
+    fn members(&self) -> Vec<MemberCrate> {
         let project = &*self.project;
         let database = &project.database;
 
         attach_db(database, || {
             Crate::all(database)
                 .into_iter()
-                .filter(|krate| {
+                .filter_map(|krate| {
                     project
                         .member_targets
-                        .contains_key(project.vfs.file_path(krate.root_file(database)))
+                        .get(project.vfs.file_path(krate.root_file(database)))
+                        .map(|crate_target| MemberCrate {
+                            crate_target: crate_target.clone(),
+                            krate,
+                        })
                 })
                 .collect()
         })
@@ -135,5 +160,16 @@ impl ModuleDependencies<'_> {
             .collect();
 
         set_all_crates_with_durability(database, order, Durability::MEDIUM);
+    }
+
+    fn workspace_files(&self, members: &[MemberCrate]) -> BTreeSet<FileId> {
+        let database = &self.project.database;
+
+        attach_db(database, || {
+            members
+                .iter()
+                .flat_map(|member| crate_module_files(database, member.krate))
+                .collect()
+        })
     }
 }

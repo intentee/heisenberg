@@ -4,8 +4,8 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
+heisenberg_graph_cycles = { workspace = true }
 heisenberg_module_graph = { workspace = true }
-petgraph = { workspace = true }
 
 [lints]
 workspace = true

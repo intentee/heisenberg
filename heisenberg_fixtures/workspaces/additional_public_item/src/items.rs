@@ -20,3 +20,15 @@ pub mod nested {
 
     pub enum AlsoNested {}
 }
+
+pub type Fifth = u8;
+
+pub macro sixth() {}
+
+unsafe extern "C" {
+    pub safe fn abs(value: i32) -> i32;
+}
+
+pub union Seventh {
+    value: u8,
+}

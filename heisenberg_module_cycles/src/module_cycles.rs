@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
 
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
+use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_path::ModulePath;
 
 use crate::lifted_dependency::LiftedDependency;
 use crate::module_cycle::ModuleCycle;
+use crate::non_empty::NonEmpty;
+use crate::sibling_edge::SiblingEdge;
 use crate::sibling_graph::SiblingGraph;
 
 pub struct ModuleCycles<'graph> {
@@ -14,20 +17,26 @@ pub struct ModuleCycles<'graph> {
 impl ModuleCycles<'_> {
     #[must_use]
     pub fn find(&self) -> Vec<ModuleCycle> {
-        let mut sibling_graphs: BTreeMap<ModulePath, SiblingGraph> = BTreeMap::new();
+        let mut edges_by_container: BTreeMap<
+            ModulePath,
+            BTreeMap<SiblingEdge, NonEmpty<ModuleDependency>>,
+        > = BTreeMap::new();
 
         for dependency in &self.graph.dependencies {
-            let lifted = LiftedDependency::of(dependency);
+            let LiftedDependency { container, edge } = LiftedDependency::of(dependency);
 
-            sibling_graphs
-                .entry(lifted.container.clone())
-                .or_insert_with(|| SiblingGraph::new(lifted.container.clone()))
-                .add(lifted, dependency);
+            NonEmpty::push_into(
+                edges_by_container.entry(container).or_default(),
+                edge,
+                dependency.clone(),
+            );
         }
 
-        sibling_graphs
-            .values()
-            .flat_map(|sibling_graph| sibling_graph.cycles(&self.graph.crate_target))
+        edges_by_container
+            .into_iter()
+            .flat_map(|(container, edges)| {
+                SiblingGraph { container, edges }.cycles(&self.graph.crate_target)
+            })
             .collect()
     }
 }

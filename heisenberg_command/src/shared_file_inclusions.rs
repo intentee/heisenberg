@@ -12,6 +12,7 @@ use crate::target_narrowing::TargetNarrowing;
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct SharedFileInclusions {
     pub inclusions: BTreeMap<ModuleInclusion, BTreeMap<SupportedTarget, ModuleFileAnalysis>>,
+    pub submodule_files: BTreeSet<String>,
 }
 
 impl SharedFileInclusions {
@@ -63,6 +64,11 @@ impl SharedFileInclusions {
                     )
                 },
             )
+            .chain(
+                (!self.submodule_files.is_empty())
+                    .then(|| "  files of its submodules:".to_owned()),
+            )
+            .chain(self.submodule_files.iter().map(|file| format!("    {file}")))
             .collect()
     }
 
