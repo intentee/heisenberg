@@ -6,6 +6,7 @@ use ra_ap_paths::AbsPathBuf;
 
 use heisenberg_error_context::error_context::error_context;
 use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_workspace_build::configured_context::ConfiguredContext;
 
 use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
@@ -17,6 +18,7 @@ use crate::library_directory::library_directory;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_project::ResolvedProject;
+use crate::target_builds::TargetBuilds;
 use crate::utf8_environment::utf8_environment;
 use crate::workspace_manifest::workspace_manifest;
 
@@ -46,7 +48,7 @@ impl ProjectModel {
         let HeisenbergSettings { out_dirs, targets } =
             HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
         let targets = declared_targets(targets, &manifest_path)?;
-        let out_dirs = DeclaredOutDirs {
+        let substituted = DeclaredOutDirs {
             manifest_path: &manifest_path,
             resolved: &project,
             targets: &targets,
@@ -93,12 +95,28 @@ impl ProjectModel {
                 FeatureGraph::new(library)
                     .map_err(Box::new)
                     .map_err(ProjectModelError::LibraryPackageGraph)
-                    .map(|library| ResolvedProject {
-                        library,
-                        out_dirs,
-                        project,
-                        sysroot: self.sysroot.clone(),
-                        targets,
+                    .and_then(|library| {
+                        let build_outputs = TargetBuilds {
+                            context: &ConfiguredContext {
+                                cargo_home: self.cargo_home.as_ref(),
+                                environment: &environment,
+                                nightly_features_allowed: false,
+                                workspace_directory: self.workspace_directory.as_ref(),
+                            },
+                            manifest_path: &manifest_path,
+                            resolved: &project.resolved,
+                            substituted: &substituted,
+                            targets: &targets,
+                        }
+                        .outputs();
+
+                        build_outputs.map(|build_outputs| ResolvedProject {
+                            build_outputs,
+                            library,
+                            project,
+                            sysroot: self.sysroot.clone(),
+                            targets,
+                        })
                     })
             })
     }

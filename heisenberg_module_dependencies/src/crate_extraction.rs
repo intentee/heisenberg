@@ -36,7 +36,9 @@ use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
+use crate::production_options::production_options;
 use crate::source_locator::SourceLocator;
+use crate::test_code::TestCode;
 use crate::test_target_findings::TestTargetFindings;
 use crate::token_origin::TokenOrigin;
 
@@ -46,6 +48,8 @@ pub struct CrateExtraction<'extraction, 'database> {
     pub krate: Crate,
     pub locator: &'extraction SourceLocator<'extraction>,
     pub semantics: &'extraction Semantics<'database, RootDatabase>,
+    pub test_code_files: &'extraction BTreeSet<FileId>,
+    pub unpublished_packages: &'extraction BTreeSet<String>,
     pub workspace_files: &'extraction BTreeSet<FileId>,
 }
 
@@ -59,6 +63,11 @@ impl CrateExtraction<'_, '_> {
             own_files: &own_files,
             semantics: self.semantics,
             workspace_files: self.workspace_files,
+        };
+        let options = self.krate.cfg(database);
+        let test_code = TestCode {
+            files: self.test_code_files,
+            semantics: self.semantics,
         };
         let mut diagnostics = Vec::new();
 
@@ -81,9 +90,12 @@ impl CrateExtraction<'_, '_> {
             krate: self.krate,
             locator: self.locator,
             module_paths: &module_paths,
-            options: self.krate.cfg(database),
+            options,
+            production_options: &production_options(options),
             semantics: self.semantics,
+            test_code: &test_code,
             token_origin: &token_origin,
+            unpublished_packages: self.unpublished_packages,
         };
         let root = self.krate.root_module(database);
         let mut graph = CrateModuleGraph {

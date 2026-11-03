@@ -22,3 +22,8 @@ fn lowered() {}
 fn lowered_group() {}
 
 generator::generated!();
+
+fn suppressed_statement() {
+    #[allow(unused)]
+    println!("suppressed");
+}

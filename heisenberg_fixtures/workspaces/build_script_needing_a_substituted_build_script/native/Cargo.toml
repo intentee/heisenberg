@@ -1,0 +1,10 @@
+[package]
+name = "native"
+edition = "2024"
+version = "0.1.0"
+links = "native"
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

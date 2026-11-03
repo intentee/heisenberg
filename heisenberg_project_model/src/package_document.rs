@@ -2,7 +2,6 @@ use cargo_metadata::Package;
 use cargo_util_schemas::manifest::TomlLints;
 
 use crate::constants::CARGO_MANIFEST_FILE;
-use crate::constants::TESTS_PACKAGE_SUFFIX;
 use crate::dependency_document::DependencyDocument;
 use crate::lint_table::LintTable;
 use crate::lints_source::LintsSource;
@@ -16,13 +15,6 @@ pub struct PackageDocument {
 }
 
 impl PackageDocument {
-    pub fn has_tests_name(&self) -> bool {
-        self.metadata
-            .name
-            .strip_suffix(TESTS_PACKAGE_SUFFIX)
-            .is_some_and(|stem| !stem.is_empty())
-    }
-
     pub fn lint_table(&self, workspace_path: &WorkspacePath<'_>) -> LintTable {
         match self.lints_source {
             LintsSource::Package => LintTable::Package {

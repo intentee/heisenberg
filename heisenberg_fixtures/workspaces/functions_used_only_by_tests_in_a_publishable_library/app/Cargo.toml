@@ -1,0 +1,13 @@
+[package]
+name = "app"
+edition = "2024"
+version = "0.1.0"
+publish = false
+
+[dependencies]
+functions_used_only_by_tests_in_a_publishable_library = { path = ".." }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

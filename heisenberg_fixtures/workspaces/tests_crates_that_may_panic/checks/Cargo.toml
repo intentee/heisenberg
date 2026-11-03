@@ -1,0 +1,11 @@
+[package]
+name = "checks"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+library = { path = "../library" }
+shared_tests = { path = "../shared_tests" }
+
+[lints.clippy]
+dbg_macro = "deny"

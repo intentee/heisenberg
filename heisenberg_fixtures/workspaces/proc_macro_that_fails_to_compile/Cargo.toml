@@ -1,0 +1,18 @@
+[package]
+name = "proc_macro_that_fails_to_compile"
+edition = "2024"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[workspace]
+members = ["user"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]

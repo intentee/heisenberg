@@ -1,0 +1,29 @@
+[package]
+name = "out_dir_of_an_ambiguous_package"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+getrandom_old = { package = "getrandom", version = "=0.3.4" }
+getrandom_new = { package = "getrandom", version = "=0.4.3" }
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+
+[workspace.metadata.heisenberg.out_dirs.getrandom]
+directory = "generated"
+
+[workspace.metadata.heisenberg.out_dirs.getrandom.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.getrandom.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}

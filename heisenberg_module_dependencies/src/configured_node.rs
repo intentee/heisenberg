@@ -2,10 +2,10 @@ use std::ops::ControlFlow;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
-use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
+use crate::attribute_owner::attribute_owner;
 use crate::negated_configuration::NegatedConfiguration;
 use crate::visit_active_metas::visit_active_metas;
 
@@ -30,7 +30,7 @@ impl ConfiguredNode<'_> {
     }
 
     pub fn negated_attributes(&self) -> Vec<ast::Attr> {
-        ast::AnyHasAttrs::cast(self.node.clone())
+        attribute_owner(self.node)
             .into_iter()
             .flat_map(|owner| ast::attrs_including_inner(&owner).collect::<Vec<ast::Attr>>())
             .filter(|attribute| attribute.meta().is_some_and(|meta| Self::negates(&meta)))

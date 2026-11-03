@@ -2511,23 +2511,36 @@ dependencies = [
  "heisenberg_error_context",
  "heisenberg_graph_cycles",
  "heisenberg_module_graph",
+ "heisenberg_workspace_build",
  "ra_ap_cfg",
  "ra_ap_ide_db",
  "ra_ap_intern",
  "ra_ap_load-cargo",
  "ra_ap_paths",
+ "ra_ap_proc_macro_api",
  "ra_ap_project_model",
  "ra_ap_vfs",
  "serde",
  "serde_json",
  "thiserror",
  "toml",
+ "triomphe",
 ]
 
 [[package]]
 name = "heisenberg_test_harness"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "heisenberg_workspace_build"
+version = "0.1.0"
+dependencies = [
+ "cargo",
+ "cargo-util-terminal",
+ "cargo_metadata",
  "thiserror",
 ]
 

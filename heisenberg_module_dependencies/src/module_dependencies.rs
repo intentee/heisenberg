@@ -95,6 +95,7 @@ impl ModuleDependencies<'_> {
         &self,
         members: &[MemberCrate],
         workspace_files: &BTreeSet<FileId>,
+        test_code_files: &BTreeSet<FileId>,
     ) -> Vec<CrateModuleGraph> {
         let project = &*self.project;
         let database = &project.database;
@@ -120,6 +121,8 @@ impl ModuleDependencies<'_> {
                             krate: *krate,
                             locator: &locator,
                             semantics: &semantics,
+                            test_code_files,
+                            unpublished_packages: &project.unpublished_packages,
                             workspace_files,
                         }
                         .graph()
@@ -131,7 +134,15 @@ impl ModuleDependencies<'_> {
 
     fn member_graphs(&mut self, members: &[MemberCrate]) -> Vec<CrateModuleGraph> {
         let crates_sharing_files = self.crates_sharing_files(members);
-        let workspace_files = self.workspace_files(members);
+        let workspace_files = self.module_files(members.iter());
+        let test_code_files =
+            self.module_files(members.iter().filter(|MemberCrate { crate_target, .. }| {
+                crate_target.kind == CrateTargetKind::IntegrationTest
+                    || self
+                        .project
+                        .test_crates
+                        .contains(&crate_target.package_name)
+            }));
         let mut graphs = self.graphs(
             &members
                 .iter()
@@ -143,11 +154,12 @@ impl ModuleDependencies<'_> {
                 .cloned()
                 .collect::<Vec<MemberCrate>>(),
             &workspace_files,
+            &test_code_files,
         );
 
         for member in crates_sharing_files {
             self.put_first(member.krate);
-            graphs.extend(self.graphs(&[member], &workspace_files));
+            graphs.extend(self.graphs(&[member], &workspace_files, &test_code_files));
         }
 
         graphs.sort();
@@ -175,6 +187,19 @@ impl ModuleDependencies<'_> {
         })
     }
 
+    fn module_files<'members>(
+        &self,
+        members: impl Iterator<Item = &'members MemberCrate>,
+    ) -> BTreeSet<FileId> {
+        let database = &self.project.database;
+
+        attach_db(database, || {
+            members
+                .flat_map(|member| crate_module_files(database, member.krate))
+                .collect()
+        })
+    }
+
     fn put_first(&mut self, krate: Crate) {
         let database = &mut self.project.database;
         let first = DatabaseCrate::from(krate);
@@ -188,16 +213,5 @@ impl ModuleDependencies<'_> {
             .collect();
 
         set_all_crates_with_durability(database, order, Durability::MEDIUM);
-    }
-
-    fn workspace_files(&self, members: &[MemberCrate]) -> BTreeSet<FileId> {
-        let database = &self.project.database;
-
-        attach_db(database, || {
-            members
-                .iter()
-                .flat_map(|member| crate_module_files(database, member.krate))
-                .collect()
-        })
     }
 }

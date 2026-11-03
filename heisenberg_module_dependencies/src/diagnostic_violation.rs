@@ -6,13 +6,10 @@ use ra_ap_hir::UnresolvedMacroCall;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::AstPtr;
-use ra_ap_syntax::TextRange;
-use ra_ap_syntax::ast;
 use ra_ap_vfs::FileId;
 
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
-use crate::attributed_item::AttributedItem;
 use crate::covering_ancestors::CoveringAncestors;
 use crate::diagnostic_site::DiagnosticSite;
 use crate::item_focus::ItemFocus;
@@ -68,21 +65,6 @@ impl DiagnosticViolation<'_, '_> {
         })
     }
 
-    fn is_procedural_attribute_input(&self, range: InFile<TextRange>) -> bool {
-        let semantics = self.semantics;
-
-        CoveringAncestors { range, semantics }
-            .nodes()
-            .filter_map(ast::Item::cast)
-            .any(|item| {
-                AttributedItem {
-                    item: &item,
-                    semantics,
-                }
-                .has_procedural_attribute()
-            })
-    }
-
     fn site(&self) -> Option<DiagnosticSite> {
         let semantics = self.semantics;
 
@@ -116,9 +98,7 @@ impl DiagnosticViolation<'_, '_> {
                 },
             }),
             AnyDiagnostic::UnresolvedMacroCall(diagnostic)
-                if (diagnostic.is_bang
-                    || !self.is_procedural_attribute_input(diagnostic.range))
-                    && !self.is_bound_by_unresolved_import(diagnostic) =>
+                if !self.is_bound_by_unresolved_import(diagnostic) =>
             {
                 Some(DiagnosticSite {
                     origin: diagnostic.range,

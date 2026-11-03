@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use ra_ap_cfg::CfgAtom;
+use ra_ap_cfg::CfgDiff;
 use ra_ap_cfg::CfgOptions;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::all_crates;
@@ -14,6 +15,7 @@ use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::test_harness::TestHarness;
 
 pub struct ExactCrateCfg<'assignment> {
+    pub build_script_atoms: &'assignment HashMap<VfsPath, Vec<CfgAtom>>,
     pub library_atoms: &'assignment [CfgAtom],
     pub member_targets: &'assignment HashMap<VfsPath, CrateTarget>,
     pub vfs: &'assignment Vfs,
@@ -39,14 +41,15 @@ impl ExactCrateCfg<'_> {
                     .collect::<CfgOptions>()
             } else {
                 let mut options = current.clone();
+                let root = self.vfs.file_path(data.root_file_id);
 
-                if self
-                    .member_targets
-                    .get(self.vfs.file_path(data.root_file_id))
-                    .is_some_and(|CrateTarget { test_harness, .. }| {
-                        *test_harness == TestHarness::Libtest
-                    })
-                {
+                if let Some(atoms) = self.build_script_atoms.get(root) {
+                    options.apply_diff(CfgDiff::new(atoms.clone(), Vec::new()));
+                }
+
+                if self.member_targets.get(root).is_some_and(
+                    |CrateTarget { test_harness, .. }| *test_harness == TestHarness::Libtest,
+                ) {
                     options.insert_atom(sym::test);
                 }
 

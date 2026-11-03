@@ -72,5 +72,3 @@ pub const RUSTFLAGS_VARIABLES: [&str; 2] = ["CARGO_ENCODED_RUSTFLAGS", "RUSTFLAG
 pub const RUST_TOOL: &str = "rust";
 
 pub const RUST_WARNINGS_GROUP: &str = "warnings";
-
-pub const TESTS_PACKAGE_SUFFIX: &str = "_tests";

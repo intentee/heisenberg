@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use cargo::context::Definition;
 use cargo_platform::ParseError;
 use guppy::errors;
+use ra_ap_ide_db::base_db::ProcMacroLoadingError;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_paths::Utf8PathBuf;
 use ra_ap_vfs::VfsPath;
@@ -15,6 +16,7 @@ use toml::de;
 
 use heisenberg_error_context::contextual_error::ContextualError;
 use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_workspace_build::workspace_build_error::WorkspaceBuildError;
 
 use crate::constants::CARGO_ENVIRONMENT_TABLE;
 use crate::constants::CLIPPY_ARGUMENTS_VARIABLE;
@@ -156,11 +158,37 @@ pub enum ProjectModelError {
     #[error("the configured value of `{}` is not UTF-8", .0.context)]
     NonUtf8ConfiguredEnvironmentValue(ContextualError<String, OsString>),
     #[error(
-        "`{manifest_path}` declares an out-dir for `{package}`, which is not a workspace member"
+        "`{manifest_path}` declares an out-dir for `{package}`, which is not a package of the workspace"
     )]
     UnknownOutDirPackage {
         manifest_path: AbsPathBuf,
         package: String,
+    },
+    #[error(
+        "`{manifest_path}` declares an out-dir for `{package}`, which names {} packages of the workspace: {}",
+        versions.len(),
+        versions.join(", ")
+    )]
+    AmbiguousOutDirPackage {
+        manifest_path: AbsPathBuf,
+        package: String,
+        versions: Vec<String>,
+    },
+    #[error(
+        "`{manifest_path}` declares an out-dir for `{package}` without the cfgs and env of its build script for {target}"
+    )]
+    OutDirTargetUndeclared {
+        manifest_path: AbsPathBuf,
+        package: String,
+        target: String,
+    },
+    #[error(
+        "`{manifest_path}` declares an out-dir for `{package}` with the build script output of {target}, which is not a declared target"
+    )]
+    UnknownOutDirTarget {
+        manifest_path: AbsPathBuf,
+        package: String,
+        target: String,
     },
     #[error("`{manifest_path}` declares an out-dir for `{package}`, which has no build script")]
     OutDirPackageWithoutBuildScript {
@@ -175,6 +203,20 @@ pub enum ProjectModelError {
         manifest_path: AbsPathBuf,
         package: String,
     },
+    #[error("the build scripts and procedural macros of the workspace cannot be built for {}", .0.context.triple())]
+    WorkspaceBuild(#[source] ContextualError<SupportedTarget, WorkspaceBuildError>),
+    #[error("the embedded target specification cannot be read")]
+    TargetSpec(#[source] error::Error),
+    #[error("the build script output cfg `{}` cannot be parsed", .0.context)]
+    BuildScriptCfg(#[source] ContextualError<String, ParseError>),
+    #[error("the build script output `{}` cannot be read", .0.context.display())]
+    UnreadableBuildScriptOutput(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("the procedural macros of `{}` cannot be loaded", .0.context)]
+    ProcMacroLoad(#[source] ContextualError<AbsPathBuf, ProcMacroLoadingError>),
+    #[error("the sysroot has no procedural macro server")]
+    ProcMacroServerMissing(#[source] Box<dyn Error + Send + Sync>),
+    #[error("the procedural macro server `{}` cannot be started", .0.context)]
+    ProcMacroServerSpawn(#[source] ContextualError<AbsPathBuf, io::Error>),
     #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
     UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]

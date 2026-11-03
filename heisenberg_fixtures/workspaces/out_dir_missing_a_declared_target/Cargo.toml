@@ -5,5 +5,13 @@ resolver = "3"
 [workspace.metadata.heisenberg]
 targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
 
-[workspace.metadata.heisenberg.out_dirs]
-bindings_sys = "bindings_sys/generated"
+[workspace.metadata.heisenberg.out_dirs.bindings_sys]
+directory = "bindings_sys/generated"
+
+[workspace.metadata.heisenberg.out_dirs.bindings_sys.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.bindings_sys.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}

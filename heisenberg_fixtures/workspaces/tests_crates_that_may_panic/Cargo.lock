@@ -3,11 +3,7 @@
 version = 4
 
 [[package]]
-name = "library"
-version = "0.1.0"
-
-[[package]]
-name = "library_tests"
+name = "checks"
 version = "0.1.0"
 dependencies = [
  "library",
@@ -15,5 +11,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "library"
+version = "0.1.0"
+
+[[package]]
 name = "shared_tests"
+version = "0.1.0"
+
+[[package]]
+name = "tool"
 version = "0.1.0"

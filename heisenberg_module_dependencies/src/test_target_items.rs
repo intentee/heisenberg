@@ -31,26 +31,25 @@ impl TestTargetItems<'_, '_> {
                 semantics: self.semantics,
             };
 
-            !attributed.has_procedural_attribute()
-                && match item {
-                    ast::Item::Const(_) | ast::Item::Module(_) | ast::Item::Use(_) => false,
-                    ast::Item::Fn(function) => {
-                        !attributed.has_test_attribute() && !self.is_entry_point(function)
-                    }
-                    ast::Item::AsmExpr(_)
-                    | ast::Item::Enum(_)
-                    | ast::Item::ExternBlock(_)
-                    | ast::Item::ExternCrate(_)
-                    | ast::Item::Impl(_)
-                    | ast::Item::MacroCall(_)
-                    | ast::Item::MacroDef(_)
-                    | ast::Item::MacroRules(_)
-                    | ast::Item::Static(_)
-                    | ast::Item::Struct(_)
-                    | ast::Item::Trait(_)
-                    | ast::Item::TypeAlias(_)
-                    | ast::Item::Union(_) => true,
+            match item {
+                ast::Item::Const(_) | ast::Item::Module(_) | ast::Item::Use(_) => false,
+                ast::Item::Fn(function) => {
+                    !attributed.has_test_attribute() && !self.is_entry_point(function)
                 }
+                ast::Item::AsmExpr(_)
+                | ast::Item::Enum(_)
+                | ast::Item::ExternBlock(_)
+                | ast::Item::ExternCrate(_)
+                | ast::Item::Impl(_)
+                | ast::Item::MacroCall(_)
+                | ast::Item::MacroDef(_)
+                | ast::Item::MacroRules(_)
+                | ast::Item::Static(_)
+                | ast::Item::Struct(_)
+                | ast::Item::Trait(_)
+                | ast::Item::TypeAlias(_)
+                | ast::Item::Union(_) => true,
+            }
         })
         .collect()
     }

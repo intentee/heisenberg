@@ -17,7 +17,7 @@ fn negated_configuration_predicate_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("NegatedConfiguration: 5 violations\n\
+        Ok("NegatedConfiguration: 6 violations\n\
             Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
             \n\
             - src/lib.rs:1:1: Configuration predicate negates a feature, test or debug_assertions\n    \
@@ -30,9 +30,12 @@ fn negated_configuration_predicate_is_a_violation() {
             #[cfg(any(windows, all(unix, not(debug_assertions))))]\n\
             - src/lib.rs:17:5: Configuration predicate negates a feature, test or debug_assertions\n        \
             #[cfg_attr(unix, cfg(not(feature = \"optional\")))]\n\
+            - src/lib.rs:30:9: Configuration predicate negates a feature, test or debug_assertions\n            \
+            #[cfg(not(feature = \"optional\"))]\n      \
+            code active on no declared target at src/lib.rs:31:9\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            6 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\

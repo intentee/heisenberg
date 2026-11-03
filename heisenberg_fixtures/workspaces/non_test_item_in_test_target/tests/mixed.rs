@@ -18,3 +18,7 @@ fn builtin_test() {
 
 #[runtime::test]
 fn attribute_macro_test() {}
+
+#[test]
+#[ignore = "the scenario needs no run"]
+fn ignored_test() {}

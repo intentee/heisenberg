@@ -6,9 +6,9 @@ use cargo_platform::ParseError;
 use guppy::platform::Platform;
 use guppy::platform::TargetFeatures;
 use ra_ap_cfg::CfgAtom;
-use ra_ap_intern::Symbol;
 use ra_ap_intern::sym;
 
+use crate::cfg_atom::cfg_atom;
 use crate::project_model_error::ProjectModelError;
 
 pub struct RustcCfg {
@@ -23,16 +23,7 @@ impl RustcCfg {
             .map(Cfg::from_str)
             .collect::<Result<Vec<Cfg>, ParseError>>()
             .map(|cfgs| Self {
-                atoms: cfgs
-                    .into_iter()
-                    .map(|cfg| match cfg {
-                        Cfg::Name(name) => CfgAtom::Flag(Symbol::intern(&name.name)),
-                        Cfg::KeyPair(key, value) => CfgAtom::KeyValue {
-                            key: Symbol::intern(&key.name),
-                            value: Symbol::intern(&value),
-                        },
-                    })
-                    .collect(),
+                atoms: cfgs.into_iter().map(cfg_atom).collect(),
                 table,
             })
     }

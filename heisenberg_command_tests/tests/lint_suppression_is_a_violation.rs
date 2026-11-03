@@ -17,7 +17,7 @@ fn lint_suppression_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("LintSuppression: 7 violations\n\
+        Ok("LintSuppression: 8 violations\n\
             Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports.\n\
             \n\
             - src/lib.rs:1:4: Attribute suppresses lints\n    \
@@ -34,9 +34,11 @@ fn lint_suppression_is_a_violation() {
             #[warn(clippy::unwrap_used)]\n\
             - src/suppressed.rs:21:3: Attribute suppresses lints\n    \
             #[warn(clippy::restriction)]\n\
+            - src/suppressed.rs:27:7: Attribute suppresses lints\n        \
+            #[allow(unused)]\n\
             \n\
             ------------------------------\n\
-            7 errors found\n\
+            8 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\

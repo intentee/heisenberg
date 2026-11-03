@@ -20,8 +20,8 @@ fn declared_out_dir_stands_in_for_the_build_script_output() {
         Ok("------------------------------\n\
             No errors found!\n\
             ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 3 crate targets, 3 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 3 modules\n\
+            Analysed on x86_64-pc-windows-msvc: 3 crate targets, 5 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 5 modules\n\
             Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);

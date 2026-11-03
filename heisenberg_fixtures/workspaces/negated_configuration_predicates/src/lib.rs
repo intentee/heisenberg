@@ -25,4 +25,9 @@ impl Configured {
 
     #[cfg(not(first, second))]
     pub fn invalid_predicate() {}
+
+    pub fn negated_statement() {
+        #[cfg(not(feature = "optional"))]
+        println!("negated");
+    }
 }

@@ -1,0 +1,17 @@
+[workspace]
+members = ["native", "wrapper"]
+resolver = "3"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+
+[workspace.metadata.heisenberg.out_dirs.native]
+directory = "native/generated"
+
+[workspace.metadata.heisenberg.out_dirs.native.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.native.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}

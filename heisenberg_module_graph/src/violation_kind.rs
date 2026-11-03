@@ -4,12 +4,22 @@ use std::fmt::Formatter;
 
 use crate::constants::CONSTANTS_MODULE_NAME;
 
+macro_rules! resolution_purpose {
+    ($instruction:literal) => {
+        concat!(
+            "Every name must resolve for the analysis to be complete. ",
+            $instruction
+        )
+    };
+}
+
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ViolationKind {
     AdditionalPublicItem,
     ComputedEnvironmentVariableName,
     ConfigurationSelectionMacro,
     FailedMacroExpansion,
+    FunctionUsedOnlyByTests,
     GlobImport,
     InvalidMacroDefinition,
     ImplWithoutLocalType,
@@ -42,11 +52,13 @@ pub enum ViolationKind {
     PublicAssociatedConstant,
     PublicConstantOutsideConstantsModule,
     Reexport,
+    TestOnlyCodeInProduction,
     UnimplementedBuiltinMacro,
     UnmappedItem,
     UnparsableMacroExpansion,
     UnresolvedExternCrate,
     UnresolvedMacroCall,
+    UnresolvedMethodCall,
     UnresolvedModule,
     UnresolvedPath,
     UndeclaredEnvironmentVariable {
@@ -62,6 +74,7 @@ impl ViolationKind {
             Self::ComputedEnvironmentVariableName => "ComputedEnvironmentVariableName",
             Self::ConfigurationSelectionMacro => "ConfigurationSelectionMacro",
             Self::FailedMacroExpansion => "FailedMacroExpansion",
+            Self::FunctionUsedOnlyByTests => "FunctionUsedOnlyByTests",
             Self::GlobImport => "GlobImport",
             Self::InvalidMacroDefinition => "InvalidMacroDefinition",
             Self::ImplWithoutLocalType => "ImplWithoutLocalType",
@@ -80,11 +93,13 @@ impl ViolationKind {
             Self::PublicAssociatedConstant => "PublicAssociatedConstant",
             Self::PublicConstantOutsideConstantsModule => "PublicConstantOutsideConstantsModule",
             Self::Reexport => "Reexport",
+            Self::TestOnlyCodeInProduction => "TestOnlyCodeInProduction",
             Self::UnimplementedBuiltinMacro => "UnimplementedBuiltinMacro",
             Self::UnmappedItem => "UnmappedItem",
             Self::UnparsableMacroExpansion => "UnparsableMacroExpansion",
             Self::UnresolvedExternCrate => "UnresolvedExternCrate",
             Self::UnresolvedMacroCall => "UnresolvedMacroCall",
+            Self::UnresolvedMethodCall => "UnresolvedMethodCall",
             Self::UnresolvedModule => "UnresolvedModule",
             Self::UnresolvedPath => "UnresolvedPath",
             Self::UndeclaredEnvironmentVariable { .. } => "UndeclaredEnvironmentVariable",
@@ -105,6 +120,9 @@ impl ViolationKind {
             }
             Self::FailedMacroExpansion => {
                 "A macro call that fails to expand produces no code to analyse. Fix the call so it expands."
+            }
+            Self::FunctionUsedOnlyByTests => {
+                "Production code holds only what production uses. Move a function that only tests use into a test crate: a leaf package with integration tests and at most a library for them."
             }
             Self::GlobImport => {
                 "Glob imports hide where names come from. Import each name explicitly."
@@ -160,6 +178,9 @@ impl ViolationKind {
             Self::Reexport => {
                 "Every item is reachable through exactly one path. Import the item from where it is defined instead of re-exporting it."
             }
+            Self::TestOnlyCodeInProduction => {
+                "Production code holds only what production runs. Keep unit tests in the inline #[cfg(test)] mod tests of the file they test, and move every other piece of test-only code into a test crate."
+            }
             Self::UnimplementedBuiltinMacro => {
                 "rust-analyzer cannot expand this built-in macro, so its output cannot be analysed. Replace the call with code that can be analysed."
             }
@@ -170,19 +191,18 @@ impl ViolationKind {
                 "A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust."
             }
             Self::UnresolvedExternCrate => {
-                "Every name must resolve for the analysis to be complete. Declare the crate as a dependency or remove the declaration."
+                resolution_purpose!("Declare the crate as a dependency or remove the declaration.")
             }
-            Self::UnresolvedMacroCall => {
-                "Every name must resolve for the analysis to be complete. Define or import the macro."
+            Self::UnresolvedMacroCall => resolution_purpose!("Define or import the macro."),
+            Self::UnresolvedMethodCall => {
+                resolution_purpose!("Fix the call so its method resolves.")
             }
             Self::UnresolvedModule => {
-                "Every name must resolve for the analysis to be complete. Create the module file or remove the declaration."
+                resolution_purpose!("Create the module file or remove the declaration.")
             }
-            Self::UnresolvedPath => {
-                "Every name must resolve for the analysis to be complete. Fix the path so it resolves."
-            }
+            Self::UnresolvedPath => resolution_purpose!("Fix the path so it resolves."),
             Self::UndeclaredEnvironmentVariable { .. } => {
-                "A compile-time environment variable that a build script or the shell sets is an input Heisenberg cannot see, so the analysis would use a wrong value. Read only variables cargo sets, declare the variable in the [env] table of the cargo configuration, or read it at run time."
+                "A compile-time environment variable that only the shell sets is an input Heisenberg cannot see, so the analysis would use a wrong value. Read only variables that cargo or a build script sets, declare the variable in the [env] table of the cargo configuration, or read it at run time."
             }
         }
     }
@@ -201,6 +221,7 @@ impl Display for ViolationKind {
                 "Configuration selection macro keeps the arms it does not select out of the analysis",
             ),
             Self::FailedMacroExpansion => formatter.write_str("Macro expansion failed"),
+            Self::FunctionUsedOnlyByTests => formatter.write_str("Function is used only by tests"),
             Self::GlobImport => formatter.write_str("Glob import"),
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
@@ -251,6 +272,8 @@ impl Display for ViolationKind {
                 "Public constant belongs in crate::{CONSTANTS_MODULE_NAME}"
             ),
             Self::Reexport => formatter.write_str("Re-export"),
+            Self::TestOnlyCodeInProduction => formatter
+                .write_str("Code exists only under cfg(test) outside the unit-test module"),
             Self::UnimplementedBuiltinMacro => {
                 formatter.write_str("Built-in macro is not implemented")
             }
@@ -260,11 +283,12 @@ impl Display for ViolationKind {
             }
             Self::UnresolvedExternCrate => formatter.write_str("Extern crate is unresolved"),
             Self::UnresolvedMacroCall => formatter.write_str("Macro call is unresolved"),
+            Self::UnresolvedMethodCall => formatter.write_str("Method call is unresolved"),
             Self::UnresolvedModule => formatter.write_str("Module file is unresolved"),
             Self::UnresolvedPath => formatter.write_str("Path is unresolved"),
             Self::UndeclaredEnvironmentVariable { variable } => write!(
                 formatter,
-                "Macro call reads {variable}, which neither cargo nor the [env] configuration sets"
+                "Macro call reads {variable}, which neither cargo, a build script nor the [env] configuration sets"
             ),
         }
     }

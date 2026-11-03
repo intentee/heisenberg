@@ -20,7 +20,7 @@ fn out_dir_of_an_unknown_package_fails_to_load_the_project() {
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the project cannot be loaded\n\
-             error: `{}` declares an out-dir for `missing`, which is not a workspace member\n",
+             error: `{}` declares an out-dir for `missing`, which is not a package of the workspace\n",
             workspace.join("Cargo.toml").display()
         )
         .as_str())

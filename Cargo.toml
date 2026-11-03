@@ -14,6 +14,7 @@ members = [
     "heisenberg_module_graph",
     "heisenberg_project_model",
     "heisenberg_test_harness",
+    "heisenberg_workspace_build",
 ]
 resolver = "3"
 
@@ -23,6 +24,127 @@ version = "0.1.0"
 
 [workspace.metadata.heisenberg]
 targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+
+[workspace.metadata.heisenberg.out_dirs.blake3]
+directory = "build_script_outputs/blake3"
+
+[workspace.metadata.heisenberg.out_dirs.blake3.targets.x86_64-pc-windows-msvc]
+cfgs = ["blake3_sse2_ffi", "blake3_sse41_ffi", "blake3_avx2_ffi", "blake3_avx512_ffi"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.blake3.targets.x86_64-unknown-linux-gnu]
+cfgs = ["blake3_sse2_ffi", "blake3_sse41_ffi", "blake3_avx2_ffi", "blake3_avx512_ffi"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.cargo]
+directory = "build_script_outputs/cargo"
+
+[workspace.metadata.heisenberg.out_dirs.cargo.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = { RUST_HOST_TARGET = "x86_64-pc-windows-msvc" }
+
+[workspace.metadata.heisenberg.out_dirs.cargo.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = { RUST_HOST_TARGET = "x86_64-unknown-linux-gnu" }
+
+[workspace.metadata.heisenberg.out_dirs.curl]
+directory = "build_script_outputs/curl"
+
+[workspace.metadata.heisenberg.out_dirs.curl.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.curl.targets.x86_64-unknown-linux-gnu]
+cfgs = ["need_openssl_probe"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.curl-sys]
+directory = "build_script_outputs/curl-sys"
+
+[workspace.metadata.heisenberg.out_dirs.curl-sys.targets.x86_64-pc-windows-msvc]
+cfgs = ["libcurl_vendored", "link_libnghttp2", "link_libz"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.curl-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = ["libcurl_vendored", "link_libnghttp2", "link_libz", "link_openssl"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libgit2-sys]
+directory = "build_script_outputs/libgit2-sys"
+
+[workspace.metadata.heisenberg.out_dirs.libgit2-sys.targets.x86_64-pc-windows-msvc]
+cfgs = ["libgit2_vendored"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libgit2-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = ["libgit2_vendored"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libnghttp2-sys]
+directory = "build_script_outputs/libnghttp2-sys"
+
+[workspace.metadata.heisenberg.out_dirs.libnghttp2-sys.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libnghttp2-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libsqlite3-sys]
+directory = "build_script_outputs/libsqlite3-sys"
+
+[workspace.metadata.heisenberg.out_dirs.libsqlite3-sys.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libsqlite3-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libssh2-sys]
+directory = "build_script_outputs/libssh2-sys"
+
+[workspace.metadata.heisenberg.out_dirs.libssh2-sys.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libssh2-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libz-sys]
+directory = "build_script_outputs/libz-sys"
+
+[workspace.metadata.heisenberg.out_dirs.libz-sys.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libz-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.openssl]
+directory = "build_script_outputs/openssl"
+
+[workspace.metadata.heisenberg.out_dirs.openssl.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.openssl.targets.x86_64-unknown-linux-gnu]
+cfgs = ['osslconf="OPENSSL_NO_IDEA"', 'osslconf="OPENSSL_NO_CAMELLIA"', 'osslconf="OPENSSL_NO_COMP"', 'osslconf="OPENSSL_NO_SSL3_METHOD"', 'osslconf="OPENSSL_NO_SEED"', "ossl101", "ossl102", "ossl110", "ossl110g", "ossl110h", "ossl111", "ossl111d", "ossl300", "ossl310", "ossl320", "ossl330", "ossl340", "ossl350"]
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.openssl-sys]
+directory = "build_script_outputs/openssl-sys"
+
+[workspace.metadata.heisenberg.out_dirs.openssl-sys.targets.x86_64-pc-windows-msvc]
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.openssl-sys.targets.x86_64-unknown-linux-gnu]
+cfgs = ['osslconf="OPENSSL_NO_IDEA"', 'osslconf="OPENSSL_NO_CAMELLIA"', 'osslconf="OPENSSL_NO_COMP"', 'osslconf="OPENSSL_NO_SSL3_METHOD"', 'osslconf="OPENSSL_NO_SEED"', "openssl", "ossl101", "ossl102", "ossl102f", "ossl102h", "ossl110", "ossl110f", "ossl110g", "ossl110h", "ossl111", "ossl111b", "ossl111c", "ossl111d", "ossl300", "ossl320", "ossl330", "ossl340", "ossl350"]
+env = {}
 
 [workspace.dependencies]
 cargo = { version = "0.100", features = ["vendored-libgit2", "vendored-openssl"] }
@@ -43,6 +165,7 @@ heisenberg_module_dependencies = { version = "0.1", path = "heisenberg_module_de
 heisenberg_module_graph = { version = "0.1", path = "heisenberg_module_graph" }
 heisenberg_project_model = { version = "0.1", path = "heisenberg_project_model" }
 heisenberg_test_harness = { version = "0.1", path = "heisenberg_test_harness" }
+heisenberg_workspace_build = { version = "0.1", path = "heisenberg_workspace_build" }
 itertools = "0.15"
 petgraph = "0.8"
 ra_ap_cfg = "0.0.358"
@@ -53,6 +176,7 @@ ra_ap_ide_db = "0.0.358"
 ra_ap_intern = "0.0.358"
 ra_ap_load-cargo = "0.0.358"
 ra_ap_paths = "0.0.358"
+ra_ap_proc_macro_api = "0.0.358"
 ra_ap_project_model = "0.0.358"
 ra_ap_stdx = "0.0.358"
 ra_ap_syntax = "0.0.358"
@@ -60,6 +184,7 @@ ra_ap_vfs = "0.0.358"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+triomphe = "0.1"
 toml = "1.1"
 
 [profile.dev.package."*"]

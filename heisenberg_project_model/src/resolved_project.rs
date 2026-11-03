@@ -1,14 +1,19 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use cargo_metadata::TargetKind;
+use cargo_platform::Cfg;
 use guppy::graph::feature::StandardFeatures;
 use guppy::platform::Platform;
 use ra_ap_cfg::CfgAtom;
 use ra_ap_cfg::CfgDiff;
 use ra_ap_ide_db::FxHashMap;
 use ra_ap_ide_db::base_db::Env;
+use ra_ap_ide_db::base_db::target::Arch;
+use ra_ap_ide_db::base_db::target::TargetData;
 use ra_ap_intern::sym;
 use ra_ap_load_cargo::LoadCargoConfig;
 use ra_ap_load_cargo::ProcMacroServerChoice;
@@ -24,21 +29,51 @@ use ra_ap_project_model::Sysroot;
 use ra_ap_project_model::WorkspaceBuildScripts;
 use ra_ap_vfs::VfsPath;
 
-use crate::disabled_proc_macros::DisabledProcMacros;
+use heisenberg_error_context::error_context::error_context;
+use heisenberg_workspace_build::build_outputs::BuildOutputs;
+use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
+
+use crate::build_script_environment::BuildScriptEnvironment;
+use crate::cfg_atom::cfg_atom;
 use crate::exact_crate_cfg::ExactCrateCfg;
 use crate::feature_graph::FeatureGraph;
 use crate::library_directory::library_directory;
 use crate::library_project_json::LibraryProjectJson;
+use crate::loaded_proc_macros::LoadedProcMacros;
 use crate::loaded_project::LoadedProject;
-use crate::out_dir_environment::OutDirEnvironment;
+use crate::out_dir_files::OutDirFiles;
+use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::supported_target::SupportedTarget;
 use crate::target_cfg::TargetCfg;
 use crate::workspace_manifest::workspace_manifest;
 
+fn build_script_atoms(
+    crate_packages: &HashMap<VfsPath, String>,
+    build_scripts: &BTreeMap<String, BuildScriptOutput>,
+) -> Result<HashMap<VfsPath, Vec<CfgAtom>>, ProjectModelError> {
+    crate_packages
+        .iter()
+        .filter_map(|(root, package)| build_scripts.get(package).map(|output| (root, output)))
+        .map(|(root, output)| {
+            output
+                .cfgs
+                .iter()
+                .map(|cfg| {
+                    Cfg::from_str(cfg).map(cfg_atom).map_err(error_context(
+                        cfg.clone(),
+                        ProjectModelError::BuildScriptCfg,
+                    ))
+                })
+                .collect::<Result<Vec<CfgAtom>, ProjectModelError>>()
+                .map(|atoms| (root.clone(), atoms))
+        })
+        .collect()
+}
+
 pub struct ResolvedProject {
+    pub build_outputs: BTreeMap<SupportedTarget, BuildOutputs>,
     pub library: FeatureGraph,
-    pub out_dirs: BTreeMap<String, AbsPathBuf>,
     pub project: FeatureGraph,
     pub sysroot: AbsPathBuf,
     pub targets: BTreeSet<SupportedTarget>,
@@ -53,13 +88,15 @@ impl ResolvedProject {
         TargetCfg::parse(target).and_then(
             |TargetCfg {
                  crates,
+                 data_layout,
                  library,
                  platform,
              }| {
                 self.cargo_workspace(&platform)
                     .and_then(|cargo| {
-                        self.sysroot(&platform)
-                            .map(|sysroot| Self::project_workspace(cargo, crates, sysroot))
+                        self.sysroot(&platform).map(|sysroot| {
+                            Self::project_workspace(cargo, crates, data_layout, sysroot)
+                        })
                     })
                     .and_then(|workspace| self.loaded(&workspace, &library, target))
             },
@@ -94,12 +131,38 @@ impl ResolvedProject {
             })
     }
 
+    fn crate_packages(&self) -> HashMap<VfsPath, String> {
+        self.project
+            .resolved
+            .packages
+            .iter()
+            .flat_map(|PackageDocument { metadata, .. }| {
+                metadata
+                    .targets
+                    .iter()
+                    .filter(|crate_target| !crate_target.kind.contains(&TargetKind::CustomBuild))
+                    .map(|crate_target| {
+                        (
+                            VfsPath::from(AbsPathBuf::assert(crate_target.src_path.clone())),
+                            metadata.id.repr.clone(),
+                        )
+                    })
+            })
+            .collect()
+    }
+
     fn loaded(
         &self,
         workspace: &ProjectWorkspace,
         library_atoms: &[CfgAtom],
         target: SupportedTarget,
     ) -> Result<LoadedProject, ProjectModelError> {
+        let BuildOutputs {
+            build_scripts,
+            proc_macro_dylibs,
+        } = &self.build_outputs[&target];
+        let crate_packages = self.crate_packages();
+
         load_workspace(
             workspace.clone(),
             &FxHashMap::default(),
@@ -113,47 +176,75 @@ impl ResolvedProject {
         )
         .map_err(Into::into)
         .map_err(ProjectModelError::WorkspaceLoad)
-        .map(|(mut database, vfs, _)| {
-            DisabledProcMacros {
-                vfs: &vfs,
-                workspace,
-            }
-            .apply(&mut database);
-
-            let member_targets = self
-                .project
-                .resolved
-                .member_targets
-                .iter()
-                .map(|member| {
-                    (
-                        VfsPath::from(member.root.clone()),
-                        member.crate_target.clone(),
-                    )
+        .and_then(|(mut database, mut vfs, _)| {
+            build_script_atoms(&crate_packages, build_scripts)
+                .and_then(|build_script_atoms| {
+                    LoadedProcMacros {
+                        dylibs: proc_macro_dylibs,
+                        vfs: &vfs,
+                        workspace,
+                    }
+                    .apply(&mut database)
+                    .map(|()| build_script_atoms)
                 })
-                .collect::<HashMap<VfsPath, _>>();
+                .and_then(|build_script_atoms| {
+                    let member_targets = self
+                        .project
+                        .resolved
+                        .member_targets
+                        .iter()
+                        .map(|member| {
+                            (
+                                VfsPath::from(member.root.clone()),
+                                member.crate_target.clone(),
+                            )
+                        })
+                        .collect::<HashMap<VfsPath, _>>();
 
-            ExactCrateCfg {
-                library_atoms,
-                member_targets: &member_targets,
-                vfs: &vfs,
-            }
-            .assign(&mut database);
+                    ExactCrateCfg {
+                        build_script_atoms: &build_script_atoms,
+                        library_atoms,
+                        member_targets: &member_targets,
+                        vfs: &vfs,
+                    }
+                    .assign(&mut database);
 
-            OutDirEnvironment {
-                member_targets: &member_targets,
-                out_dirs: &self.out_dirs,
-                target,
-                vfs: &vfs,
-            }
-            .assign(&mut database);
+                    BuildScriptEnvironment {
+                        crate_packages: &crate_packages,
+                        outputs: build_scripts,
+                        vfs: &vfs,
+                    }
+                    .assign(&mut database);
 
-            LoadedProject {
-                database,
-                member_targets,
-                vfs,
-                workspace_root: self.project.resolved.workspace.root.clone(),
-            }
+                    OutDirFiles {
+                        crate_packages: &crate_packages,
+                        outputs: build_scripts,
+                    }
+                    .assign(&mut database, &mut vfs)
+                    .map(|()| member_targets)
+                })
+                .map(|member_targets| LoadedProject {
+                    database,
+                    member_targets,
+                    test_crates: self
+                        .project
+                        .resolved
+                        .members()
+                        .filter(|member| self.project.resolved.is_test_crate(member))
+                        .map(|member| member.metadata.name.to_string())
+                        .collect(),
+                    unpublished_packages: self
+                        .project
+                        .resolved
+                        .members()
+                        .filter(|member| {
+                            member.metadata.publish.as_ref().is_some_and(Vec::is_empty)
+                        })
+                        .map(|member| member.metadata.name.to_string())
+                        .collect(),
+                    vfs,
+                    workspace_root: self.project.resolved.workspace.root.clone(),
+                })
         })
         .and_then(|loaded| {
             let virtual_file = loaded
@@ -172,6 +263,7 @@ impl ResolvedProject {
     fn project_workspace(
         cargo: CargoWorkspace,
         rustc_cfg: Vec<CfgAtom>,
+        data_layout: Box<str>,
         sysroot: Sysroot,
     ) -> ProjectWorkspace {
         ProjectWorkspace {
@@ -189,7 +281,10 @@ impl ResolvedProject {
             rustc_cfg,
             set_test: false,
             sysroot,
-            target: Err("the target data layout is not used by name resolution".into()),
+            target: Ok(TargetData {
+                data_layout,
+                arch: Arch::Other,
+            }),
             toolchain: None,
         }
     }

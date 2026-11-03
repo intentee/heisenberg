@@ -2,5 +2,10 @@ use proc_macro::TokenStream;
 
 #[proc_macro_attribute]
 pub fn test(_attribute: TokenStream, item: TokenStream) -> TokenStream {
-    item
+    "#[test]"
+        .parse::<TokenStream>()
+        .into_iter()
+        .flatten()
+        .chain(item)
+        .collect()
 }

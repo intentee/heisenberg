@@ -1,5 +1,4 @@
 use ra_ap_hir::Macro;
-use ra_ap_hir::MacroKind;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::PathResolution;
 use ra_ap_hir::Semantics;
@@ -16,12 +15,6 @@ pub struct AttributedItem<'item, 'database> {
 }
 
 impl AttributedItem<'_, '_> {
-    pub fn has_procedural_attribute(&self) -> bool {
-        self.attribute_macros()
-            .into_iter()
-            .any(|definition| definition.kind(self.semantics.db) == MacroKind::Attr)
-    }
-
     pub fn has_test_attribute(&self) -> bool {
         self.attribute_macros().into_iter().any(|definition| {
             matches!(

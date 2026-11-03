@@ -1,0 +1,18 @@
+[package]
+name = "const_generic_receiver_from_another_crate"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+arrays = { path = "arrays" }
+
+[workspace]
+members = ["arrays"]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]

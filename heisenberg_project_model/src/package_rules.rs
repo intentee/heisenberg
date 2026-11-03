@@ -24,7 +24,6 @@ impl PackageRules<'_> {
             self.dependency_cycles().into_iter().collect();
 
         violations.extend(self.tests_without_test_libraries());
-        violations.extend(self.tests_without_tests_suffix());
 
         violations.into_iter().collect()
     }
@@ -167,19 +166,6 @@ impl PackageRules<'_> {
                     package: member.metadata.name.to_string(),
                     potential_owners,
                 }
-            })
-            .collect()
-    }
-
-    fn tests_without_tests_suffix(&self) -> Vec<PackageViolation> {
-        let workspace_path = self.resolved.workspace_path();
-
-        self.resolved
-            .members()
-            .filter(|member| self.is_tests_package(member) && !member.has_tests_name())
-            .map(|member| PackageViolation::TestsPackageWithoutTestsSuffix {
-                manifest: member.relative_manifest(&workspace_path),
-                package: member.metadata.name.to_string(),
             })
             .collect()
     }

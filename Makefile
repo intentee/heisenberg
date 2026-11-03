@@ -11,7 +11,8 @@ HEISENBERG_CRATES := \
 	heisenberg_module_cycles \
 	heisenberg_module_dependencies \
 	heisenberg_module_graph \
-	heisenberg_project_model
+	heisenberg_project_model \
+	heisenberg_workspace_build
 RUST_SYSROOT := $(shell rustc --print sysroot)
 SUPPORTED_TARGETS := \
 	aarch64-apple-darwin \
@@ -19,7 +20,8 @@ SUPPORTED_TARGETS := \
 	x86_64-unknown-linux-gnu
 TARGET_CFG_TABLES := \
 	$(addprefix heisenberg_project_model/targets/,$(addsuffix /crates.cfg,$(SUPPORTED_TARGETS))) \
-	$(addprefix heisenberg_project_model/targets/,$(addsuffix /library.cfg,$(SUPPORTED_TARGETS)))
+	$(addprefix heisenberg_project_model/targets/,$(addsuffix /library.cfg,$(SUPPORTED_TARGETS))) \
+	$(addprefix heisenberg_project_model/targets/,$(addsuffix /target-spec.json,$(SUPPORTED_TARGETS)))
 HEISENBERG_SOURCES := \
 	$(wildcard $(addsuffix /src/*.rs,$(HEISENBERG_CRATES))) \
 	$(addsuffix /Cargo.toml,$(HEISENBERG_CRATES)) \
@@ -38,6 +40,10 @@ heisenberg_project_model/targets/%/crates.cfg: rust-toolchain.toml
 heisenberg_project_model/targets/%/library.cfg: export RUSTC_BOOTSTRAP := 1
 heisenberg_project_model/targets/%/library.cfg: rust-toolchain.toml
 	rustc --print cfg -O --target $* > $@
+
+heisenberg_project_model/targets/%/target-spec.json: export RUSTC_BOOTSTRAP := 1
+heisenberg_project_model/targets/%/target-spec.json: rust-toolchain.toml
+	rustc -Z unstable-options --print target-spec-json --target $* > $@
 
 node_modules/.package-lock.json: package.json package-lock.json
 	npm ci
@@ -96,4 +102,5 @@ test.coverage: fetch node_modules/.package-lock.json $(TARGET_CFG_TABLES)
 		--gated heisenberg_module_dependencies=100 \
 		--gated heisenberg_module_graph=100 \
 		--gated heisenberg_project_model=100 \
-		--gated heisenberg_test_harness=100
+		--gated heisenberg_test_harness=100 \
+		--gated heisenberg_workspace_build=100

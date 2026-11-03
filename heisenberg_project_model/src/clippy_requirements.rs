@@ -23,7 +23,7 @@ fn member_violations(
     let name = metadata.name.to_string();
     let manifest = member.relative_manifest(workspace_path);
     let table = member.lint_table(workspace_path);
-    let may_panic = member.has_tests_name() && resolved.is_leaf(member);
+    let may_panic = resolved.is_test_crate(member);
     let mut violations: Vec<PackageViolation> = CLIPPY_DENIED_LINTS
         .iter()
         .filter(|_| !may_panic)

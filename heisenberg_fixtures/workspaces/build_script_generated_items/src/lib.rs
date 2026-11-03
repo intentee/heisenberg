@@ -17,6 +17,8 @@ configured_macro!();
 
 include!(concat!(env!("OUT_DIR"), "/included.rs"));
 
+include!(concat!(env!("OUT_DIR"), "/nested/deeper.rs"));
+
 pub fn item() -> Item {
     crate::configured::Item
 }

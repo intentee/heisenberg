@@ -84,17 +84,7 @@ impl PathReference<'_, '_> {
 
     fn qualified(&self, qualifier: &ast::Path) -> PathReferenceOutcome {
         match self.semantics.resolve_path(qualifier) {
-            None
-            | Some(
-                PathResolution::Def(
-                    ModuleDef::Adt(_)
-                    | ModuleDef::BuiltinType(_)
-                    | ModuleDef::Trait(_)
-                    | ModuleDef::TypeAlias(_),
-                )
-                | PathResolution::SelfType(_)
-                | PathResolution::TypeParam(_),
-            ) => PathReferenceOutcome::Irrelevant,
+            None => PathReferenceOutcome::Irrelevant,
             Some(PathResolution::Def(ModuleDef::Module(module)))
                 if module.krate(self.semantics.db) != self.krate =>
             {

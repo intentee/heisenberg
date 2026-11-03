@@ -18,7 +18,7 @@ fn lint_table_inherited_from_the_workspace_is_reported_once_at_the_workspace_man
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 1 violation\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a package named <something>_tests that no workspace member depends on may leave it undenied, in its own lints table.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a leaf package of integration tests and at most a library for them, may leave it undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Workspace does not deny clippy::panic\n\
             \n\

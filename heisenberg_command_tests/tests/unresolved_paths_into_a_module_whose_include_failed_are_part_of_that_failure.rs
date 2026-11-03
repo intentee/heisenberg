@@ -22,8 +22,6 @@ fn unresolved_paths_into_a_module_whose_include_failed_are_part_of_that_failure(
             \n\
             - bindings_sys/src/lib.rs:1:1: Macro expansion failed\n    \
             include!(concat!(env!(\"OUT_DIR\"), \"/bindings.rs\"));\n      \
-            expansion failing at bindings_sys/src/lib.rs:1:10\n      \
-            expansion failing at bindings_sys/src/lib.rs:1:18\n      \
             expansion failing at bindings_sys/src/lib.rs:1:23\n      \
             unresolved paths into bindings_sys: 2, the first at bindings/src/lib.rs:2:18\n\
             \n\

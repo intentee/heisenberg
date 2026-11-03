@@ -3,7 +3,6 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-use cargo::GlobalContext;
 use cargo::ops::resolve_ws;
 use cargo::util::data_structures::HashMap;
 use cargo::workspace::Package;
@@ -11,6 +10,8 @@ use cargo::workspace::PackageId;
 use cargo::workspace::Workspace;
 use cargo_util_terminal::Shell;
 use ra_ap_paths::AbsPath;
+
+use heisenberg_workspace_build::configured_context::ConfiguredContext;
 
 use crate::cargo_configuration_overrides::CargoConfigurationOverrides;
 use crate::cargo_metadata_document::CargoMetadataDocument;
@@ -32,21 +33,18 @@ pub struct CargoPackages<'request> {
 impl CargoPackages<'_> {
     pub fn resolve(&self) -> Result<ResolvedPackages, ProjectModelError> {
         let manifest_path: PathBuf = workspace_manifest(self.workspace_directory).into();
-        let mut context = GlobalContext::new(
-            Shell::from_write(Box::new(io::sink())),
-            self.workspace_directory.to_path_buf().into(),
-            self.cargo_home.to_path_buf(),
-        );
-
-        context.set_env(self.environment.clone());
-        context.nightly_features_allowed = self.role == CargoWorkspaceRole::Library;
-        context
-            .configure(0, true, None, true, true, true, &None, &[], &[])
-            .and_then(|()| context.values().and(Ok(())))
-            .map_err(|source| ProjectModelError::CargoConfiguration {
-                manifest_path: manifest_path.clone(),
-                source: source.into(),
-            })?;
+        let context = ConfiguredContext {
+            cargo_home: self.cargo_home,
+            environment: self.environment,
+            nightly_features_allowed: self.role == CargoWorkspaceRole::Library,
+            workspace_directory: self.workspace_directory.as_ref(),
+        }
+        .with_shell(Shell::from_write(Box::new(io::sink())))
+        .and_then(|context| context.values().map(|_| ()).map(|()| context))
+        .map_err(|source| ProjectModelError::CargoConfiguration {
+            manifest_path: manifest_path.clone(),
+            source: source.into(),
+        })?;
 
         if self.role == CargoWorkspaceRole::Project {
             CargoConfigurationOverrides {
