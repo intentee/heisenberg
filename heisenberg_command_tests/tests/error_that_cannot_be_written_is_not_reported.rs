@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::fs::File;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn error_that_cannot_be_written_is_not_reported() {

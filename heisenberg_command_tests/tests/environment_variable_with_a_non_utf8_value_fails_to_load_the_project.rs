@@ -3,9 +3,9 @@ use std::ffi::OsString;
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::non_utf8_os_string::non_utf8_os_string;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
-use heisenberg_test_harness::non_utf8_os_string::non_utf8_os_string;
 
 #[test]
 fn environment_variable_with_a_non_utf8_value_fails_to_load_the_project() {

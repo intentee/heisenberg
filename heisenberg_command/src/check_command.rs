@@ -15,6 +15,8 @@ use heisenberg_module_cycles::module_cycles::ModuleCycles;
 use heisenberg_module_dependencies::module_dependencies::ModuleDependencies;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
+use heisenberg_module_graph::violation::Violation;
+use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
 use heisenberg_project_model::constants::CARGO_MANIFEST_FILE;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
@@ -109,6 +111,26 @@ fn joined(
         .collect()
 }
 
+fn test_library_packages(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
+    analyses
+        .iter()
+        .flat_map(|TargetAnalysis { graphs, .. }| graphs)
+        .filter(
+            |CrateModuleGraph {
+                 crate_target,
+                 violations,
+                 ..
+             }| {
+                crate_target.kind == CrateTargetKind::IntegrationTest
+                    && violations.iter().any(|(Violation { kind, .. }, _)| {
+                        *kind == ViolationKind::NonTestItemInTestTarget
+                    })
+            },
+        )
+        .map(|CrateModuleGraph { crate_target, .. }| crate_target.package_name.clone())
+        .collect()
+}
+
 #[derive(Args, Debug)]
 pub struct CheckCommand {
     #[arg(
@@ -196,6 +218,7 @@ impl CheckCommand {
                         PackageRules {
                             empty_libraries: &empty_libraries(&analyses),
                             resolved: &project.project.resolved,
+                            test_library_packages: &test_library_packages(&analyses),
                         }
                         .violations(),
                     )

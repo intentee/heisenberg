@@ -111,7 +111,7 @@ impl ViolationKind {
                 "Names and structure document the code; only doc comments, which documentation tooling consumes, are allowed. Rename or restructure until the comment is unnecessary, or make it a doc comment if it documents an API."
             }
             Self::NonTestItemInTestTarget => {
-                "Integration test files hold only tests. Move helpers and fixtures into a library crate."
+                "A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle."
             }
             Self::PublicAssociatedConstant => {
                 "Public constants have a single home, crate::constants. Move the constant there as a free constant."
@@ -182,7 +182,7 @@ impl Display for ViolationKind {
             }
             Self::NonDocComment => formatter.write_str("Comment is not a doc comment"),
             Self::NonTestItemInTestTarget => formatter.write_str(
-                "Integration test target holds an item that is neither a test, a constant nor an import",
+                "Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file",
             ),
             Self::PublicAssociatedConstant => write!(
                 formatter,

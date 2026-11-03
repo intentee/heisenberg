@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use cargo::workspace::dependency::DepKind;
-
 use heisenberg_graph_cycles::cycle_components::CycleComponents;
 use heisenberg_graph_cycles::graph_edge::GraphEdge;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
+use crate::dependency_document::DependencyDocument;
 use crate::member_target::MemberTarget;
 use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
@@ -15,6 +14,7 @@ use crate::resolved_packages::ResolvedPackages;
 pub struct PackageRules<'rules> {
     pub empty_libraries: &'rules BTreeSet<String>,
     pub resolved: &'rules ResolvedPackages,
+    pub test_library_packages: &'rules BTreeSet<String>,
 }
 
 impl PackageRules<'_> {
@@ -30,12 +30,7 @@ impl PackageRules<'_> {
 
     fn dependency_cycles(&self) -> Vec<PackageViolation> {
         let workspace_path = self.resolved.workspace_path();
-        let cycles = CycleComponents::new(self.resolved.packages.iter().flat_map(|package| {
-            package.dependencies.iter().map(|dependency| GraphEdge {
-                from: package.metadata.id.repr.as_str(),
-                to: dependency.package_id.as_str(),
-            })
-        }));
+        let cycles = CycleComponents::new(self.package_edges());
         let component_of = cycles.component_of();
         let members_by_name: BTreeMap<&str, &PackageDocument> = self
             .resolved
@@ -76,25 +71,62 @@ impl PackageRules<'_> {
             .collect()
     }
 
-    fn is_tests_only_with_an_empty_library(
-        &self,
-        PackageDocument { metadata, .. }: &PackageDocument,
-    ) -> bool {
+    fn is_tests_package(&self, PackageDocument { metadata, .. }: &PackageDocument) -> bool {
         let name = metadata.name.as_str();
         let targets: Vec<&MemberTarget> = self
             .resolved
             .member_targets
             .iter()
-            .filter(|target| target.crate_target.package_name == name)
+            .filter(|MemberTarget { crate_target, .. }| crate_target.package_name == name)
             .collect();
         let others: Vec<&&MemberTarget> = targets
             .iter()
-            .filter(|target| target.crate_target.kind != CrateTargetKind::IntegrationTest)
+            .filter(|MemberTarget { crate_target, .. }| {
+                crate_target.kind != CrateTargetKind::IntegrationTest
+            })
             .collect();
 
         others.len() < targets.len()
-            && matches!(others.as_slice(), [library] if library.crate_target.kind == CrateTargetKind::Library)
-            && self.empty_libraries.contains(name)
+            && others.iter().all(|MemberTarget { crate_target, .. }| {
+                crate_target.kind == CrateTargetKind::Library && self.empty_libraries.contains(name)
+            })
+    }
+
+    fn moving_tests_closes_a_cycle(
+        &self,
+        destination: &str,
+        dependencies: &BTreeSet<&str>,
+    ) -> bool {
+        CycleComponents::new(
+            self.package_edges().chain(
+                dependencies
+                    .iter()
+                    .filter(|dependency| **dependency != destination)
+                    .map(|dependency| GraphEdge {
+                        from: destination,
+                        to: *dependency,
+                    }),
+            ),
+        )
+        .component_of()
+        .contains_key(destination)
+    }
+
+    fn package_edges(&self) -> impl Iterator<Item = GraphEdge<&str>> {
+        self.resolved.packages.iter().flat_map(
+            |PackageDocument {
+                 dependencies,
+                 metadata,
+                 ..
+             }| {
+                dependencies
+                    .iter()
+                    .map(|DependencyDocument { package_id, .. }| GraphEdge {
+                        from: metadata.id.repr.as_str(),
+                        to: package_id.as_str(),
+                    })
+            },
+        )
     }
 
     fn tests_without_test_libraries(&self) -> Vec<PackageViolation> {
@@ -103,49 +135,37 @@ impl PackageRules<'_> {
 
         members
             .iter()
-            .filter(|member| self.is_tests_only_with_an_empty_library(member))
-            .filter_map(|member| {
+            .filter(|member| {
+                self.is_tests_package(member)
+                    && !self
+                        .test_library_packages
+                        .contains(member.metadata.name.as_str())
+            })
+            .map(|member| {
                 let dependencies: BTreeSet<&str> = member
                     .dependencies
                     .iter()
-                    .map(|dependency| dependency.package_id.as_str())
+                    .map(|DependencyDocument { package_id, .. }| package_id.as_str())
                     .collect();
-                let destinations: BTreeMap<&str, String> = members
+                let mut potential_owners: Vec<String> = members
                     .iter()
-                    .filter(|candidate| dependencies.contains(candidate.metadata.id.repr.as_str()))
-                    .filter(|candidate| {
-                        let available: BTreeSet<&str> = candidate
-                            .dependencies
-                            .iter()
-                            .filter(|dependency| {
-                                dependency.has_kind(DepKind::Normal)
-                                    || dependency.has_kind(DepKind::Development)
-                            })
-                            .map(|dependency| dependency.package_id.as_str())
-                            .collect();
-
-                        dependencies
-                            .iter()
-                            .filter(|dependency| {
-                                **dependency != candidate.metadata.id.repr.as_str()
-                            })
-                            .all(|dependency| available.contains(dependency))
+                    .filter(|PackageDocument { metadata, .. }| {
+                        dependencies.contains(metadata.id.repr.as_str())
+                            && !self.moving_tests_closes_a_cycle(
+                                metadata.id.repr.as_str(),
+                                &dependencies,
+                            )
                     })
-                    .map(|candidate| {
-                        (
-                            candidate.metadata.id.repr.as_str(),
-                            candidate.metadata.name.to_string(),
-                        )
-                    })
+                    .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
                     .collect();
 
-                (!destinations.is_empty()).then(|| {
-                    PackageViolation::TestsOnlyPackageWithoutTestLibraries {
-                        destinations: destinations.into_values().collect(),
-                        manifest: member.relative_manifest(&workspace_path),
-                        package: member.metadata.name.to_string(),
-                    }
-                })
+                potential_owners.sort();
+
+                PackageViolation::TestsOnlyPackageWithoutTestLibraries {
+                    manifest: member.relative_manifest(&workspace_path),
+                    package: member.metadata.name.to_string(),
+                    potential_owners,
+                }
             })
             .collect()
     }

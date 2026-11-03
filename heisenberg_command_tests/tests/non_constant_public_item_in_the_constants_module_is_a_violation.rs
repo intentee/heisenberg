@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn non_constant_public_item_in_the_constants_module_is_a_violation() {

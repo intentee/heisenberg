@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn module_file_repeated_in_one_crate_is_a_violation() {

@@ -1,0 +1,39 @@
+use std::str;
+
+use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
+
+#[test]
+fn tests_package_using_only_packages_on_a_cycle_has_no_potential_owner() {
+    let outcome = HeisenbergCheck {
+        workspace: &FixtureWorkspace {
+            name: "tests_package_closing_a_cycle",
+        }
+        .path(),
+    }
+    .run()
+    .expect("the arguments must parse");
+
+    assert_eq!(
+        str::from_utf8(&outcome.output),
+        Ok("PackageDependencyCycle: 1 violation\n\
+            Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library.\n\
+            \n\
+            - harness/Cargo.toml: Packages harness v0.1.0, library v0.1.0 depend on each other through dev-dependencies\n\
+            \n\
+            TestsOnlyPackageWithoutTestLibraries: 1 violation\n\
+            Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so the packages listed could take the tests without a cycle, but the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.\n\
+            \n\
+            - library_tests/Cargo.toml: Package library_tests holds only tests and no test library of its own, so the package its tests verify must own them\n      \
+            no package it uses can take its tests without a dependency cycle\n\
+            \n\
+            ------------------------------\n\
+            2 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 4 crate targets, 4 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 4 crate targets, 4 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+    );
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
+}

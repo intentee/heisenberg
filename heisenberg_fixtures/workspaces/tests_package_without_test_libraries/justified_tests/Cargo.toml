@@ -3,10 +3,12 @@ name = "justified_tests"
 edition = "2024"
 version = "0.1.0"
 
-[dev-dependencies]
+[dependencies]
 base = { path = "../base" }
-extra_harness = { path = "../extra_harness" }
 library = { path = "../library" }
+
+[dev-dependencies]
+extra_harness = { path = "../extra_harness" }
 
 [lints.clippy]
 expect_used = "deny"

@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn cfg_alternatives_inside_a_macro_with_an_argument_are_active_code() {

@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn tests_package_without_test_libraries_is_a_violation() {
@@ -18,9 +18,10 @@ fn tests_package_without_test_libraries_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("TestsOnlyPackageWithoutTestLibraries: 1 violation\n\
-            A separate tests package is justified only by test-only libraries. Move the tests into the tests directory of the package they test.\n\
+            Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so the packages listed could take the tests without a cycle, but the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.\n\
             \n\
-            - library_tests/Cargo.toml: Package library_tests holds only tests that need no test library; move them into the tests directory of library\n\
+            - library_tests/Cargo.toml: Package library_tests holds only tests and no test library of its own, so the package its tests verify must own them\n      \
+            could move without a dependency cycle to library\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

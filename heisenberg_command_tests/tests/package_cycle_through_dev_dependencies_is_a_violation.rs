@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn package_cycle_through_dev_dependencies_is_a_violation() {
@@ -18,7 +18,7 @@ fn package_cycle_through_dev_dependencies_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("PackageDependencyCycle: 1 violation\n\
-            Dev-dependency cycles build a package twice and blur which package owns what. Break the cycle.\n\
+            Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library.\n\
             \n\
             - alpha/Cargo.toml: Packages alpha v0.1.0, beta v0.1.0 depend on each other through dev-dependencies\n\
             \n\

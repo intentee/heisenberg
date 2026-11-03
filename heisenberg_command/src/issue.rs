@@ -148,7 +148,12 @@ impl Issue {
                 .iter()
                 .map(|finding| format!("  {finding}"))
                 .collect(),
-            Self::CodeActiveOnNoTarget { .. } | Self::Package(_) => Vec::new(),
+            Self::Package(violation) => violation
+                .details()
+                .iter()
+                .map(|line| format!("  {line}"))
+                .collect(),
+            Self::CodeActiveOnNoTarget { .. } => Vec::new(),
         }
     }
 

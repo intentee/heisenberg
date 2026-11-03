@@ -3,10 +3,14 @@ name = "heisenberg_command_tests"
 edition.workspace = true
 version.workspace = true
 
-[dev-dependencies]
+[dependencies]
+clap = { workspace = true }
 heisenberg_command = { workspace = true }
-heisenberg_fixtures = { workspace = true }
 heisenberg_test_harness = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+heisenberg_fixtures = { workspace = true }
 toml = { workspace = true }
 
 [lints]

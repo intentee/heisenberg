@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::constants::FIXTURE_DIRECTORY;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn heisenberg_workspace_is_compliant() {

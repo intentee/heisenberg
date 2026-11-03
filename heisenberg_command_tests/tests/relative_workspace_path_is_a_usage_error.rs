@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
-use heisenberg_test_harness::test_harness_error::TestHarnessError;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::heisenberg_check_error::HeisenbergCheckError;
 
 #[test]
 fn relative_workspace_path_is_a_usage_error() {
-    let Err(TestHarnessError::Arguments(error)) = (HeisenbergCheck {
+    let Err(HeisenbergCheckError::Arguments(error)) = (HeisenbergCheck {
         workspace: Path::new("relative"),
     })
     .run() else {

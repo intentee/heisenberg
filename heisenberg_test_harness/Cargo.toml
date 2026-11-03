@@ -4,8 +4,6 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
-clap = { workspace = true }
-heisenberg_command = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

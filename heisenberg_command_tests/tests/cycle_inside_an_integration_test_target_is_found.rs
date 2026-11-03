@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn cycle_inside_an_integration_test_target_is_found() {
@@ -34,13 +34,13 @@ fn cycle_inside_an_integration_test_target_is_found() {
             crate::second uses crate::first at tests/cycle.rs:11:9\n\
             \n\
             NonTestItemInTestTarget: 3 violations\n\
-            Integration test files hold only tests. Move helpers and fixtures into a library crate.\n\
+            A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
-            - tests/cycle.rs:2:12: Integration test target holds an item that is neither a test, a constant nor an import\n        \
+            - tests/cycle.rs:2:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
             pub fn run() {\n\
-            - tests/cycle.rs:8:12: Integration test target holds an item that is neither a test, a constant nor an import\n        \
+            - tests/cycle.rs:8:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
             pub fn helper() {}\n\
-            - tests/cycle.rs:10:12: Integration test target holds an item that is neither a test, a constant nor an import\n        \
+            - tests/cycle.rs:10:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
             pub fn back() {\n\
             \n\
             ------------------------------\n\

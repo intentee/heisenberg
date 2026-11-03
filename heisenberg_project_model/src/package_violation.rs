@@ -38,13 +38,41 @@ pub enum PackageViolation {
         package: String,
     },
     TestsOnlyPackageWithoutTestLibraries {
-        destinations: Vec<String>,
         manifest: String,
         package: String,
+        potential_owners: Vec<String>,
     },
 }
 
 impl PackageViolation {
+    #[must_use]
+    pub fn details(&self) -> Vec<String> {
+        match self {
+            Self::TestsOnlyPackageWithoutTestLibraries {
+                potential_owners, ..
+            } => {
+                if potential_owners.is_empty() {
+                    vec![
+                        "no package it uses can take its tests without a dependency cycle"
+                            .to_owned(),
+                    ]
+                } else {
+                    potential_owners
+                        .iter()
+                        .map(|owner| format!("could move without a dependency cycle to {owner}"))
+                        .collect()
+                }
+            }
+            Self::ClippyConfigurationAmbiguous { .. }
+            | Self::ClippyConfigurationMissing { .. }
+            | Self::ClippyLintNotDenied { .. }
+            | Self::ClippyTestAllowanceMissing { .. }
+            | Self::LintAllowedInManifest { .. }
+            | Self::PackageDependencyCycle { .. }
+            | Self::PackageDependsOnItself { .. } => Vec::new(),
+        }
+    }
+
     #[must_use]
     pub fn file(&self) -> &str {
         match self {
@@ -95,13 +123,13 @@ impl PackageViolation {
                 "Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports."
             }
             Self::PackageDependencyCycle { .. } => {
-                "Dev-dependency cycles build a package twice and blur which package owns what. Break the cycle."
+                "Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library."
             }
             Self::PackageDependsOnItself { .. } => {
                 "A package depending on itself is built twice and blurs what it owns. Remove the self-dependency."
             }
             Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
-                "A separate tests package is justified only by test-only libraries. Move the tests into the tests directory of the package they test."
+                "Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so the packages listed could take the tests without a cycle, but the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it."
             }
         }
     }
@@ -143,14 +171,9 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {package} depends on itself through dev-dependencies"
             ),
-            Self::TestsOnlyPackageWithoutTestLibraries {
-                destinations,
-                package,
-                ..
-            } => write!(
+            Self::TestsOnlyPackageWithoutTestLibraries { package, .. } => write!(
                 formatter,
-                "Package {package} holds only tests that need no test library; move them into the tests directory of {}",
-                destinations.join(", ")
+                "Package {package} holds only tests and no test library of its own, so the package its tests verify must own them"
             ),
         }
     }

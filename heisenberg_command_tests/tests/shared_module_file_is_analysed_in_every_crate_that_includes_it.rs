@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::heisenberg_check::HeisenbergCheck;
 
 #[test]
 fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
@@ -28,12 +28,12 @@ fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
             crate::support::second_part uses crate::support::first_part at tests/support/second_part.rs:4:29\n\
             \n\
             NonTestItemInTestTarget: 2 violations\n\
-            Integration test files hold only tests. Move helpers and fixtures into a library crate.\n\
+            A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
-            - tests/support/first_part.rs:1:12: Integration test target holds an item that is neither a test, a constant nor an import\n    \
+            - tests/support/first_part.rs:1:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n    \
             pub struct FirstPart;\n      \
             impl block at tests/support/first_part.rs:3:6\n\
-            - tests/support/second_part.rs:1:12: Integration test target holds an item that is neither a test, a constant nor an import\n    \
+            - tests/support/second_part.rs:1:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n    \
             pub struct SecondPart;\n      \
             impl block at tests/support/second_part.rs:3:6\n\
             \n\
