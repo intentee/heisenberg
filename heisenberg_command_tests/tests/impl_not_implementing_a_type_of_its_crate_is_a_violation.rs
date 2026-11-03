@@ -17,12 +17,12 @@ fn impl_not_implementing_a_type_of_its_crate_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ImplWithoutLocalType: 2 violations\n\
-            Behavior belongs with the type or trait that owns it, so impls do not extend foreign types. Implement it for a type of this crate, convert from a type of this crate, or write a blanket or trait-object impl beside its trait.\n\
+        Ok("LocalTraitOnForeignType: 2 violations\n\
+            Behavior belongs with the type that owns it, so a trait of this crate does not extend a type this crate does not define. Implement the trait for a type of this crate, such as a wrapper around the foreign type, write a blanket or trait-object impl beside the trait, or make the behavior a function.\n\
             \n\
-            - src/greeting.rs:5:19: Impl block belongs to no type or trait of this crate\n    \
+            - src/greeting.rs:5:19: Impl block implements Greeting, a trait of this crate, for a foreign type\n    \
             impl Greeting for String {\n\
-            - src/local.rs:11:19: Impl block belongs to no type or trait of this crate\n    \
+            - src/local.rs:11:19: Impl block implements Greeting, a trait of this crate, for a foreign type\n    \
             impl Greeting for Vec<Local> {\n\
             \n\
             ------------------------------\n\

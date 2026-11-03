@@ -515,6 +515,10 @@ impl ModuleWalk<'_, '_> {
                 },
                 location,
             }),
+            ImplHome::LocalTraitOnForeignType { trait_name } => Some(Violation {
+                kind: ViolationKind::LocalTraitOnForeignType { trait_name },
+                location,
+            }),
             ImplHome::Foreign => Some(Violation {
                 kind: ViolationKind::ImplWithoutLocalType,
                 location,

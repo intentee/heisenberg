@@ -13,6 +13,7 @@ pub enum ViolationKind {
     InvalidMacroDefinition,
     ImplWithoutLocalType,
     LintSuppression,
+    LocalTraitOnForeignType { trait_name: String },
     ModuleFileInsideBlock,
     MisplacedBlanketImpl { trait_file: String },
     MisplacedImpl { type_file: String },
@@ -44,6 +45,7 @@ impl ViolationKind {
             Self::InvalidMacroDefinition => "InvalidMacroDefinition",
             Self::ImplWithoutLocalType => "ImplWithoutLocalType",
             Self::LintSuppression => "LintSuppression",
+            Self::LocalTraitOnForeignType { .. } => "LocalTraitOnForeignType",
             Self::ModuleFileInsideBlock => "ModuleFileInsideBlock",
             Self::MisplacedBlanketImpl { .. } => "MisplacedBlanketImpl",
             Self::MisplacedImpl { .. } => "MisplacedImpl",
@@ -84,10 +86,13 @@ impl ViolationKind {
                 "An invalid macro definition produces no code to analyse. Fix the definition."
             }
             Self::ImplWithoutLocalType => {
-                "Behavior belongs with the type or trait that owns it, so impls do not extend foreign types. Implement it for a type of this crate, convert from a type of this crate, or write a blanket or trait-object impl beside its trait."
+                "An impl of another crate's trait belongs beside the one type of this crate it serves. Implement the trait for a struct, enum or union of this crate, or for a foreign type with exactly one of them among the trait's type arguments."
             }
             Self::LintSuppression => {
                 "Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports."
+            }
+            Self::LocalTraitOnForeignType { .. } => {
+                "Behavior belongs with the type that owns it, so a trait of this crate does not extend a type this crate does not define. Implement the trait for a type of this crate, such as a wrapper around the foreign type, write a blanket or trait-object impl beside the trait, or make the behavior a function."
             }
             Self::ModuleFileInsideBlock => {
                 "A module file declared inside a block is outside the analysed module tree. Declare the module at module level."
@@ -160,8 +165,12 @@ impl Display for ViolationKind {
             Self::GlobImport => formatter.write_str("Glob import"),
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
-                .write_str("Impl block belongs to no type or trait of this crate"),
+                .write_str("Impl block belongs to no single type or trait of this crate"),
             Self::LintSuppression => formatter.write_str("Attribute suppresses lints"),
+            Self::LocalTraitOnForeignType { trait_name } => write!(
+                formatter,
+                "Impl block implements {trait_name}, a trait of this crate, for a foreign type"
+            ),
             Self::ModuleFileInsideBlock => {
                 formatter.write_str("Module file declared inside a block is not analysed")
             }

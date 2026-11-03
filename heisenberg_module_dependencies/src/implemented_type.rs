@@ -53,6 +53,15 @@ impl ImplementedType<'_> {
                         file: original_file_id(database, source.file_id),
                     })
             })
+            .or_else(|| {
+                self.local_trait()
+                    .map(|local_trait| ImplHome::LocalTraitOnForeignType {
+                        trait_name: local_trait
+                            .name(database)
+                            .display(database, self.krate.edition(database))
+                            .to_string(),
+                    })
+            })
             .unwrap_or(ImplHome::Foreign)
     }
 
@@ -77,6 +86,12 @@ impl ImplementedType<'_> {
 
     fn is_local_trait(&self, candidate: Trait) -> bool {
         candidate.module(self.database).krate(self.database) == self.krate
+    }
+
+    fn local_trait(&self) -> Option<Trait> {
+        self.implementation
+            .trait_(self.database)
+            .filter(|implemented_trait| self.is_local_trait(*implemented_trait))
     }
 
     fn local_type_argument(&self, trait_arguments: &[Type<'_>]) -> Option<Adt> {
