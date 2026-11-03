@@ -2,6 +2,8 @@ pub const CARGO_HOME_VARIABLE: &str = "HEISENBERG_CARGO_HOME";
 
 pub const LLVM_PROFILE_FILE_VARIABLE: &str = "LLVM_PROFILE_FILE";
 
+pub const PACKAGE_DIRECTORY: &str = env!("CARGO_MANIFEST_DIR");
+
 pub const PATH_VARIABLE: &str = "PATH";
 
 pub const SYSROOT_VARIABLE: &str = "HEISENBERG_SYSROOT";

@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
 
 #[test]
 fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {

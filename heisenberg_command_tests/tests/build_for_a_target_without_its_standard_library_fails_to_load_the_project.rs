@@ -3,9 +3,9 @@ use std::path::Path;
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
-use heisenberg_test_harness::constants::SYSROOT_VARIABLE;
 
 #[test]
 fn build_for_a_target_without_its_standard_library_fails_to_load_the_project() {

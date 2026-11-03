@@ -2,8 +2,8 @@ use std::fs;
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
 
 #[test]
 fn unreadable_clippy_configuration_beside_a_hidden_one_fails_to_load_the_project() {

@@ -1,8 +1,8 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
 
 #[test]
 fn integration_test_helpers_shared_between_tests_are_violations() {

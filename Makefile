@@ -54,8 +54,8 @@ target/release/heisenberg: $(HEISENBERG_SOURCES)
 .PHONY: benchmark
 benchmark: fetch target/release/heisenberg
 	hyperfine --shell=none --warmup 1 --ignore-failure=1 --export-markdown target/benchmark.md \
-		--command-name acyclic_modules "$(HEISENBERG_CHECK) $(CURDIR)/heisenberg_fixtures/workspaces/acyclic_modules" \
-		--command-name cycles_in_a_dependency_diamond "$(HEISENBERG_CHECK) $(CURDIR)/heisenberg_fixtures/workspaces/cycles_in_a_dependency_diamond" \
+		--command-name acyclic_modules "$(HEISENBERG_CHECK) $(CURDIR)/heisenberg_command_tests/workspaces/acyclic_modules" \
+		--command-name cycles_in_a_dependency_diamond "$(HEISENBERG_CHECK) $(CURDIR)/heisenberg_command_tests/workspaces/cycles_in_a_dependency_diamond" \
 		--command-name heisenberg "$(HEISENBERG_CHECK) $(CURDIR)"
 
 .PHONY: clean
@@ -96,11 +96,9 @@ test.coverage: fetch node_modules/.package-lock.json $(TARGET_CFG_TABLES)
 		--gated heisenberg_command=100 \
 		--gated heisenberg_command_tests=100 \
 		--gated heisenberg_error_context=100 \
-		--gated heisenberg_fixtures=100 \
 		--gated heisenberg_graph_cycles=100 \
 		--gated heisenberg_module_cycles=100 \
 		--gated heisenberg_module_dependencies=100 \
 		--gated heisenberg_module_graph=100 \
 		--gated heisenberg_project_model=100 \
-		--gated heisenberg_test_harness=100 \
 		--gated heisenberg_workspace_build=100

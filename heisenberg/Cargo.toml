@@ -8,8 +8,7 @@ clap = { workspace = true }
 heisenberg_command = { workspace = true }
 
 [dev-dependencies]
-heisenberg_fixtures = { workspace = true }
-heisenberg_test_harness = { workspace = true }
+heisenberg_command_tests = { workspace = true }
 
 [lints]
 workspace = true

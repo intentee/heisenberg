@@ -6,10 +6,10 @@ use std::path::Path;
 use clap::Parser;
 
 use heisenberg_command::heisenberg_command::HeisenbergCommand;
-use heisenberg_test_harness::constants::CARGO_HOME_VARIABLE;
-use heisenberg_test_harness::constants::SYSROOT_VARIABLE;
 
 use crate::check_outcome::CheckOutcome;
+use crate::constants::CARGO_HOME_VARIABLE;
+use crate::constants::SYSROOT_VARIABLE;
 use crate::heisenberg_check_error::HeisenbergCheckError;
 
 pub struct HeisenbergCheck<'check> {

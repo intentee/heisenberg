@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["heisenberg_fixtures/workspaces"]
+exclude = ["heisenberg_command_tests/workspaces"]
 members = [
     "heisenberg",
     "heisenberg_absolute_path",
@@ -7,13 +7,11 @@ members = [
     "heisenberg_command",
     "heisenberg_command_tests",
     "heisenberg_error_context",
-    "heisenberg_fixtures",
     "heisenberg_graph_cycles",
     "heisenberg_module_cycles",
     "heisenberg_module_dependencies",
     "heisenberg_module_graph",
     "heisenberg_project_model",
-    "heisenberg_test_harness",
     "heisenberg_workspace_build",
 ]
 resolver = "3"
@@ -157,14 +155,13 @@ guppy = { version = "0.19", features = ["custom-cfg-platforms"] }
 heisenberg_absolute_path = { version = "0.1", path = "heisenberg_absolute_path" }
 heisenberg_analysis_threads = { version = "0.1", path = "heisenberg_analysis_threads" }
 heisenberg_command = { version = "0.1", path = "heisenberg_command" }
+heisenberg_command_tests = { version = "0.1", path = "heisenberg_command_tests" }
 heisenberg_error_context = { version = "0.1", path = "heisenberg_error_context" }
-heisenberg_fixtures = { version = "0.1", path = "heisenberg_fixtures" }
 heisenberg_graph_cycles = { version = "0.1", path = "heisenberg_graph_cycles" }
 heisenberg_module_cycles = { version = "0.1", path = "heisenberg_module_cycles" }
 heisenberg_module_dependencies = { version = "0.1", path = "heisenberg_module_dependencies" }
 heisenberg_module_graph = { version = "0.1", path = "heisenberg_module_graph" }
 heisenberg_project_model = { version = "0.1", path = "heisenberg_project_model" }
-heisenberg_test_harness = { version = "0.1", path = "heisenberg_test_harness" }
 heisenberg_workspace_build = { version = "0.1", path = "heisenberg_workspace_build" }
 itertools = "0.15"
 petgraph = "0.8"

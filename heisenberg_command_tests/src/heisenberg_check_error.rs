@@ -3,8 +3,8 @@ use std::env::VarError;
 use clap::Error;
 use thiserror::Error;
 
-use heisenberg_test_harness::constants::CARGO_HOME_VARIABLE;
-use heisenberg_test_harness::constants::SYSROOT_VARIABLE;
+use crate::constants::CARGO_HOME_VARIABLE;
+use crate::constants::SYSROOT_VARIABLE;
 
 #[derive(Debug, Error)]
 pub enum HeisenbergCheckError {
