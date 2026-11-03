@@ -15,6 +15,7 @@ use ra_ap_paths::AbsPath;
 use crate::cargo_configuration_overrides::CargoConfigurationOverrides;
 use crate::cargo_metadata_document::CargoMetadataDocument;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
+use crate::configured_environment::ConfiguredEnvironment;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
 use crate::resolver_version::ResolverVersion;
@@ -113,14 +114,22 @@ impl CargoPackages<'_> {
                     workspace: &workspace,
                 }
                 .collect()
-                .map(|member_targets| ResolvedPackages {
-                    member_targets,
-                    packages: package_documents,
-                    resolver: ResolverVersion {
-                        behavior: workspace.resolve_behavior(),
+                .and_then(|member_targets| {
+                    ConfiguredEnvironment {
+                        context: &context,
+                        environment: self.environment,
                     }
-                    .to_guppy(),
-                    workspace: workspace_document,
+                    .variables()
+                    .map(|configured_environment| ResolvedPackages {
+                        configured_environment,
+                        member_targets,
+                        packages: package_documents,
+                        resolver: ResolverVersion {
+                            behavior: workspace.resolve_behavior(),
+                        }
+                        .to_guppy(),
+                        workspace: workspace_document,
+                    })
                 })
             })
         })

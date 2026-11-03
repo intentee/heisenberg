@@ -18,7 +18,7 @@ fn clippy_restriction_group_overrides_by_cargo_lint_order() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 4 violations\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a package named <something>_tests that no workspace member depends on may leave it undenied, in its own lints table.\n\
             \n\
             - overridden/Cargo.toml: Package overridden does not deny clippy::expect_used\n\
             - overridden/Cargo.toml: Package overridden does not deny clippy::panic\n\
@@ -26,7 +26,7 @@ fn clippy_restriction_group_overrides_by_cargo_lint_order() {
             - same_priority/Cargo.toml: Package same_priority does not deny clippy::unwrap_used\n\
             \n\
             LintAllowedInManifest: 4 violations\n\
-            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports.\n\
+            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code.\n\
             \n\
             - forbidden/Cargo.toml: Package forbidden allows restriction in its clippy lints\n\
             - overridden/Cargo.toml: Package overridden allows restriction in its clippy lints\n\

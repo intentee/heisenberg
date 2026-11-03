@@ -1,0 +1,7 @@
+[package]
+name = "shared_tests"
+edition = "2024"
+version = "0.1.0"
+
+[lints.clippy]
+dbg_macro = "deny"

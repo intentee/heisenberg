@@ -1,19 +1,19 @@
 mod first {
-    pub fn run() {
-        super::second::helper();
+    pub fn first() {
+        super::second::second();
     }
 }
 
 mod second {
-    pub fn helper() {}
+    pub fn second() {}
 
     pub fn back() {
-        super::first::run();
+        super::first::first();
     }
 }
 
 #[test]
 fn runs_both_modules() {
-    first::run();
+    first::first();
     second::back();
 }

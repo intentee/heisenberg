@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,6 +30,7 @@ use crate::feature_graph::FeatureGraph;
 use crate::library_directory::library_directory;
 use crate::library_project_json::LibraryProjectJson;
 use crate::loaded_project::LoadedProject;
+use crate::out_dir_environment::OutDirEnvironment;
 use crate::project_model_error::ProjectModelError;
 use crate::supported_target::SupportedTarget;
 use crate::target_cfg::TargetCfg;
@@ -36,6 +38,7 @@ use crate::workspace_manifest::workspace_manifest;
 
 pub struct ResolvedProject {
     pub library: FeatureGraph,
+    pub out_dirs: BTreeMap<String, AbsPathBuf>,
     pub project: FeatureGraph,
     pub sysroot: AbsPathBuf,
     pub targets: BTreeSet<SupportedTarget>,
@@ -58,7 +61,7 @@ impl ResolvedProject {
                         self.sysroot(&platform)
                             .map(|sysroot| Self::project_workspace(cargo, crates, sysroot))
                     })
-                    .and_then(|workspace| self.loaded(&workspace, &library))
+                    .and_then(|workspace| self.loaded(&workspace, &library, target))
             },
         )
     }
@@ -79,7 +82,15 @@ impl ResolvedProject {
             .and_then(|metadata| {
                 ManifestPath::try_from(workspace_manifest(&self.project.resolved.workspace.root))
                     .map_err(ProjectModelError::WorkspaceManifestPath)
-                    .map(|manifest| CargoWorkspace::new(metadata, manifest, Env::default(), false))
+                    .map(|manifest| {
+                        let mut configured = Env::default();
+
+                        for (name, value) in &self.project.resolved.configured_environment {
+                            configured.set(name, value.clone());
+                        }
+
+                        CargoWorkspace::new(metadata, manifest, configured, false)
+                    })
             })
     }
 
@@ -87,6 +98,7 @@ impl ResolvedProject {
         &self,
         workspace: &ProjectWorkspace,
         library_atoms: &[CfgAtom],
+        target: SupportedTarget,
     ) -> Result<LoadedProject, ProjectModelError> {
         load_workspace(
             workspace.clone(),
@@ -124,6 +136,14 @@ impl ResolvedProject {
             ExactCrateCfg {
                 library_atoms,
                 member_targets: &member_targets,
+                vfs: &vfs,
+            }
+            .assign(&mut database);
+
+            OutDirEnvironment {
+                member_targets: &member_targets,
+                out_dirs: &self.out_dirs,
+                target,
                 vfs: &vfs,
             }
             .assign(&mut database);

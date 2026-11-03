@@ -10,21 +10,23 @@ use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
-use crate::workspace_path::WorkspacePath;
 
 fn member_violations(
     member: &PackageDocument,
     configuration: ClippyConfigurationFile,
-    workspace_path: &WorkspacePath<'_>,
+    resolved: &ResolvedPackages,
 ) -> Vec<PackageViolation> {
+    let workspace_path = &resolved.workspace_path();
     let PackageDocument {
         lints, metadata, ..
     } = member;
     let name = metadata.name.to_string();
     let manifest = member.relative_manifest(workspace_path);
     let table = member.lint_table(workspace_path);
+    let may_panic = member.has_tests_name() && resolved.is_leaf(member);
     let mut violations: Vec<PackageViolation> = CLIPPY_DENIED_LINTS
         .iter()
+        .filter(|_| !may_panic)
         .filter(|lint| !ClippyLintLevel { lint, lints }.is_denied())
         .map(|lint| PackageViolation::ClippyLintNotDenied {
             lint: lint.name.to_owned(),
@@ -81,7 +83,7 @@ impl ClippyRequirements<'_> {
                     &package.metadata.manifest_path,
                     workspace_path.root,
                 )
-                .map(|configuration| member_violations(package, configuration, &workspace_path))
+                .map(|configuration| member_violations(package, configuration, self.resolved))
             })
             .collect::<Result<Vec<Vec<PackageViolation>>, ProjectModelError>>()
             .map(|violations| {

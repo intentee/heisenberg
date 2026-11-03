@@ -18,7 +18,7 @@ fn lint_allowed_in_a_manifest_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("LintAllowedInManifest: 2 violations\n\
-            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports.\n\
+            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code.\n\
             \n\
             - Cargo.toml: Package lint_allowed_in_a_manifest allows dead_code in its rust lints\n\
             - Cargo.toml: Package lint_allowed_in_a_manifest allows too_many_lines in its clippy lints\n\

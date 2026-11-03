@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use guppy::graph::cargo::CargoResolverVersion;
 use ra_ap_paths::Utf8Path;
 use serde_json::Value;
@@ -12,6 +14,7 @@ use crate::workspace_document::WorkspaceDocument;
 use crate::workspace_path::WorkspacePath;
 
 pub struct ResolvedPackages {
+    pub configured_environment: BTreeMap<String, String>,
     pub member_targets: Vec<MemberTarget>,
     pub packages: Vec<PackageDocument>,
     pub resolver: CargoResolverVersion,
@@ -19,6 +22,15 @@ pub struct ResolvedPackages {
 }
 
 impl ResolvedPackages {
+    pub fn is_leaf(&self, PackageDocument { metadata, .. }: &PackageDocument) -> bool {
+        !self.members().any(|member| {
+            member
+                .dependencies
+                .iter()
+                .any(|DependencyDocument { package_id, .. }| *package_id == metadata.id.repr)
+        })
+    }
+
     pub fn members(&self) -> impl Iterator<Item = &PackageDocument> {
         self.packages
             .iter()

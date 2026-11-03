@@ -21,7 +21,7 @@ fn tests_package_holding_a_test_library_stays_separate() {
             A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
             - library_tests/tests/support/mod.rs:3:8: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n    \
-            pub fn constructed_library() -> Library {\n\
+            pub fn support() -> Library {\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

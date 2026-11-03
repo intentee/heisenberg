@@ -21,7 +21,7 @@ fn impl_block_of_a_flagged_type_is_part_of_its_issue() {
             A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
             - tests/helping.rs:3:16: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
-            pub struct Helper;\n      \
+            pub struct Helpers;\n      \
             impl block at tests/helping.rs:6:6\n\
             \n\
             ------------------------------\n\

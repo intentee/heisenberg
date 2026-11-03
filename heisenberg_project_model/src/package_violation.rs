@@ -5,6 +5,7 @@ use std::fmt::Formatter;
 use crate::clippy_lint_path::clippy_lint_path;
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
+use crate::constants::TESTS_PACKAGE_SUFFIX;
 use crate::lint_table::LintTable;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -42,6 +43,10 @@ pub enum PackageViolation {
         package: String,
         potential_owners: Vec<String>,
     },
+    TestsPackageWithoutTestsSuffix {
+        manifest: String,
+        package: String,
+    },
 }
 
 impl PackageViolation {
@@ -69,7 +74,8 @@ impl PackageViolation {
             | Self::ClippyTestAllowanceMissing { .. }
             | Self::LintAllowedInManifest { .. }
             | Self::PackageDependencyCycle { .. }
-            | Self::PackageDependsOnItself { .. } => Vec::new(),
+            | Self::PackageDependsOnItself { .. }
+            | Self::TestsPackageWithoutTestsSuffix { .. } => Vec::new(),
         }
     }
 
@@ -81,7 +87,8 @@ impl PackageViolation {
             | Self::ClippyConfigurationMissing { manifest: file, .. }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
-            | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. } => file,
+            | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. }
+            | Self::TestsPackageWithoutTestsSuffix { manifest: file, .. } => file,
             Self::ClippyLintNotDenied { table, .. } | Self::LintAllowedInManifest { table, .. } => {
                 table.manifest()
             }
@@ -101,6 +108,7 @@ impl PackageViolation {
             Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
                 "TestsOnlyPackageWithoutTestLibraries"
             }
+            Self::TestsPackageWithoutTestsSuffix { .. } => "TestsPackageWithoutTestsSuffix",
         }
     }
 
@@ -114,13 +122,13 @@ impl PackageViolation {
                 "Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart. Add a clippy.toml with the test allowances."
             }
             Self::ClippyLintNotDenied { .. } => {
-                "Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses."
+                "Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a package named <something>_tests that no workspace member depends on may leave it undenied, in its own lints table."
             }
             Self::ClippyTestAllowanceMissing { .. } => {
                 "Tests may fail fast with expect, unwrap and panic. Set the allowance to true in the clippy configuration."
             }
             Self::LintAllowedInManifest { .. } => {
-                "Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports."
+                "Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code."
             }
             Self::PackageDependencyCycle { .. } => {
                 "Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library."
@@ -130,6 +138,9 @@ impl PackageViolation {
             }
             Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
                 "Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so the packages listed could take the tests without a cycle, but the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it."
+            }
+            Self::TestsPackageWithoutTestsSuffix { .. } => {
+                "A package that holds tests says so in its name, so people and tools tell test crates from production crates. Rename the package to end in _tests."
             }
         }
     }
@@ -174,6 +185,10 @@ impl Display for PackageViolation {
             Self::TestsOnlyPackageWithoutTestLibraries { package, .. } => write!(
                 formatter,
                 "Package {package} holds only tests and no test library of its own, so the package its tests verify must own them"
+            ),
+            Self::TestsPackageWithoutTestsSuffix { package, .. } => write!(
+                formatter,
+                "Package {package} holds only tests but its name does not end in {TESTS_PACKAGE_SUFFIX}"
             ),
         }
     }

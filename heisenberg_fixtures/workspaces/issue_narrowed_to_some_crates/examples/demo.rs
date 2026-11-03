@@ -2,5 +2,5 @@
 mod support;
 
 fn main() {
-    support::helper();
+    support::support();
 }

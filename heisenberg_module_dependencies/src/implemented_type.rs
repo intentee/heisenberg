@@ -47,19 +47,23 @@ impl ImplementedType<'_> {
                     })
             })
             .or_else(|| {
+                self.local_trait().and_then(|local_trait| {
+                    local_trait
+                        .source(database)
+                        .map(|source| ImplHome::LocalTraitForeignType {
+                            file: original_file_id(database, source.file_id),
+                            trait_name: local_trait
+                                .name(database)
+                                .display(database, self.krate.edition(database))
+                                .to_string(),
+                        })
+                })
+            })
+            .or_else(|| {
                 self.local_type_argument(trait_arguments)
                     .and_then(|adt| adt.source(database))
                     .map(|source| ImplHome::LocalTypeArgument {
                         file: original_file_id(database, source.file_id),
-                    })
-            })
-            .or_else(|| {
-                self.local_trait()
-                    .map(|local_trait| ImplHome::LocalTraitOnForeignType {
-                        trait_name: local_trait
-                            .name(database)
-                            .display(database, self.krate.edition(database))
-                            .to_string(),
                     })
             })
             .unwrap_or(ImplHome::Foreign)

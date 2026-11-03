@@ -15,6 +15,7 @@ ra_ap_hir_expand = { workspace = true }
 ra_ap_ide_db = { workspace = true }
 ra_ap_intern = { workspace = true }
 ra_ap_paths = { workspace = true }
+ra_ap_stdx = { workspace = true }
 ra_ap_syntax = { workspace = true }
 ra_ap_vfs = { workspace = true }
 thiserror = { workspace = true }

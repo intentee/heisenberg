@@ -1,7 +1,35 @@
+use std::collections::BTreeMap;
+
+use ra_ap_paths::AbsPath;
 use serde::Deserialize;
+use toml::Value;
+
+use crate::constants::HEISENBERG_SETTINGS_KEY;
+use crate::project_model_error::ProjectModelError;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeisenbergSettings {
+    #[serde(default)]
+    pub out_dirs: BTreeMap<String, String>,
     pub targets: Vec<String>,
+}
+
+impl HeisenbergSettings {
+    pub fn of_workspace(
+        metadata: &Value,
+        manifest_path: &AbsPath,
+    ) -> Result<Self, ProjectModelError> {
+        metadata
+            .get(HEISENBERG_SETTINGS_KEY)
+            .ok_or_else(|| ProjectModelError::HeisenbergSettingsMissing {
+                manifest_path: manifest_path.to_path_buf(),
+            })?
+            .clone()
+            .try_into()
+            .map_err(|source| ProjectModelError::HeisenbergSettingsInvalid {
+                manifest_path: manifest_path.to_path_buf(),
+                source: Box::new(source),
+            })
+    }
 }

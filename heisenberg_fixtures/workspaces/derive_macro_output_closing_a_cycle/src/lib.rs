@@ -2,7 +2,7 @@
 
 macro_rules! described {
     derive() ($visibility:vis struct $name:ident;) => {
-        impl crate::second::Describe for $name {}
+        impl crate::second::Second for $name {}
     };
 }
 

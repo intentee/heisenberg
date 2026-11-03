@@ -4,6 +4,6 @@ pub struct Marker;
 
 impl Marker {
     pub fn shared() -> Self {
-        support::shared()
+        support::support()
     }
 }

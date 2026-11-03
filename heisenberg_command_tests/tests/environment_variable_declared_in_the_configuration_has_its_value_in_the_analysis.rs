@@ -5,10 +5,10 @@ use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
 
 #[test]
-fn name_bound_by_an_explicit_foreign_import_is_not_ambiguous() {
+fn environment_variable_declared_in_the_configuration_has_its_value_in_the_analysis() {
     let outcome = HeisenbergCheck {
         workspace: &FixtureWorkspace {
-            name: "explicit_import_of_a_build_script_shaped_item",
+            name: "declared_environment_value",
         }
         .path(),
     }
@@ -20,8 +20,8 @@ fn name_bound_by_an_explicit_foreign_import_is_not_ambiguous() {
         Ok("------------------------------\n\
             No errors found!\n\
             ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
+            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
             Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);

@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::iter;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
@@ -23,6 +25,8 @@ use ra_ap_hir_expand::Lookup;
 use ra_ap_hir_expand::MacroDefKind;
 use ra_ap_hir_expand::builtin::BuiltinFnLikeExpander;
 use ra_ap_ide_db::RootDatabase;
+use ra_ap_paths::AbsPath;
+use ra_ap_stdx::to_lower_snake_case;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::AstToken;
 use ra_ap_syntax::NodeOrToken;
@@ -34,17 +38,21 @@ use ra_ap_syntax::TextSize;
 use ra_ap_syntax::WalkEvent;
 use ra_ap_syntax::ast;
 use ra_ap_syntax::ast::HasGenericArgs as _;
+use ra_ap_syntax::ast::HasName as _;
 use ra_ap_syntax::ast::HasVisibility as _;
 use ra_ap_vfs::FileId;
 
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
+use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
+use heisenberg_module_graph::foreign_module::ForeignModule;
 use heisenberg_module_graph::inactive_focus::InactiveFocus;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::shared_module_file::SharedModuleFile;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_module_graph::walked_code::WalkedCode;
@@ -79,7 +87,8 @@ use crate::test_target_items::TestTargetItems;
 use crate::token_origin::TokenOrigin;
 
 pub struct ModuleWalk<'walk, 'database> {
-    pub crate_target_kind: CrateTargetKind,
+    pub cargo_variables: &'walk BTreeSet<String>,
+    pub crate_target: &'walk CrateTarget,
     pub inactive_code: &'walk HashMap<InFile<SyntaxNodePtr>, CfgExpr>,
     pub krate: Crate,
     pub locator: &'walk SourceLocator<'walk>,
@@ -179,6 +188,47 @@ impl ModuleWalk<'_, '_> {
         }
     }
 
+    fn environment_variable_violation(
+        &self,
+        call: &ast::MacroCall,
+        origin: &SubtreeOrigin,
+    ) -> Option<Violation> {
+        let location = self.locate_focus(call.syntax(), origin);
+        let variable = call
+            .token_tree()
+            .and_then(|tree| {
+                tree.syntax()
+                    .children_with_tokens()
+                    .filter_map(NodeOrToken::into_token)
+                    .filter(|token| !token.kind().is_trivia())
+                    .nth(1)
+            })
+            .and_then(ast::String::cast)
+            .and_then(|literal| literal.value().ok().map(Cow::into_owned));
+
+        match variable {
+            None => Some(Violation {
+                kind: ViolationKind::ComputedEnvironmentVariableName,
+                location,
+            }),
+            Some(variable)
+                if self.cargo_variables.contains(&variable)
+                    || self
+                        .krate
+                        .base()
+                        .env(self.semantics.db)
+                        .get(&variable)
+                        .is_some() =>
+            {
+                None
+            }
+            Some(variable) => Some(Violation {
+                kind: ViolationKind::UndeclaredEnvironmentVariable { variable },
+                location,
+            }),
+        }
+    }
+
     fn expand(
         &self,
         call: &ast::MacroCall,
@@ -208,6 +258,15 @@ impl ModuleWalk<'_, '_> {
                     kind: ViolationKind::ConfigurationSelectionMacro,
                     location: self.locate_focus(call.syntax(), origin),
                 });
+            }
+
+            if let MacroDefKind::BuiltInEager(_, expander) = call_location.def.kind
+                && expander.is_env_or_option_env()
+                && !self.token_origin.is_foreign_text(call.syntax())
+            {
+                graph
+                    .violations
+                    .extend(self.environment_variable_violation(call, origin));
             }
 
             if expansion.kind(database) != MacroKind::ProcMacro {
@@ -489,6 +548,7 @@ impl ModuleWalk<'_, '_> {
         {
             ImplHome::LocalType { file }
             | ImplHome::LocalTraitBlanket { file }
+            | ImplHome::LocalTraitForeignType { file, .. }
             | ImplHome::LocalTraitObject { file }
             | ImplHome::LocalTypeArgument { file }
                 if file == written_in =>
@@ -515,8 +575,11 @@ impl ModuleWalk<'_, '_> {
                 },
                 location,
             }),
-            ImplHome::LocalTraitOnForeignType { trait_name } => Some(Violation {
-                kind: ViolationKind::LocalTraitOnForeignType { trait_name },
+            ImplHome::LocalTraitForeignType { file, trait_name } => Some(Violation {
+                kind: ViolationKind::MisplacedForeignTypeImpl {
+                    trait_file: self.locator.file(file),
+                    trait_name,
+                },
                 location,
             }),
             ImplHome::Foreign => Some(Violation {
@@ -524,6 +587,55 @@ impl ModuleWalk<'_, '_> {
                 location,
             }),
         }
+    }
+
+    fn module_name(&self, module: Module) -> Option<String> {
+        let database = self.semantics.db;
+
+        module.name(database).and_then(|name| {
+            if module.is_inline(database) {
+                Some(name.as_str().to_owned())
+            } else {
+                self.locator
+                    .vfs
+                    .file_path(original_file_id(
+                        database,
+                        module.definition_source_file_id(database),
+                    ))
+                    .as_path()
+                    .and_then(|path| {
+                        if module.is_mod_rs(database) {
+                            path.parent().and_then(AbsPath::file_name)
+                        } else {
+                            path.file_stem()
+                        }
+                    })
+                    .map(str::to_owned)
+            }
+        })
+    }
+
+    fn module_naming_violation(
+        &self,
+        container: &SyntaxNode,
+        public_item: Option<&ast::Item>,
+        origin: &SubtreeOrigin,
+    ) -> Option<Violation> {
+        public_item.and_then(|item| {
+            self.semantics
+                .scope(container)
+                .and_then(|scope| self.module_name(scope.module()))
+                .and_then(|module| {
+                    ast::AnyHasName::cast(item.syntax().clone())
+                        .and_then(|named| named.name())
+                        .map(|name| to_lower_snake_case(name.text()))
+                        .filter(|expected| *expected != module)
+                        .map(|expected| Violation {
+                            kind: ViolationKind::ModuleNotNamedAfterItsItem { expected, module },
+                            location: self.locate_focus(item.syntax(), origin),
+                        })
+                })
+        })
     }
 
     fn negated_attributes(
@@ -599,6 +711,7 @@ impl ModuleWalk<'_, '_> {
         origin: &SubtreeOrigin,
         CrateModuleGraph {
             dependencies,
+            unresolved_foreign_references,
             violations,
             ..
         }: &mut CrateModuleGraph,
@@ -628,6 +741,21 @@ impl ModuleWalk<'_, '_> {
                 violations.insert(Violation {
                     kind: ViolationKind::UnresolvedPath,
                     location: self.locate(path.syntax(), origin),
+                });
+            }
+            PathReferenceOutcome::UnresolvedInForeignModule { crate_name, module } => {
+                unresolved_foreign_references.insert(UnresolvedForeignReference {
+                    location: self.locate(path.syntax(), origin),
+                    module: ForeignModule {
+                        file: self.locator.file(original_file_id(
+                            self.semantics.db,
+                            module.definition_source_file_id(self.semantics.db),
+                        )),
+                        name: iter::once(crate_name)
+                            .chain(self.module_paths.path(module).segments)
+                            .collect::<Vec<String>>()
+                            .join("::"),
+                    },
                 });
             }
         }
@@ -778,14 +906,20 @@ impl ModuleWalk<'_, '_> {
                     &ViolationKind::AdditionalPublicItem,
                     origin,
                 ));
+                graph.violations.extend(self.module_naming_violation(
+                    node,
+                    non_constant.first(),
+                    origin,
+                ));
             }
 
-            if self.crate_target_kind == CrateTargetKind::IntegrationTest {
+            if self.crate_target.kind == CrateTargetKind::IntegrationTest {
                 self.test_target_violations(
                     &TestTargetItems {
                         container: node,
                         options: self.options,
                         semantics: self.semantics,
+                        test_harness: self.crate_target.test_harness,
                     }
                     .neither_tests_constants_nor_imports(),
                     origin,

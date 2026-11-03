@@ -1,8 +1,8 @@
 mod support;
 
-use support::constructed_library;
+use support::support;
 
 #[test]
 fn library_is_constructible() {
-    let _library = constructed_library();
+    let _library = support();
 }

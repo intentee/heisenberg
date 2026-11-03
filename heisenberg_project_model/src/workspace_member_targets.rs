@@ -1,6 +1,7 @@
 use cargo::workspace::Workspace;
 
 use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_module_graph::test_harness::TestHarness;
 
 use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::cargo_target_kind::CargoTargetKind;
@@ -33,12 +34,20 @@ impl WorkspaceMemberTargets<'_, '_> {
                         })
                         .map(|root| MemberTarget {
                             crate_target: CrateTarget {
+                                name: target.name().to_owned(),
                                 package_name: member.name().to_string(),
                                 target_description: target.description_named(),
                                 kind: CargoTargetKind {
                                     kind: target.kind(),
                                 }
                                 .crate_target_kind(),
+                                test_harness: if target.harness()
+                                    && (target.tested() || target.benched())
+                                {
+                                    TestHarness::Libtest
+                                } else {
+                                    TestHarness::Absent
+                                },
                             },
                             root,
                         })

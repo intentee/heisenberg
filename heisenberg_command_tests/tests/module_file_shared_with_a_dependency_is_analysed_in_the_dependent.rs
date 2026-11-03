@@ -21,18 +21,18 @@ fn module_file_shared_with_a_dependency_is_analysed_in_the_dependent() {
             Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
             - src/lib.rs:7:9: Parts of crate depend on each other\n            \
-            support::shared()\n      \
+            support::support()\n      \
             crate (own code) -> crate::support:\n        \
             crate uses crate::support at src/lib.rs:7:9\n      \
             crate::support -> crate (own code):\n        \
-            crate::support uses crate at src/support.rs:1:20\n        \
+            crate::support uses crate at src/support.rs:1:21\n        \
             crate::support uses crate at src/support.rs:2:5\n\
             - src/main.rs:6:5: Parts of crate depend on each other\n        \
-            support::shared();\n      \
+            support::support();\n      \
             crate (own code) -> crate::support:\n        \
             crate uses crate::support at src/main.rs:6:5\n      \
             crate::support -> crate (own code):\n        \
-            crate::support uses crate at src/support.rs:1:20\n        \
+            crate::support uses crate at src/support.rs:1:21\n        \
             crate::support uses crate at src/support.rs:2:5\n\
             \n\
             SharedModuleFile: 1 violation\n\

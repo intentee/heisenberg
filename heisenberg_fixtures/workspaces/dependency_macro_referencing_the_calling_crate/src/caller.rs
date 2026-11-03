@@ -1,3 +1,3 @@
-pub fn call() {
+pub fn caller() {
     calling::call_home!();
 }

@@ -6,12 +6,14 @@ use heisenberg_module_cycles::cycle_site::cycle_site;
 use heisenberg_module_cycles::cycle_witness::CycleWitness;
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_cycles::sibling_edge::SiblingEdge;
+use heisenberg_module_graph::foreign_module::ForeignModule;
 use heisenberg_module_graph::line_position::LinePosition;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::module_path::ModulePath;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
+use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::supported_target::SupportedTarget;
 
@@ -45,6 +47,11 @@ pub enum Issue {
     SharedModuleFile {
         file: String,
         inclusions: SharedFileInclusions,
+    },
+    UnresolvedForeignReferences {
+        module: ForeignModule,
+        sites: NonEmpty<SourceLocation>,
+        targets: BTreeSet<SupportedTarget>,
     },
     Violation {
         occurrences: ViolationOccurrences,
@@ -110,6 +117,22 @@ impl Issue {
     }
 
     #[must_use]
+    pub fn new_unresolved_foreign_references(
+        module: &ForeignModule,
+        NonEmpty { first, others }: &NonEmpty<&SourceLocation>,
+        targets: BTreeSet<SupportedTarget>,
+    ) -> Self {
+        Self::UnresolvedForeignReferences {
+            module: module.clone(),
+            sites: NonEmpty {
+                first: (*first).clone(),
+                others: others.iter().map(|site| (*site).clone()).collect(),
+            },
+            targets,
+        }
+    }
+
+    #[must_use]
     pub fn new_violation(violation: &Violation, occurrences: ViolationOccurrences) -> Self {
         Self::Violation {
             occurrences,
@@ -141,6 +164,11 @@ impl Issue {
                 .map(|copy| format!("  duplicate at {copy}"))
                 .collect(),
             Self::SharedModuleFile { inclusions, .. } => inclusions.lines(),
+            Self::UnresolvedForeignReferences { sites, .. } => sites
+                .others
+                .iter()
+                .map(|site| format!("  also unresolved at {site}"))
+                .collect(),
             Self::Violation {
                 occurrences: ViolationOccurrences { folded, .. },
                 ..
@@ -165,6 +193,7 @@ impl Issue {
             Self::ModuleCycle { .. } => "ModuleCycle",
             Self::Package(violation) => violation.issue_type(),
             Self::SharedModuleFile { .. } => "SharedModuleFile",
+            Self::UnresolvedForeignReferences { .. } => ViolationKind::UnresolvedPath.issue_type(),
             Self::Violation { violation, .. } => violation.kind.issue_type(),
         }
     }
@@ -198,7 +227,8 @@ impl Issue {
                 }
                 .to_string()
             }
-            Self::DuplicatedFunctionBody { targets, .. } => TargetNarrowing {
+            Self::DuplicatedFunctionBody { targets, .. }
+            | Self::UnresolvedForeignReferences { targets, .. } => TargetNarrowing {
                 all: &analysed
                     .map(|AnalysisContext { target, .. }| *target)
                     .chain(targets.iter().copied())
@@ -236,6 +266,9 @@ impl Issue {
             }
             Self::Package(violation) => IssueLocation::new_whole_file(violation.file()),
             Self::SharedModuleFile { file, .. } => IssueLocation::new_whole_file(file),
+            Self::UnresolvedForeignReferences { sites, .. } => {
+                IssueLocation::new_position(&sites.first)
+            }
             Self::Violation { violation, .. } => IssueLocation::new_position(&violation.location),
         }
     }
@@ -254,6 +287,9 @@ impl Issue {
                 ..
             } => {
                 format!("Module file belongs to {} modules", inclusions.len())
+            }
+            Self::UnresolvedForeignReferences { module, .. } => {
+                format!("Path into {module} is unresolved")
             }
             Self::Violation { violation, .. } => violation.kind.to_string(),
         }
@@ -275,6 +311,7 @@ impl Issue {
             Self::SharedModuleFile { .. } => {
                 "A file included as several modules has no single owner. Give each module its own file."
             }
+            Self::UnresolvedForeignReferences { .. } => ViolationKind::UnresolvedPath.purpose(),
             Self::Violation { violation, .. } => violation.kind.purpose(),
         }
     }

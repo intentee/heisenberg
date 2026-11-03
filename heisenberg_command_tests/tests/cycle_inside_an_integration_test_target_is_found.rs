@@ -27,7 +27,7 @@ fn cycle_inside_an_integration_test_target_is_found() {
             Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
             - tests/cycle.rs:3:9: Parts of crate depend on each other\n            \
-            super::second::helper();\n      \
+            super::second::second();\n      \
             crate::first -> crate::second:\n        \
             crate::first uses crate::second at tests/cycle.rs:3:9\n      \
             crate::second -> crate::first:\n        \
@@ -37,9 +37,9 @@ fn cycle_inside_an_integration_test_target_is_found() {
             A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
             - tests/cycle.rs:2:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
-            pub fn run() {\n\
+            pub fn first() {\n\
             - tests/cycle.rs:8:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
-            pub fn helper() {}\n\
+            pub fn second() {}\n\
             - tests/cycle.rs:10:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
             pub fn back() {\n\
             \n\

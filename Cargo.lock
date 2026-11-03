@@ -2488,6 +2488,7 @@ dependencies = [
  "ra_ap_ide_db",
  "ra_ap_intern",
  "ra_ap_paths",
+ "ra_ap_stdx",
  "ra_ap_syntax",
  "ra_ap_vfs",
  "thiserror",

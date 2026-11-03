@@ -41,6 +41,7 @@ use crate::test_target_findings::TestTargetFindings;
 use crate::token_origin::TokenOrigin;
 
 pub struct CrateExtraction<'extraction, 'database> {
+    pub cargo_variables: &'extraction BTreeSet<String>,
     pub crate_target: &'extraction CrateTarget,
     pub krate: Crate,
     pub locator: &'extraction SourceLocator<'extraction>,
@@ -74,7 +75,8 @@ impl CrateExtraction<'_, '_> {
         }
 
         let walk = ModuleWalk {
-            crate_target_kind: self.crate_target.kind,
+            cargo_variables: self.cargo_variables,
+            crate_target: self.crate_target,
             inactive_code: &inactive_code,
             krate: self.krate,
             locator: self.locator,
@@ -98,6 +100,7 @@ impl CrateExtraction<'_, '_> {
                 && root.legacy_macros(database).is_empty()
                 && root.scope(database, None).is_empty(),
             shared_module_files: BTreeSet::new(),
+            unresolved_foreign_references: BTreeSet::new(),
             violations: ViolationSet::default(),
             walked_code: WalkedCode::default(),
         };

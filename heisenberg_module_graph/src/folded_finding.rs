@@ -13,7 +13,7 @@ pub struct FoldedFinding {
 
 impl Display for FoldedFinding {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        match self.kind {
+        match &self.kind {
             FoldedFindingKind::FailingExpansion => {
                 write!(formatter, "expansion failing at {}", self.location)
             }
@@ -21,6 +21,11 @@ impl Display for FoldedFinding {
             FoldedFindingKind::InactiveCode => write!(
                 formatter,
                 "code active on no declared target at {}",
+                self.location
+            ),
+            FoldedFindingKind::UnresolvedForeignReferences { count, module } => write!(
+                formatter,
+                "unresolved paths into {module}: {count}, the first at {}",
                 self.location
             ),
         }

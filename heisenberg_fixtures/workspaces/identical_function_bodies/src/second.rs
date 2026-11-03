@@ -1,4 +1,4 @@
-pub fn summed_length(words: &[String]) -> usize {
+pub fn second(words: &[String]) -> usize {
     let mut total = 0;
 
     for word in words {

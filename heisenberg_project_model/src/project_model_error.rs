@@ -151,6 +151,32 @@ pub enum ProjectModelError {
     LibraryProjectJson(#[source] error::Error),
     #[error("rust-analyzer returns no standard library workspace for `{library_directory}`")]
     LibraryWorkspaceMissing { library_directory: AbsPathBuf },
+    #[error("the [env] table of the cargo configuration cannot be read")]
+    CargoEnvironmentTable(#[source] Box<dyn Error + Send + Sync>),
+    #[error("the configured value of `{}` is not UTF-8", .0.context)]
+    NonUtf8ConfiguredEnvironmentValue(ContextualError<String, OsString>),
+    #[error(
+        "`{manifest_path}` declares an out-dir for `{package}`, which is not a workspace member"
+    )]
+    UnknownOutDirPackage {
+        manifest_path: AbsPathBuf,
+        package: String,
+    },
+    #[error("`{manifest_path}` declares an out-dir for `{package}`, which has no build script")]
+    OutDirPackageWithoutBuildScript {
+        manifest_path: AbsPathBuf,
+        package: String,
+    },
+    #[error(
+        "`{manifest_path}` declares the out-dir `{directory}` for `{package}` outside the workspace"
+    )]
+    OutDirOutsideWorkspace {
+        directory: String,
+        manifest_path: AbsPathBuf,
+        package: String,
+    },
+    #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
+    UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]
     PackageSources {
         manifest_path: PathBuf,

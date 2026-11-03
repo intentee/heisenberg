@@ -98,7 +98,15 @@ impl PathReference<'_, '_> {
             Some(PathResolution::Def(ModuleDef::Module(module)))
                 if module.krate(self.semantics.db) != self.krate =>
             {
-                PathReferenceOutcome::Irrelevant
+                module
+                    .krate(self.semantics.db)
+                    .display_name(self.semantics.db)
+                    .map_or(PathReferenceOutcome::Unresolved, |crate_name| {
+                        PathReferenceOutcome::UnresolvedInForeignModule {
+                            crate_name: crate_name.to_string(),
+                            module,
+                        }
+                    })
             }
             Some(_) => PathReferenceOutcome::Unresolved,
         }

@@ -21,7 +21,7 @@ fn identical_function_bodies_are_one_duplication_issue() {
             Duplicated code drifts apart when one copy changes. Keep one function and call it from every place that needs it.\n\
             \n\
             - src/first.rs:1:8: Function body is duplicated\n    \
-            pub fn total_length(names: &[String]) -> usize {\n      \
+            pub fn first(names: &[String]) -> usize {\n      \
             duplicate at src/second.rs:1:8\n\
             \n\
             ------------------------------\n\

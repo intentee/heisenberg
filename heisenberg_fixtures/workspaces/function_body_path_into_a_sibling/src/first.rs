@@ -1,3 +1,3 @@
-pub fn run() {
+pub fn first() {
     crate::second::Second::helper();
 }

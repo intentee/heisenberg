@@ -11,6 +11,7 @@ use ra_ap_vfs::Vfs;
 use ra_ap_vfs::VfsPath;
 
 use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_module_graph::test_harness::TestHarness;
 
 pub struct ExactCrateCfg<'assignment> {
     pub library_atoms: &'assignment [CfgAtom],
@@ -41,7 +42,10 @@ impl ExactCrateCfg<'_> {
 
                 if self
                     .member_targets
-                    .contains_key(self.vfs.file_path(data.root_file_id))
+                    .get(self.vfs.file_path(data.root_file_id))
+                    .is_some_and(|CrateTarget { test_harness, .. }| {
+                        *test_harness == TestHarness::Libtest
+                    })
                 {
                     options.insert_atom(sym::test);
                 }

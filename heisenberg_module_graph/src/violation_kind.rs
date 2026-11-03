@@ -7,17 +7,31 @@ use crate::constants::CONSTANTS_MODULE_NAME;
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ViolationKind {
     AdditionalPublicItem,
+    ComputedEnvironmentVariableName,
     ConfigurationSelectionMacro,
     FailedMacroExpansion,
     GlobImport,
     InvalidMacroDefinition,
     ImplWithoutLocalType,
     LintSuppression,
-    LocalTraitOnForeignType { trait_name: String },
     ModuleFileInsideBlock,
-    MisplacedBlanketImpl { trait_file: String },
-    MisplacedImpl { type_file: String },
-    MisplacedTraitObjectImpl { trait_file: String },
+    ModuleNotNamedAfterItsItem {
+        expected: String,
+        module: String,
+    },
+    MisplacedBlanketImpl {
+        trait_file: String,
+    },
+    MisplacedForeignTypeImpl {
+        trait_file: String,
+        trait_name: String,
+    },
+    MisplacedImpl {
+        type_file: String,
+    },
+    MisplacedTraitObjectImpl {
+        trait_file: String,
+    },
     NegatedConfiguration,
     NonConstantInConstantsModule,
     NonDocComment,
@@ -32,6 +46,9 @@ pub enum ViolationKind {
     UnresolvedMacroCall,
     UnresolvedModule,
     UnresolvedPath,
+    UndeclaredEnvironmentVariable {
+        variable: String,
+    },
 }
 
 impl ViolationKind {
@@ -39,15 +56,17 @@ impl ViolationKind {
     pub const fn issue_type(&self) -> &'static str {
         match self {
             Self::AdditionalPublicItem => "AdditionalPublicItem",
+            Self::ComputedEnvironmentVariableName => "ComputedEnvironmentVariableName",
             Self::ConfigurationSelectionMacro => "ConfigurationSelectionMacro",
             Self::FailedMacroExpansion => "FailedMacroExpansion",
             Self::GlobImport => "GlobImport",
             Self::InvalidMacroDefinition => "InvalidMacroDefinition",
             Self::ImplWithoutLocalType => "ImplWithoutLocalType",
             Self::LintSuppression => "LintSuppression",
-            Self::LocalTraitOnForeignType { .. } => "LocalTraitOnForeignType",
             Self::ModuleFileInsideBlock => "ModuleFileInsideBlock",
+            Self::ModuleNotNamedAfterItsItem { .. } => "ModuleNotNamedAfterItsItem",
             Self::MisplacedBlanketImpl { .. } => "MisplacedBlanketImpl",
+            Self::MisplacedForeignTypeImpl { .. } => "MisplacedForeignTypeImpl",
             Self::MisplacedImpl { .. } => "MisplacedImpl",
             Self::MisplacedTraitObjectImpl { .. } => "MisplacedTraitObjectImpl",
             Self::NegatedConfiguration => "NegatedConfiguration",
@@ -64,6 +83,7 @@ impl ViolationKind {
             Self::UnresolvedMacroCall => "UnresolvedMacroCall",
             Self::UnresolvedModule => "UnresolvedModule",
             Self::UnresolvedPath => "UnresolvedPath",
+            Self::UndeclaredEnvironmentVariable { .. } => "UndeclaredEnvironmentVariable",
         }
     }
 
@@ -72,6 +92,9 @@ impl ViolationKind {
         match self {
             Self::AdditionalPublicItem => {
                 "Each module exposes a single public item, so every file has one responsibility. Move each additional public item into its own module."
+            }
+            Self::ComputedEnvironmentVariableName => {
+                "Heisenberg accounts for the environment variable a macro call reads only when a string literal names it. Name the variable with a string literal."
             }
             Self::ConfigurationSelectionMacro => {
                 "cfg_select! discards the arms it does not select before they can be analysed. Write each arm as an item under its own #[cfg] attribute."
@@ -91,14 +114,17 @@ impl ViolationKind {
             Self::LintSuppression => {
                 "Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports."
             }
-            Self::LocalTraitOnForeignType { .. } => {
-                "Behavior belongs with the type that owns it, so a trait of this crate does not extend a type this crate does not define. Implement the trait for a type of this crate, such as a wrapper around the foreign type, write a blanket or trait-object impl beside the trait, or make the behavior a function."
-            }
             Self::ModuleFileInsideBlock => {
                 "A module file declared inside a block is outside the analysed module tree. Declare the module at module level."
             }
+            Self::ModuleNotNamedAfterItsItem { .. } => {
+                "A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item."
+            }
             Self::MisplacedBlanketImpl { .. } => {
                 "A blanket impl reaches every type its bounds admit, so it belongs beside its trait. Move the impl into the file that defines the trait."
+            }
+            Self::MisplacedForeignTypeImpl { .. } => {
+                "An impl of a trait of this crate for a type it does not define belongs beside the trait, so every impl has exactly one place. Move the impl into the file that defines the trait."
             }
             Self::MisplacedImpl { .. } => {
                 "All behavior of a type is read in one place, the file that defines it. Move the impl block into that file."
@@ -148,6 +174,9 @@ impl ViolationKind {
             Self::UnresolvedPath => {
                 "Every name must resolve for the analysis to be complete. Fix the path so it resolves."
             }
+            Self::UndeclaredEnvironmentVariable { .. } => {
+                "A compile-time environment variable that a build script or the shell sets is an input Heisenberg cannot see, so the analysis would use a wrong value. Read only variables cargo sets, declare the variable in the [env] table of the cargo configuration, or read it at run time."
+            }
         }
     }
 }
@@ -158,6 +187,9 @@ impl Display for ViolationKind {
             Self::AdditionalPublicItem => {
                 formatter.write_str("Module already has a public item")
             }
+            Self::ComputedEnvironmentVariableName => formatter.write_str(
+                "Macro call does not name its environment variable with a readable string literal",
+            ),
             Self::ConfigurationSelectionMacro => formatter.write_str(
                 "Configuration selection macro keeps the arms it does not select out of the analysis",
             ),
@@ -167,16 +199,23 @@ impl Display for ViolationKind {
             Self::ImplWithoutLocalType => formatter
                 .write_str("Impl block belongs to no single type or trait of this crate"),
             Self::LintSuppression => formatter.write_str("Attribute suppresses lints"),
-            Self::LocalTraitOnForeignType { trait_name } => write!(
-                formatter,
-                "Impl block implements {trait_name}, a trait of this crate, for a foreign type"
-            ),
             Self::ModuleFileInsideBlock => {
                 formatter.write_str("Module file declared inside a block is not analysed")
             }
+            Self::ModuleNotNamedAfterItsItem { expected, module } => write!(
+                formatter,
+                "Module is named {module}, but its public item names it {expected}"
+            ),
             Self::MisplacedBlanketImpl { trait_file } => {
                 write!(formatter, "Blanket impl belongs in {trait_file}")
             }
+            Self::MisplacedForeignTypeImpl {
+                trait_file,
+                trait_name,
+            } => write!(
+                formatter,
+                "Impl block of {trait_name} for a foreign type belongs in {trait_file}"
+            ),
             Self::MisplacedImpl { type_file } => {
                 write!(formatter, "Impl block belongs in {type_file}")
             }
@@ -213,6 +252,10 @@ impl Display for ViolationKind {
             Self::UnresolvedMacroCall => formatter.write_str("Macro call is unresolved"),
             Self::UnresolvedModule => formatter.write_str("Module file is unresolved"),
             Self::UnresolvedPath => formatter.write_str("Path is unresolved"),
+            Self::UndeclaredEnvironmentVariable { variable } => write!(
+                formatter,
+                "Macro call reads {variable}, which neither cargo nor the [env] configuration sets"
+            ),
         }
     }
 }

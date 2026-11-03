@@ -1,4 +1,4 @@
 #[attribute::mark]
-pub fn uses_second() -> crate::second::Second {
+pub fn first() -> crate::second::Second {
     crate::second::Second
 }

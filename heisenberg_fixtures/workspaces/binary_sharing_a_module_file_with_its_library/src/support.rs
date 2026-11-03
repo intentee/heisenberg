@@ -1,3 +1,3 @@
-pub fn shared() -> crate::Marker {
+pub fn support() -> crate::Marker {
     crate::Marker
 }

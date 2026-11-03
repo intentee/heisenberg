@@ -11,14 +11,37 @@ use ra_ap_ide_db::base_db::set_all_crates_with_durability;
 use ra_ap_vfs::FileId;
 
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
+use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_project_model::loaded_project::LoadedProject;
 
+use crate::constants::CARGO_BINARY_PATH_VARIABLE_PREFIX;
+use crate::constants::CARGO_BUILD_VARIABLES;
 use crate::crate_extraction::CrateExtraction;
 use crate::crate_module_files::crate_module_files;
 use crate::member_crate::MemberCrate;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::name_resolution_priming::NameResolutionPriming;
 use crate::source_locator::SourceLocator;
+
+fn cargo_variables(project: &LoadedProject, crate_target: &CrateTarget) -> BTreeSet<String> {
+    CARGO_BUILD_VARIABLES
+        .iter()
+        .map(|variable| (*variable).to_owned())
+        .chain(
+            project
+                .member_targets
+                .values()
+                .filter(|target| {
+                    target.kind == CrateTargetKind::Binary
+                        && target.package_name == crate_target.package_name
+                })
+                .map(|CrateTarget { name, .. }| {
+                    format!("{CARGO_BINARY_PATH_VARIABLE_PREFIX}{name}")
+                }),
+        )
+        .collect()
+}
 
 pub struct ModuleDependencies<'project> {
     pub project: &'project mut LoadedProject,
@@ -92,6 +115,7 @@ impl ModuleDependencies<'_> {
                          krate,
                      }| {
                         CrateExtraction {
+                            cargo_variables: &cargo_variables(project, crate_target),
                             crate_target,
                             krate: *krate,
                             locator: &locator,

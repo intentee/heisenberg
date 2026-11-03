@@ -1,9 +1,9 @@
 mod helpers {
     #[derive(Debug)]
-    pub struct Helper;
+    pub struct Helpers;
 }
 
-impl helpers::Helper {
+impl helpers::Helpers {
     fn help() {}
 }
 

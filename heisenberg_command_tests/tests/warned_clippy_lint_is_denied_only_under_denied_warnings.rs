@@ -36,7 +36,7 @@ fn warned_clippy_lint_is_denied_only_under_denied_warnings() {
     assert_eq!(
         str::from_utf8(&warned.output),
         Ok("ClippyLintNotDenied: 1 violation\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a package named <something>_tests that no workspace member depends on may leave it undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Package clippy_lint_warned_under_warned_warnings does not deny clippy::expect_used\n\
             \n\

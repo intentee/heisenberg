@@ -1,4 +1,4 @@
-pub struct First;
+pub struct Items;
 
 pub fn second() {}
 

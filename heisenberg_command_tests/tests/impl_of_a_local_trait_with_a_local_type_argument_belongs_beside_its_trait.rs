@@ -5,10 +5,10 @@ use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_fixtures::fixture_workspace::FixtureWorkspace;
 
 #[test]
-fn impl_not_implementing_a_type_of_its_crate_is_a_violation() {
+fn impl_of_a_local_trait_with_a_local_type_argument_belongs_beside_its_trait() {
     let outcome = HeisenbergCheck {
         workspace: &FixtureWorkspace {
-            name: "impl_without_local_type",
+            name: "local_trait_with_a_local_type_argument",
         }
         .path(),
     }
@@ -17,16 +17,14 @@ fn impl_not_implementing_a_type_of_its_crate_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("LocalTraitOnForeignType: 2 violations\n\
-            Behavior belongs with the type that owns it, so a trait of this crate does not extend a type this crate does not define. Implement the trait for a type of this crate, such as a wrapper around the foreign type, write a blanket or trait-object impl beside the trait, or make the behavior a function.\n\
+        Ok("MisplacedForeignTypeImpl: 1 violation\n\
+            An impl of a trait of this crate for a type it does not define belongs beside the trait, so every impl has exactly one place. Move the impl into the file that defines the trait.\n\
             \n\
-            - src/greeting.rs:5:19: Impl block implements Greeting, a trait of this crate, for a foreign type\n    \
-            impl Greeting for String {\n\
-            - src/local.rs:11:19: Impl block implements Greeting, a trait of this crate, for a foreign type\n    \
-            impl Greeting for Vec<Local> {\n\
+            - src/local.rs:5:25: Impl block of Convert for a foreign type belongs in src/convert.rs\n    \
+            impl Convert<Local> for u32 {\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            1 errors found\n\
             ------------------------------\n\
             Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
             Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\

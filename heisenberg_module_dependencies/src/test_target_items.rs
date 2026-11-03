@@ -4,6 +4,8 @@ use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
+use heisenberg_module_graph::test_harness::TestHarness;
+
 use crate::attributed_item::AttributedItem;
 use crate::defined_items::DefinedItems;
 
@@ -11,6 +13,7 @@ pub struct TestTargetItems<'items, 'database> {
     pub container: &'items SyntaxNode,
     pub options: &'items CfgOptions,
     pub semantics: &'items Semantics<'database, RootDatabase>,
+    pub test_harness: TestHarness,
 }
 
 impl TestTargetItems<'_, '_> {
@@ -31,7 +34,9 @@ impl TestTargetItems<'_, '_> {
             !attributed.has_procedural_attribute()
                 && match item {
                     ast::Item::Const(_) | ast::Item::Module(_) | ast::Item::Use(_) => false,
-                    ast::Item::Fn(_) => !attributed.has_test_attribute(),
+                    ast::Item::Fn(function) => {
+                        !attributed.has_test_attribute() && !self.is_entry_point(function)
+                    }
                     ast::Item::AsmExpr(_)
                     | ast::Item::Enum(_)
                     | ast::Item::ExternBlock(_)
@@ -48,5 +53,13 @@ impl TestTargetItems<'_, '_> {
                 }
         })
         .collect()
+    }
+
+    fn is_entry_point(&self, function: &ast::Fn) -> bool {
+        self.test_harness == TestHarness::Absent
+            && self
+                .semantics
+                .to_def(function)
+                .is_some_and(|definition| definition.is_main(self.semantics.db))
     }
 }

@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "impl_block_of_a_flagged_type"
+name = "impl_block_of_a_flagged_type_tests"
 version = "0.1.0"

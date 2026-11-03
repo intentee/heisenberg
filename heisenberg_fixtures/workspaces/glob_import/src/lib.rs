@@ -2,6 +2,6 @@ pub mod inner;
 
 use inner::*;
 
-pub fn item() -> Item {
-    Item
+pub fn item() -> Inner {
+    Inner
 }

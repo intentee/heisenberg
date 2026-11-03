@@ -1,1 +1,1 @@
-pub fn stop() {}
+pub fn second() {}

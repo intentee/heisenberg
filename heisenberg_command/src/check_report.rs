@@ -5,9 +5,11 @@ use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
 use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
+use heisenberg_module_graph::foreign_module::ForeignModule;
 use heisenberg_module_graph::function_body::FunctionBody;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::package_violation::PackageViolation;
@@ -296,6 +298,7 @@ impl CheckReport {
         let mut issues = Vec::new();
 
         issues.extend(self.inactive_code_issues(&mut violations));
+        issues.extend(self.unresolved_foreign_reference_issues(&mut violations));
 
         for (violation, occurrences) in violations {
             issues.push(Issue::new_violation(violation, occurrences));
@@ -320,6 +323,67 @@ impl CheckReport {
                 .then_with(|| left.cmp(right))
         });
         issues.dedup();
+
+        issues
+    }
+    fn unresolved_foreign_reference_issues<'report>(
+        &'report self,
+        violations: &mut BTreeMap<&'report Violation, ViolationOccurrences>,
+    ) -> Vec<Issue> {
+        let references: BTreeSet<&UnresolvedForeignReference> = self
+            .analyses
+            .iter()
+            .flat_map(|TargetAnalysis { graphs, .. }| graphs)
+            .flat_map(|graph| &graph.unresolved_foreign_references)
+            .collect();
+
+        let mut sites: BTreeMap<&ForeignModule, NonEmpty<&SourceLocation>> = BTreeMap::new();
+
+        for UnresolvedForeignReference { location, module } in references {
+            NonEmpty::push_into(&mut sites, module, location);
+        }
+
+        let mut issues = Vec::new();
+
+        for (module, group) in sites {
+            let failed: Vec<&mut ViolationOccurrences> = violations
+                .iter_mut()
+                .filter(|(violation, _)| {
+                    violation.kind == ViolationKind::FailedMacroExpansion
+                        && violation.location.file == module.file
+                })
+                .map(|(_, occurrences)| occurrences)
+                .collect();
+
+            if failed.is_empty() {
+                issues.push(Issue::new_unresolved_foreign_references(
+                    module,
+                    &group,
+                    self.analyses
+                        .iter()
+                        .filter(|TargetAnalysis { graphs, .. }| {
+                            graphs.iter().any(|graph| {
+                                graph
+                                    .unresolved_foreign_references
+                                    .iter()
+                                    .any(|reference| reference.module == *module)
+                            })
+                        })
+                        .map(|TargetAnalysis { target, .. }| *target)
+                        .collect(),
+                ));
+            }
+
+            for occurrences in failed {
+                occurrences.folded.insert(FoldedFinding {
+                    kind: FoldedFindingKind::UnresolvedForeignReferences {
+                        count: group.others.len() + 1,
+                        module: module.name.clone(),
+                    },
+                    location: group.first.clone(),
+                });
+            }
+        }
 
         issues
     }

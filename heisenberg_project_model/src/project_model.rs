@@ -9,8 +9,10 @@ use heisenberg_module_graph::crate_target::CrateTarget;
 
 use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
+use crate::declared_out_dirs::DeclaredOutDirs;
 use crate::declared_targets::declared_targets;
 use crate::feature_graph::FeatureGraph;
+use crate::heisenberg_settings::HeisenbergSettings;
 use crate::library_directory::library_directory;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
@@ -40,10 +42,16 @@ impl ProjectModel {
             workspace_directory: &self.workspace_directory,
         }
         .resolve()?;
-        let targets = declared_targets(
-            &project.workspace.metadata,
-            &workspace_manifest(&self.workspace_directory),
-        )?;
+        let manifest_path = workspace_manifest(&self.workspace_directory);
+        let HeisenbergSettings { out_dirs, targets } =
+            HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
+        let targets = declared_targets(targets, &manifest_path)?;
+        let out_dirs = DeclaredOutDirs {
+            manifest_path: &manifest_path,
+            resolved: &project,
+            targets: &targets,
+        }
+        .validated(out_dirs)?;
         let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
 
         for MemberTarget { crate_target, root } in &project.member_targets {
@@ -87,6 +95,7 @@ impl ProjectModel {
                     .map_err(ProjectModelError::LibraryPackageGraph)
                     .map(|library| ResolvedProject {
                         library,
+                        out_dirs,
                         project,
                         sysroot: self.sysroot.clone(),
                         targets,

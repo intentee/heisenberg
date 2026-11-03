@@ -21,7 +21,7 @@ fn issue_holding_in_only_some_crates_names_them() {
             A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
             - tests/support/mod.rs:1:8: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file (only in issue_narrowed_to_some_crates test \"first\"; issue_narrowed_to_some_crates test \"second\")\n    \
-            pub fn helper() {}\n\
+            pub fn support() {}\n\
             \n\
             SharedModuleFile: 1 violation\n\
             A file included as several modules has no single owner. Give each module its own file.\n\

@@ -22,7 +22,7 @@ impl Imports {
 pub mod inline {
     use shaped::backend::Generated;
 
-    pub fn inline_module() -> Generated {
+    pub fn inline() -> Generated {
         Generated
     }
 }

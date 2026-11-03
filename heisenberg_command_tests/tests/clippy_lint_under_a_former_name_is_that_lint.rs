@@ -18,12 +18,12 @@ fn clippy_lint_under_a_former_name_is_that_lint() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 1 violation\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a package named <something>_tests that no workspace member depends on may leave it undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Package clippy_lint_under_a_former_name does not deny clippy::unwrap_used\n\
             \n\
             LintAllowedInManifest: 1 violation\n\
-            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports.\n\
+            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code.\n\
             \n\
             - Cargo.toml: Package clippy_lint_under_a_former_name allows option_unwrap_used in its clippy lints\n\
             \n\

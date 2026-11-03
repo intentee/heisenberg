@@ -18,12 +18,12 @@ fn lint_table_inherited_from_the_workspace_is_reported_once_at_the_workspace_man
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 1 violation\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a package named <something>_tests that no workspace member depends on may leave it undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Workspace does not deny clippy::panic\n\
             \n\
             LintAllowedInManifest: 1 violation\n\
-            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow and fix the code the lint reports.\n\
+            Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code.\n\
             \n\
             - Cargo.toml: Workspace allows too_many_lines in its clippy lints\n\
             \n\

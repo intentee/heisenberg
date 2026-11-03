@@ -2,6 +2,6 @@
 
 const LIMIT: u8 = 1;
 
-pub fn limit() -> u8 {
+pub fn limits() -> u8 {
     LIMIT
 }

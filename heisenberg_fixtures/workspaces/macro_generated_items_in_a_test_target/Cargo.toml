@@ -1,5 +1,5 @@
 [package]
-name = "macro_generated_items_in_a_test_target"
+name = "macro_generated_items_in_a_test_target_tests"
 edition = "2024"
 version = "0.1.0"
 

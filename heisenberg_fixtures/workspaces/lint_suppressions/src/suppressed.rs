@@ -2,7 +2,7 @@
 struct Unused;
 
 #[expect(clippy::expect_used, reason = "the fixture expects")]
-pub fn expected() {}
+pub fn suppressed() {}
 
 #[cfg_attr(unix, allow(unused_variables))]
 fn platform() {}

@@ -1,5 +1,5 @@
 [package]
-name = "impl_block_of_a_flagged_type"
+name = "impl_block_of_a_flagged_type_tests"
 edition = "2024"
 version = "0.1.0"
 

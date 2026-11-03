@@ -2,6 +2,7 @@ mod adt_violation;
 mod attributed_item;
 mod code_tokens;
 mod configured_node;
+mod constants;
 mod constants_module;
 mod covering_ancestors;
 mod crate_extraction;
