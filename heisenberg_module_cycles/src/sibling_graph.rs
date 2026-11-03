@@ -21,10 +21,11 @@ pub struct SiblingGraph {
 impl SiblingGraph {
     #[must_use]
     pub fn cycles(&self, crate_target: &CrateTarget) -> Vec<ModuleCycle> {
-        let components = CycleComponents::new(self.edges.keys().map(|edge| GraphEdge {
-            from: &edge.from,
-            to: &edge.to,
-        }));
+        let components = CycleComponents::new(
+            self.edges
+                .keys()
+                .map(|SiblingEdge { from, to }| GraphEdge { from, to }),
+        );
         let component_of = components.component_of();
         let mut witnesses: BTreeMap<&BTreeSet<&ModuleUnit>, NonEmpty<CycleWitness>> =
             BTreeMap::new();

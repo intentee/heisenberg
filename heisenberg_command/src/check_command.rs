@@ -77,7 +77,9 @@ fn empty_libraries(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
     } in analyses
         .iter()
         .flat_map(|TargetAnalysis { graphs, .. }| graphs)
-        .filter(|graph| graph.crate_target.kind == CrateTargetKind::Library)
+        .filter(|CrateModuleGraph { crate_target, .. }| {
+            crate_target.kind == CrateTargetKind::Library
+        })
     {
         *libraries
             .entry(crate_target.package_name.as_str())

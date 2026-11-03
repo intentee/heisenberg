@@ -147,7 +147,11 @@ impl CheckReport {
             .flat_map(|TargetAnalysis { graphs, target, .. }| {
                 graphs
                     .iter()
-                    .flat_map(|graph| &graph.function_bodies)
+                    .flat_map(
+                        |CrateModuleGraph {
+                             function_bodies, ..
+                         }| function_bodies,
+                    )
                     .map(|body| TargetFunctionBody {
                         body,
                         target: *target,
@@ -237,8 +241,13 @@ impl CheckReport {
         let declarations_of_negated_files: BTreeSet<&SourceLocation> = self
             .analyses
             .iter()
-            .flat_map(|analysis| &analysis.graphs)
-            .flat_map(|graph| &graph.configured_out_negations.declarations)
+            .flat_map(|TargetAnalysis { graphs, .. }| graphs)
+            .flat_map(
+                |CrateModuleGraph {
+                     configured_out_negations,
+                     ..
+                 }| &configured_out_negations.declarations,
+            )
             .collect();
 
         for analysis in &self.analyses {
@@ -255,12 +264,9 @@ impl CheckReport {
                     occurrences.folded.extend(folded_findings.iter().cloned());
                 }
 
-                for negation in graph
-                    .configured_out_negations
-                    .negations
-                    .iter()
-                    .filter(|negation| !declarations_of_negated_files.contains(&negation.location))
-                {
+                for negation in graph.configured_out_negations.negations.iter().filter(
+                    |Violation { location, .. }| !declarations_of_negated_files.contains(location),
+                ) {
                     violations
                         .entry(negation)
                         .or_default()
@@ -334,7 +340,12 @@ impl CheckReport {
             .analyses
             .iter()
             .flat_map(|TargetAnalysis { graphs, .. }| graphs)
-            .flat_map(|graph| &graph.unresolved_foreign_references)
+            .flat_map(
+                |CrateModuleGraph {
+                     unresolved_foreign_references,
+                     ..
+                 }| unresolved_foreign_references,
+            )
             .collect();
 
         let mut sites: BTreeMap<&ForeignModule, NonEmpty<&SourceLocation>> = BTreeMap::new();
@@ -362,12 +373,21 @@ impl CheckReport {
                     self.analyses
                         .iter()
                         .filter(|TargetAnalysis { graphs, .. }| {
-                            graphs.iter().any(|graph| {
-                                graph
-                                    .unresolved_foreign_references
-                                    .iter()
-                                    .any(|reference| reference.module == *module)
-                            })
+                            graphs.iter().any(
+                                |CrateModuleGraph {
+                                     unresolved_foreign_references,
+                                     ..
+                                 }| {
+                                    unresolved_foreign_references.iter().any(
+                                        |UnresolvedForeignReference {
+                                             module: referenced_module,
+                                             ..
+                                         }| {
+                                            referenced_module == module
+                                        },
+                                    )
+                                },
+                            )
                         })
                         .map(|TargetAnalysis { target, .. }| *target)
                         .collect(),

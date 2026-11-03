@@ -22,7 +22,11 @@ impl TestTargetFindings {
         } = self;
 
         for AdtViolation { adt, violation } in impl_blocks {
-            match types.iter().find(|flagged| flagged.adt == adt) {
+            match types.iter().find(
+                |AdtViolation {
+                     adt: flagged_adt, ..
+                 }| *flagged_adt == adt,
+            ) {
                 Some(flagged) => {
                     violations.fold(
                         flagged.violation.clone(),

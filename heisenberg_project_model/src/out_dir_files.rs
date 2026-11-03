@@ -128,12 +128,8 @@ impl OutDirFiles<'_> {
         let existing = database.source_root(source_root).source_root(database);
         let mut file_set = FileSet::default();
 
-        for (file, path) in existing.iter().filter_map(|file| {
-            existing
-                .path_for_file(&file)
-                .map(|path| (file, path.clone()))
-        }) {
-            file_set.insert(file, path);
+        for file in existing.iter() {
+            file_set.insert(file, vfs.file_path(file).clone());
         }
 
         let added: Vec<FileId> = contents

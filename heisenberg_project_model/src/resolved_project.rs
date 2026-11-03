@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
 use cargo_platform::Cfg;
 use guppy::graph::feature::StandardFeatures;
@@ -41,6 +42,7 @@ use crate::library_directory::library_directory;
 use crate::library_project_json::LibraryProjectJson;
 use crate::loaded_proc_macros::LoadedProcMacros;
 use crate::loaded_project::LoadedProject;
+use crate::member_target::MemberTarget;
 use crate::out_dir_files::OutDirFiles;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
@@ -54,19 +56,20 @@ fn build_script_atoms(
 ) -> Result<HashMap<VfsPath, Vec<CfgAtom>>, ProjectModelError> {
     crate_packages
         .iter()
-        .filter_map(|(root, package)| build_scripts.get(package).map(|output| (root, output)))
-        .map(|(root, output)| {
-            output
-                .cfgs
-                .iter()
-                .map(|cfg| {
-                    Cfg::from_str(cfg).map(cfg_atom).map_err(error_context(
-                        cfg.clone(),
-                        ProjectModelError::BuildScriptCfg,
-                    ))
+        .filter_map(|(root, package)| {
+            build_scripts
+                .get(package)
+                .map(|BuildScriptOutput { cfgs, .. }| {
+                    cfgs.iter()
+                        .map(|cfg| {
+                            Cfg::from_str(cfg).map(cfg_atom).map_err(error_context(
+                                cfg.clone(),
+                                ProjectModelError::BuildScriptCfg,
+                            ))
+                        })
+                        .collect::<Result<Vec<CfgAtom>, ProjectModelError>>()
+                        .map(|atoms| (root.clone(), atoms))
                 })
-                .collect::<Result<Vec<CfgAtom>, ProjectModelError>>()
-                .map(|atoms| (root.clone(), atoms))
         })
         .collect()
 }
@@ -140,10 +143,10 @@ impl ResolvedProject {
                 metadata
                     .targets
                     .iter()
-                    .filter(|crate_target| !crate_target.kind.contains(&TargetKind::CustomBuild))
-                    .map(|crate_target| {
+                    .filter(|Target { kind, .. }| !kind.contains(&TargetKind::CustomBuild))
+                    .map(|Target { src_path, .. }| {
                         (
-                            VfsPath::from(AbsPathBuf::assert(crate_target.src_path.clone())),
+                            VfsPath::from(AbsPathBuf::assert(src_path.clone())),
                             metadata.id.repr.clone(),
                         )
                     })
@@ -193,11 +196,8 @@ impl ResolvedProject {
                         .resolved
                         .member_targets
                         .iter()
-                        .map(|member| {
-                            (
-                                VfsPath::from(member.root.clone()),
-                                member.crate_target.clone(),
-                            )
+                        .map(|MemberTarget { root, crate_target }| {
+                            (VfsPath::from(root.clone()), crate_target.clone())
                         })
                         .collect::<HashMap<VfsPath, _>>();
 
@@ -231,16 +231,16 @@ impl ResolvedProject {
                         .resolved
                         .members()
                         .filter(|member| self.project.resolved.is_test_crate(member))
-                        .map(|member| member.metadata.name.to_string())
+                        .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
                         .collect(),
                     unpublished_packages: self
                         .project
                         .resolved
                         .members()
-                        .filter(|member| {
-                            member.metadata.publish.as_ref().is_some_and(Vec::is_empty)
+                        .filter(|PackageDocument { metadata, .. }| {
+                            metadata.publish.as_ref().is_some_and(Vec::is_empty)
                         })
-                        .map(|member| member.metadata.name.to_string())
+                        .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
                         .collect(),
                     vfs,
                     workspace_root: self.project.resolved.workspace.root.clone(),

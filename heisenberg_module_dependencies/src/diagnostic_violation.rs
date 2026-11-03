@@ -26,9 +26,8 @@ pub struct DiagnosticViolation<'violation, 'database> {
 impl DiagnosticViolation<'_, '_> {
     pub fn violation(&self) -> Option<LocatedViolation> {
         self.site()
-            .filter(|site| {
-                self.token_origin
-                    .is_own_text(site.origin.file_id, site.origin.value)
+            .filter(|DiagnosticSite { origin, .. }| {
+                self.token_origin.is_own_text(origin.file_id, origin.value)
             })
             .map(|DiagnosticSite { violation, .. }| violation)
     }

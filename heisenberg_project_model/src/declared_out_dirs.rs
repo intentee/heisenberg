@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
 
+use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPath;
 
@@ -39,7 +40,7 @@ impl DeclaredOutDirs<'_> {
                 .resolved
                 .packages
                 .iter()
-                .filter(|document| document.metadata.name.as_str() == package)
+                .filter(|PackageDocument { metadata, .. }| metadata.name.as_str() == package)
                 .collect::<Vec<&PackageDocument>>()
                 .as_slice()
             {
@@ -55,7 +56,7 @@ impl DeclaredOutDirs<'_> {
                         manifest_path: self.manifest_path.to_path_buf(),
                         versions: documents
                             .iter()
-                            .map(|document| document.metadata.version.to_string())
+                            .map(|PackageDocument { metadata, .. }| metadata.version.to_string())
                             .collect(),
                         package,
                     });
@@ -65,7 +66,7 @@ impl DeclaredOutDirs<'_> {
             if !metadata
                 .targets
                 .iter()
-                .any(|target| target.kind.contains(&TargetKind::CustomBuild))
+                .any(|Target { kind, .. }| kind.contains(&TargetKind::CustomBuild))
             {
                 return Err(ProjectModelError::OutDirPackageWithoutBuildScript {
                     manifest_path: self.manifest_path.to_path_buf(),

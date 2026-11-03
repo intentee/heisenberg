@@ -31,8 +31,8 @@ const CONTINUATION_INDENT: &str = "    ";
 fn cycle_site(witnesses: &NonEmpty<CycleWitness>) -> &SourceLocation {
     witnesses
         .iter()
-        .flat_map(|witness| witness.dependencies.iter())
-        .map(|dependency| &dependency.location)
+        .flat_map(|CycleWitness { dependencies, .. }| dependencies.iter())
+        .map(|ModuleDependency { location, .. }| location)
         .fold(&witnesses.first.dependencies.first.location, Ord::min)
 }
 

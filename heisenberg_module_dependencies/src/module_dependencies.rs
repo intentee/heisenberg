@@ -24,18 +24,25 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::name_resolution_priming::NameResolutionPriming;
 use crate::source_locator::SourceLocator;
 
-fn cargo_variables(project: &LoadedProject, crate_target: &CrateTarget) -> BTreeSet<String> {
+fn cargo_variables(
+    LoadedProject { member_targets, .. }: &LoadedProject,
+    CrateTarget { package_name, .. }: &CrateTarget,
+) -> BTreeSet<String> {
     CARGO_BUILD_VARIABLES
         .iter()
         .map(|variable| (*variable).to_owned())
         .chain(
-            project
-                .member_targets
+            member_targets
                 .values()
-                .filter(|target| {
-                    target.kind == CrateTargetKind::Binary
-                        && target.package_name == crate_target.package_name
-                })
+                .filter(
+                    |CrateTarget {
+                         kind,
+                         package_name: target_package_name,
+                         ..
+                     }| {
+                        *kind == CrateTargetKind::Binary && target_package_name == package_name
+                    },
+                )
                 .map(|CrateTarget { name, .. }| {
                     format!("{CARGO_BINARY_PATH_VARIABLE_PREFIX}{name}")
                 }),
@@ -59,7 +66,7 @@ impl ModuleDependencies<'_> {
             database: &self.project.database,
             members: &members
                 .iter()
-                .map(|member| member.krate)
+                .map(|MemberCrate { krate, .. }| *krate)
                 .collect::<Vec<Crate>>(),
         }
         .prime()
@@ -74,8 +81,8 @@ impl ModuleDependencies<'_> {
 
             members
                 .iter()
-                .filter(|member| {
-                    member.krate.modules(database).iter().any(|module| {
+                .filter(|MemberCrate { krate, .. }| {
+                    krate.modules(database).iter().any(|module| {
                         module
                             .as_source_file_id(database)
                             .is_some_and(|source_file_id| {
@@ -146,11 +153,19 @@ impl ModuleDependencies<'_> {
         let mut graphs = self.graphs(
             &members
                 .iter()
-                .filter(|member| {
-                    !crates_sharing_files
-                        .iter()
-                        .any(|sharing| sharing.krate == member.krate)
-                })
+                .filter(
+                    |MemberCrate {
+                         krate: member_crate,
+                         ..
+                     }| {
+                        !crates_sharing_files.iter().any(
+                            |MemberCrate {
+                                 krate: sharing_crate,
+                                 ..
+                             }| sharing_crate == member_crate,
+                        )
+                    },
+                )
                 .cloned()
                 .collect::<Vec<MemberCrate>>(),
             &workspace_files,
@@ -195,7 +210,7 @@ impl ModuleDependencies<'_> {
 
         attach_db(database, || {
             members
-                .flat_map(|member| crate_module_files(database, member.krate))
+                .flat_map(|MemberCrate { krate, .. }| crate_module_files(database, *krate))
                 .collect()
         })
     }

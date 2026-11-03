@@ -4,6 +4,7 @@ use std::thread::available_parallelism;
 use std::thread::scope;
 
 use ra_ap_hir::Crate;
+use ra_ap_hir::CrateDependency;
 use ra_ap_ide_db::RootDatabase;
 
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
@@ -82,12 +83,12 @@ impl NameResolutionPriming<'_> {
             return *known;
         }
 
-        let depth = krate
-            .dependencies(self.database)
-            .into_iter()
-            .fold(0, |deepest, dependency| {
-                deepest.max(self.depth(dependency.krate, depths, layers) + 1)
-            });
+        let depth = krate.dependencies(self.database).into_iter().fold(
+            0,
+            |deepest, CrateDependency { krate, .. }| {
+                deepest.max(self.depth(krate, depths, layers) + 1)
+            },
+        );
 
         depths.insert(krate, depth);
         layers.entry(depth).or_default().push(krate);

@@ -24,13 +24,13 @@ impl TargetCfg {
                 crates.platform(target.triple()).and_then(|platform| {
                     RustcCfg::parse(target.library_cfg())
                         .map_err(ProjectModelError::LibraryCfgTable)
-                        .and_then(|library| {
+                        .and_then(|RustcCfg { atoms, .. }| {
                             from_str::<TargetSpec>(target.target_spec())
                                 .map_err(ProjectModelError::TargetSpec)
                                 .map(|TargetSpec { data_layout }| Self {
                                     crates: crates.atoms,
                                     data_layout: data_layout.into_boxed_str(),
-                                    library: library.atoms,
+                                    library: atoms,
                                     platform,
                                 })
                         })

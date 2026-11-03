@@ -47,24 +47,29 @@ impl<'files> SharedFileTree<'files> {
         candidates
             .first_key_value()
             .map(|(_, candidate)| *candidate)
-            .filter(|candidate| {
-                candidates.len() == 1
-                    && parents.len() == inclusions.len()
-                    && candidate.inclusions.len() == parents.len()
-                    && inclusions
-                        .values()
-                        .flat_map(BTreeMap::values)
-                        .all(|analysis| *analysis == ModuleFileAnalysis::Analysed)
-                    && parents.iter().all(|(parent, targets)| {
-                        candidate.inclusions.get(parent).is_some_and(|analyses| {
-                            analyses
-                                .keys()
-                                .copied()
-                                .collect::<BTreeSet<SupportedTarget>>()
-                                == *targets
+            .filter(
+                |SharedFile {
+                     inclusions: candidate_inclusions,
+                     ..
+                 }| {
+                    candidates.len() == 1
+                        && parents.len() == inclusions.len()
+                        && candidate_inclusions.len() == parents.len()
+                        && inclusions
+                            .values()
+                            .flat_map(BTreeMap::values)
+                            .all(|analysis| *analysis == ModuleFileAnalysis::Analysed)
+                        && parents.iter().all(|(parent, targets)| {
+                            candidate_inclusions.get(parent).is_some_and(|analyses| {
+                                analyses
+                                    .keys()
+                                    .copied()
+                                    .collect::<BTreeSet<SupportedTarget>>()
+                                    == *targets
+                            })
                         })
-                    })
-            })
+                },
+            )
     }
 
     #[must_use]

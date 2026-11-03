@@ -7,6 +7,7 @@ use ra_ap_ide_db::FxHashMap;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::CrateBuilderId;
 use ra_ap_ide_db::base_db::CrateGraphBuilder;
+use ra_ap_ide_db::base_db::DependencyBuilder;
 use ra_ap_load_cargo::load_proc_macro;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_paths::Utf8PathBuf;
@@ -50,7 +51,7 @@ impl LoadedProcMacros<'_> {
         let proc_macro_crates: BTreeSet<CrateBuilderId> = crate_graph
             .iter()
             .flat_map(|krate| crate_graph[krate].basic.dependencies.iter())
-            .map(|dependency| dependency.crate_id)
+            .map(|DependencyBuilder { crate_id, .. }| *crate_id)
             .filter(|krate| crate_graph[*krate].basic.is_proc_macro)
             .collect();
 

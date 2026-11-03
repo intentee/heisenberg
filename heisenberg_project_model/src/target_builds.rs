@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPath;
 
@@ -31,9 +32,9 @@ impl TargetBuilds<'_> {
                 .packages
                 .iter()
                 .any(|PackageDocument { metadata, .. }| {
-                    metadata.targets.iter().any(|target| {
-                        target.kind.contains(&TargetKind::ProcMacro)
-                            || (target.kind.contains(&TargetKind::CustomBuild)
+                    metadata.targets.iter().any(|Target { kind, .. }| {
+                        kind.contains(&TargetKind::ProcMacro)
+                            || (kind.contains(&TargetKind::CustomBuild)
                                 && !substituted_packages.contains(&metadata.id.repr))
                     })
                 });

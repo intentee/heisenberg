@@ -53,7 +53,9 @@ impl PackageRules<'_> {
                     .resolved
                     .packages
                     .iter()
-                    .filter(|package| component.contains(package.metadata.id.repr.as_str()))
+                    .filter(|PackageDocument { metadata, .. }| {
+                        component.contains(metadata.id.repr.as_str())
+                    })
                     .map(|package| {
                         format!("{} v{}", package.metadata.name, package.metadata.version)
                     })

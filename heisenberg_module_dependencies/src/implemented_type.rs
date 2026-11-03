@@ -2,6 +2,7 @@ use ra_ap_hir::Adt;
 use ra_ap_hir::Crate;
 use ra_ap_hir::HasSource;
 use ra_ap_hir::Impl;
+use ra_ap_hir::InFile;
 use ra_ap_hir::Trait;
 use ra_ap_hir::Type;
 use ra_ap_ide_db::RootDatabase;
@@ -29,41 +30,41 @@ impl ImplementedType<'_> {
 
         self.adt()
             .and_then(|adt| adt.source(database))
-            .map(|source| ImplHome::LocalType {
-                file: original_file_id(database, source.file_id),
+            .map(|InFile { file_id, .. }| ImplHome::LocalType {
+                file: original_file_id(database, file_id),
             })
             .or_else(|| {
                 self.blanket_trait()
                     .and_then(|blanket_trait| blanket_trait.source(database))
-                    .map(|source| ImplHome::LocalTraitBlanket {
-                        file: original_file_id(database, source.file_id),
+                    .map(|InFile { file_id, .. }| ImplHome::LocalTraitBlanket {
+                        file: original_file_id(database, file_id),
                     })
             })
             .or_else(|| {
                 self.trait_object()
                     .and_then(|object_trait| object_trait.source(database))
-                    .map(|source| ImplHome::LocalTraitObject {
-                        file: original_file_id(database, source.file_id),
+                    .map(|InFile { file_id, .. }| ImplHome::LocalTraitObject {
+                        file: original_file_id(database, file_id),
                     })
             })
             .or_else(|| {
                 self.local_trait().and_then(|local_trait| {
-                    local_trait
-                        .source(database)
-                        .map(|source| ImplHome::LocalTraitForeignType {
-                            file: original_file_id(database, source.file_id),
+                    local_trait.source(database).map(|InFile { file_id, .. }| {
+                        ImplHome::LocalTraitForeignType {
+                            file: original_file_id(database, file_id),
                             trait_name: local_trait
                                 .name(database)
                                 .display(database, self.krate.edition(database))
                                 .to_string(),
-                        })
+                        }
+                    })
                 })
             })
             .or_else(|| {
                 self.local_type_argument(trait_arguments)
                     .and_then(|adt| adt.source(database))
-                    .map(|source| ImplHome::LocalTypeArgument {
-                        file: original_file_id(database, source.file_id),
+                    .map(|InFile { file_id, .. }| ImplHome::LocalTypeArgument {
+                        file: original_file_id(database, file_id),
                     })
             })
             .unwrap_or(ImplHome::Foreign)

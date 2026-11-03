@@ -11,11 +11,15 @@ pub struct BuildScriptOutput {
 }
 
 impl From<&BuildScript> for BuildScriptOutput {
-    fn from(executed: &BuildScript) -> Self {
+    fn from(
+        BuildScript {
+            cfgs, env, out_dir, ..
+        }: &BuildScript,
+    ) -> Self {
         Self {
-            cfgs: executed.cfgs.clone(),
-            env: executed.env.iter().cloned().collect(),
-            out_dir: executed.out_dir.clone(),
+            cfgs: cfgs.clone(),
+            env: env.iter().cloned().collect(),
+            out_dir: out_dir.clone(),
         }
     }
 }

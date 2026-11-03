@@ -15,10 +15,12 @@ use cargo::compiler::CrateType;
 use cargo::compiler::DefaultExecutor;
 use cargo::compiler::Executor;
 use cargo::compiler::FileFlavor;
+use cargo::compiler::FileType;
 use cargo::compiler::MessageFormat;
 use cargo::compiler::Unit;
 use cargo::compiler::UnitInterner;
 use cargo::compiler::UserIntent;
+use cargo::compiler::unit_graph::UnitDep;
 use cargo::compiler::unit_graph::UnitGraph;
 use cargo::ops::CompileFilter;
 use cargo::ops::CompileOptions;
@@ -128,7 +130,7 @@ impl WorkspaceBuild<'_> {
 
                 if let Some(substituted) = dependencies
                     .iter()
-                    .find(|dependency| self.is_substituted(&dependency.unit))
+                    .find(|UnitDep { unit, .. }| self.is_substituted(unit))
                 {
                     return Err(WorkspaceBuildError::SubstitutedBuildScriptRequired {
                         dependent: vacancy.key().pkg.name().to_string(),
@@ -136,11 +138,7 @@ impl WorkspaceBuild<'_> {
                     });
                 }
 
-                pending.extend(
-                    dependencies
-                        .iter()
-                        .map(|dependency| dependency.unit.clone()),
-                );
+                pending.extend(dependencies.iter().map(|UnitDep { unit, .. }| unit.clone()));
                 vacancy.insert(dependencies);
             }
         }
@@ -233,7 +231,7 @@ impl WorkspaceBuild<'_> {
 
     fn proc_macro_dylibs(
         context: &GlobalContext,
-        plan: &BuildContext<'_, '_>,
+        BuildContext { target_data, .. }: &BuildContext<'_, '_>,
         graph: &UnitGraph,
         host: &[Message],
     ) -> Result<BTreeMap<Utf8PathBuf, Utf8PathBuf>, WorkspaceBuildError> {
@@ -247,12 +245,12 @@ impl WorkspaceBuild<'_> {
             .keys()
             .filter(|unit| is_proc_macro_dylib(unit))
             .map(|unit| {
-                plan.target_data
+                target_data
                     .info(unit.kind)
                     .rustc_outputs(
                         unit.mode,
                         unit.target.kind(),
-                        plan.target_data.short_name(&unit.kind),
+                        target_data.short_name(&unit.kind),
                         context,
                     )
                     .map_err(Into::into)
@@ -262,10 +260,14 @@ impl WorkspaceBuild<'_> {
 
                         file_types
                             .iter()
-                            .filter(|file_type| {
-                                file_type.flavor == FileFlavor::Linkable
-                                    && file_type.crate_type == Some(CrateType::ProcMacro)
-                            })
+                            .filter(
+                                |FileType {
+                                     flavor, crate_type, ..
+                                 }| {
+                                    *flavor == FileFlavor::Linkable
+                                        && *crate_type == Some(CrateType::ProcMacro)
+                                },
+                            )
                             .flat_map(|file_type| {
                                 let (prefix, suffix) = file_type.output_prefix_suffix(&unit.target);
 

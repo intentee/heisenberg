@@ -28,6 +28,7 @@ use ra_ap_hir_expand::builtin::BuiltinFnLikeExpander;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
 use ra_ap_ide_db::famous_defs::FamousDefs;
+use ra_ap_ide_db::search::FileReference;
 use ra_ap_paths::AbsPath;
 use ra_ap_stdx::to_lower_snake_case;
 use ra_ap_syntax::AstNode;
@@ -369,13 +370,14 @@ impl ModuleWalk<'_, '_> {
                     .references;
 
                 !references.is_empty()
-                    && references.values().flatten().all(|reference| {
-                        reference
-                            .name
-                            .syntax()
-                            .parent()
-                            .is_some_and(|parent| self.test_code.contains(&parent))
-                    })
+                    && references
+                        .values()
+                        .flatten()
+                        .all(|FileReference { name, .. }| {
+                            name.syntax()
+                                .parent()
+                                .is_some_and(|parent| self.test_code.contains(&parent))
+                        })
             })
         .then(|| Violation {
             kind: ViolationKind::FunctionUsedOnlyByTests,
@@ -395,6 +397,16 @@ impl ModuleWalk<'_, '_> {
                 implementation,
                 krate: self.krate,
             })
+    }
+
+    fn in_test_gated_code(&self, node: &SyntaxNode) -> bool {
+        Ancestry {
+            node,
+            semantics: self.semantics,
+        }
+        .nodes()
+        .iter()
+        .any(|enclosing| self.is_test_gated(enclosing))
     }
 
     fn inactive(
@@ -430,21 +442,11 @@ impl ModuleWalk<'_, '_> {
                     .iter()
                     .filter(|token| focus_range.contains_range(token.text_range()))
                     .map(|token| self.token_origin.written_range(file, token.text_range()))
-                    .filter(|written| written.file_id == focus.file_id)
-                    .map(|written| u32::from(written.range.start()))
+                    .filter(|FileRangeWrapper { file_id, .. }| *file_id == focus.file_id)
+                    .map(|FileRangeWrapper { range, .. }| u32::from(range.start()))
                     .collect(),
             });
         }
-    }
-
-    fn in_test_gated_code(&self, node: &SyntaxNode) -> bool {
-        Ancestry {
-            node,
-            semantics: self.semantics,
-        }
-        .nodes()
-        .iter()
-        .any(|enclosing| self.is_test_gated(enclosing))
     }
 
     fn is_constants_module(&self, container: &SyntaxNode) -> bool {

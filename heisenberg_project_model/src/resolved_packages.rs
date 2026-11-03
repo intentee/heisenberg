@@ -25,9 +25,8 @@ pub struct ResolvedPackages {
 
 impl ResolvedPackages {
     pub fn is_leaf(&self, PackageDocument { metadata, .. }: &PackageDocument) -> bool {
-        !self.members().any(|member| {
-            member
-                .dependencies
+        !self.members().any(|PackageDocument { dependencies, .. }| {
+            dependencies
                 .iter()
                 .any(|DependencyDocument { package_id, .. }| *package_id == metadata.id.repr)
         })
@@ -53,26 +52,29 @@ impl ResolvedPackages {
     pub fn members(&self) -> impl Iterator<Item = &PackageDocument> {
         self.packages
             .iter()
-            .filter(|package| self.workspace.members.contains(&package.metadata.id.repr))
+            .filter(|PackageDocument { metadata, .. }| {
+                self.workspace.members.contains(&metadata.id.repr)
+            })
     }
 
     pub fn metadata(&self, selection: &BuildSelection) -> Value {
         let selected: Vec<&PackageDocument> = self
             .packages
             .iter()
-            .filter(|package| selection.includes_package(&package.metadata.id.repr))
+            .filter(|PackageDocument { metadata, .. }| {
+                selection.includes_package(&metadata.id.repr)
+            })
             .collect();
         let nodes: Vec<Value> = selected
             .iter()
-            .map(|package| {
-                let id = &package.metadata.id.repr;
-                let deps: Vec<&DependencyDocument> = package
-                    .dependencies
+            .map(|PackageDocument { metadata, dependencies, .. }| {
+                let id = &metadata.id.repr;
+                let deps: Vec<&DependencyDocument> = dependencies
                     .iter()
-                    .filter(|dependency| {
+                    .filter(|DependencyDocument { package_id, .. }| {
                         selection.includes_edge(&PackageEdge {
                             from: id.clone(),
-                            to: dependency.package_id.clone(),
+                            to: package_id.clone(),
                         })
                     })
                     .collect();

@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use cargo_metadata::DependencyKind;
 use cargo_metadata::Metadata;
+use cargo_metadata::Node;
 use cargo_metadata::PackageId;
+use cargo_metadata::Resolve;
+use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_project_model::ProjectJson;
@@ -38,12 +41,15 @@ impl LibraryProjectJson<'_> {
                 package
                     .targets
                     .iter()
-                    .find(|target| {
-                        target
-                            .kind
-                            .iter()
-                            .any(|kind| LIBRARY_TARGET_KINDS.contains(kind))
-                    })
+                    .find(
+                        |Target {
+                             kind: target_kinds, ..
+                         }| {
+                            target_kinds
+                                .iter()
+                                .any(|kind| LIBRARY_TARGET_KINDS.contains(kind))
+                        },
+                    )
                     .map(|target| LibraryCrate { package, target })
             })
             .collect();
@@ -64,15 +70,15 @@ impl LibraryProjectJson<'_> {
 
     fn crate_json(
         &self,
-        library: &LibraryCrate<'_>,
+        LibraryCrate { package, target }: &LibraryCrate<'_>,
         indices: &BTreeMap<&PackageId, usize>,
     ) -> Value {
         let nodes = self
             .metadata
             .resolve
             .iter()
-            .flat_map(|resolve| &resolve.nodes)
-            .filter(|node| node.id == library.package.id);
+            .flat_map(|Resolve { nodes, .. }| nodes)
+            .filter(|Node { id, .. }| *id == package.id);
 
         json!({
             "cfg": nodes
@@ -94,11 +100,11 @@ impl LibraryProjectJson<'_> {
                         .map(|index| json!({"crate": index, "name": dependency.name}))
                 })
                 .collect::<Vec<Value>>(),
-            "display_name": library.target.name,
-            "edition": library.target.edition.as_str(),
-            "is_proc_macro": library.target.is_proc_macro(),
+            "display_name": target.name,
+            "edition": target.edition.as_str(),
+            "is_proc_macro": target.is_proc_macro(),
             "is_workspace_member": false,
-            "root_module": library.target.src_path,
+            "root_module": target.src_path,
         })
     }
 }

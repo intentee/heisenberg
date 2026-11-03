@@ -6,6 +6,8 @@ use cargo::workspace::Package;
 use cargo::workspace::PackageId;
 use cargo::workspace::Target;
 use cargo::workspace::Workspace;
+use cargo_util_schemas::manifest::InheritableLints;
+use cargo_util_schemas::manifest::TomlManifest;
 use serde_json::from_value;
 use serde_json::to_value;
 use toml::Table;
@@ -63,13 +65,13 @@ impl CargoMetadataDocument<'_, '_> {
                                 .normalized_toml()
                                 .lints
                                 .as_ref()
-                                .map(|lints| lints.lints.clone())
+                                .map(|InheritableLints { lints, .. }| lints.clone())
                                 .unwrap_or_default(),
                             lints_source: if package
                                 .manifest()
                                 .original_toml()
-                                .and_then(|original| original.lints.as_ref())
-                                .is_some_and(|lints| lints.workspace)
+                                .and_then(|TomlManifest { lints, .. }| lints.as_ref())
+                                .is_some_and(|InheritableLints { workspace, .. }| *workspace)
                             {
                                 LintsSource::Workspace
                             } else {

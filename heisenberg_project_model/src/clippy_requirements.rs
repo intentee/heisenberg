@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use toml::Value;
 
 use crate::clippy_configuration_file::ClippyConfigurationFile;
+use crate::clippy_lint::ClippyLint;
 use crate::clippy_lint_level::ClippyLintLevel;
 use crate::constants::CLIPPY_DENIED_LINTS;
 use crate::constants::CLIPPY_TEST_ALLOWANCES;
@@ -28,10 +29,12 @@ fn member_violations(
         .iter()
         .filter(|_| !may_panic)
         .filter(|lint| !ClippyLintLevel { lint, lints }.is_denied())
-        .map(|lint| PackageViolation::ClippyLintNotDenied {
-            lint: lint.name.to_owned(),
-            table: table.clone(),
-        })
+        .map(
+            |ClippyLint { name, .. }| PackageViolation::ClippyLintNotDenied {
+                lint: (*name).to_owned(),
+                table: table.clone(),
+            },
+        )
         .collect();
 
     match configuration {
