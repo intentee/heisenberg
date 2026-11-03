@@ -1,0 +1,17 @@
+[package]
+name = "function_under_a_procedural_attribute"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+attribute = { path = "attribute" }
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]

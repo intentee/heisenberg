@@ -36,6 +36,9 @@ pub enum ViolationKind {
     NonConstantInConstantsModule,
     NonDocComment,
     NonTestItemInTestTarget,
+    ProceduralFunction {
+        type_name: String,
+    },
     PublicAssociatedConstant,
     PublicConstantOutsideConstantsModule,
     Reexport,
@@ -73,6 +76,7 @@ impl ViolationKind {
             Self::NonConstantInConstantsModule => "NonConstantInConstantsModule",
             Self::NonDocComment => "NonDocComment",
             Self::NonTestItemInTestTarget => "NonTestItemInTestTarget",
+            Self::ProceduralFunction { .. } => "ProceduralFunction",
             Self::PublicAssociatedConstant => "PublicAssociatedConstant",
             Self::PublicConstantOutsideConstantsModule => "PublicConstantOutsideConstantsModule",
             Self::Reexport => "Reexport",
@@ -143,6 +147,9 @@ impl ViolationKind {
             }
             Self::NonTestItemInTestTarget => {
                 "A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle."
+            }
+            Self::ProceduralFunction { .. } => {
+                "Behavior belongs with the data it works on. Make the function a method of the type it takes, a constructor of its own type, or a private helper used in a single file."
             }
             Self::PublicAssociatedConstant => {
                 "Public constants have a single home, crate::constants. Move the constant there as a free constant."
@@ -232,6 +239,9 @@ impl Display for ViolationKind {
             Self::NonTestItemInTestTarget => formatter.write_str(
                 "Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file",
             ),
+            Self::ProceduralFunction { type_name } => {
+                write!(formatter, "Function takes {type_name} without belonging to it")
+            }
             Self::PublicAssociatedConstant => write!(
                 formatter,
                 "Public associated constant belongs in crate::{CONSTANTS_MODULE_NAME} as a free constant"

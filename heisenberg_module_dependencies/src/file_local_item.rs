@@ -18,7 +18,7 @@ impl FileLocalItem<'_, '_> {
         self.is_private() && self.is_used_only_in_its_file()
     }
 
-    fn is_private(&self) -> bool {
+    pub fn is_private(&self) -> bool {
         let database = self.semantics.db;
 
         self.definition.module(database).is_some_and(|module| {

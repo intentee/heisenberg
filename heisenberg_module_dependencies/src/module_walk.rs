@@ -5,11 +5,13 @@ use std::iter;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
+use ra_ap_hir::Adt;
 use ra_ap_hir::AsAssocItem;
 use ra_ap_hir::AssocItemContainer;
 use ra_ap_hir::Const;
 use ra_ap_hir::Crate;
 use ra_ap_hir::FileRangeWrapper;
+use ra_ap_hir::Function;
 use ra_ap_hir::HasVisibility;
 use ra_ap_hir::HirFileId;
 use ra_ap_hir::Impl;
@@ -25,6 +27,7 @@ use ra_ap_hir_expand::Lookup;
 use ra_ap_hir_expand::MacroDefKind;
 use ra_ap_hir_expand::builtin::BuiltinFnLikeExpander;
 use ra_ap_ide_db::RootDatabase;
+use ra_ap_ide_db::famous_defs::FamousDefs;
 use ra_ap_paths::AbsPath;
 use ra_ap_stdx::to_lower_snake_case;
 use ra_ap_syntax::AstNode;
@@ -59,6 +62,7 @@ use heisenberg_module_graph::walked_code::WalkedCode;
 use heisenberg_module_graph::written_tokens::WrittenTokens;
 
 use crate::adt_violation::AdtViolation;
+use crate::attributed_item::AttributedItem;
 use crate::code_tokens::code_tokens;
 use crate::configured_node::ConfiguredNode;
 use crate::constants_module::ConstantsModule;
@@ -156,6 +160,19 @@ impl ModuleWalk<'_, '_> {
 
             self.record_own_tokens(self.semantics.hir_file_for(node), &tokens, active_tokens);
         }
+    }
+
+    fn constructs(&self, returned: &Type<'_>, constructed: &Type<'_>) -> bool {
+        returned == constructed
+            || FamousDefs(self.semantics, self.krate)
+                .core_result_Result()
+                .is_some_and(|result| {
+                    returned.as_adt() == Some(Adt::Enum(result))
+                        && returned
+                            .type_arguments()
+                            .next()
+                            .is_some_and(|succeeded| succeeded == *constructed)
+                })
     }
 
     fn declare(
@@ -375,6 +392,37 @@ impl ModuleWalk<'_, '_> {
         })
     }
 
+    fn is_exempt_from_the_procedural_rule(&self, function: Function, node: &SyntaxNode) -> bool {
+        let database = self.semantics.db;
+
+        function.self_param(database).is_some()
+            || function.as_assoc_item(database).is_some_and(|item| {
+                matches!(
+                    item.container(database),
+                    AssocItemContainer::Impl(implementation)
+                        if implementation.trait_(database).is_some()
+                            || self.constructs(&function.ret_type(database), &implementation.self_ty(database))
+                )
+            })
+            || {
+                let item = FileLocalItem {
+                    definition: ModuleDef::Function(function),
+                    file_id: original_file_id(database, self.semantics.hir_file_for(node)),
+                    semantics: self.semantics,
+                };
+
+                item.is_private()
+                    && ast::Item::cast(node.clone()).is_some_and(|written| {
+                        AttributedItem {
+                            item: &written,
+                            semantics: self.semantics,
+                        }
+                        .has_procedural_attribute()
+                    })
+                    || item.is_file_local()
+            }
+    }
+
     fn is_public_item_container(node: &SyntaxNode) -> bool {
         ast::SourceFile::can_cast(node.kind())
             || ast::ItemList::cast(node.clone()).is_some_and(|items| {
@@ -412,6 +460,17 @@ impl ModuleWalk<'_, '_> {
                 declaration.visibility(database),
                 declaration.module(database),
             )))
+    }
+
+    fn is_workspace_adt(&self, adt: Adt) -> bool {
+        let database = self.semantics.db;
+
+        self.token_origin
+            .workspace_files
+            .contains(&original_file_id(
+                database,
+                adt.module(database).definition_source_file_id(database),
+            ))
     }
 
     fn item_violations<'items>(
@@ -679,6 +738,36 @@ impl ModuleWalk<'_, '_> {
         );
     }
 
+    fn procedural_function(
+        &self,
+        function: Function,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Option<Violation> {
+        let database = self.semantics.db;
+
+        function
+            .params_without_self(database)
+            .iter()
+            .find_map(|parameter| {
+                parameter
+                    .ty()
+                    .strip_references()
+                    .as_adt()
+                    .filter(|adt| self.is_workspace_adt(*adt))
+            })
+            .filter(|_| !self.is_exempt_from_the_procedural_rule(function, node))
+            .map(|adt| Violation {
+                kind: ViolationKind::ProceduralFunction {
+                    type_name: adt
+                        .name(database)
+                        .display(database, self.krate.edition(database))
+                        .to_string(),
+                },
+                location: self.locate_focus(node, origin),
+            })
+    }
+
     fn push_expansion(
         &self,
         expansion: HirFileId,
@@ -884,6 +973,12 @@ impl ModuleWalk<'_, '_> {
                 kind,
                 location: self.locate_focus(node, origin),
             });
+        } else if matches!(origin, SubtreeOrigin::SourceFile)
+            && let ItemDefinition::ModuleDef(ModuleDef::Function(function)) = definition
+        {
+            graph
+                .violations
+                .extend(self.procedural_function(*function, node, origin));
         } else if matches!(origin, SubtreeOrigin::SourceFile)
             && Self::is_public_item_container(node)
         {

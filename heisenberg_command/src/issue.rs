@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::iter;
 
-use heisenberg_module_cycles::cycle_site::cycle_site;
 use heisenberg_module_cycles::cycle_witness::CycleWitness;
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_cycles::sibling_edge::SiblingEdge;
@@ -28,6 +27,14 @@ use crate::target_narrowing::TargetNarrowing;
 use crate::violation_occurrences::ViolationOccurrences;
 
 const CONTINUATION_INDENT: &str = "    ";
+
+fn cycle_site(witnesses: &NonEmpty<CycleWitness>) -> &SourceLocation {
+    witnesses
+        .iter()
+        .flat_map(|witness| witness.dependencies.iter())
+        .map(|dependency| &dependency.location)
+        .fold(&witnesses.first.dependencies.first.location, Ord::min)
+}
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Issue {

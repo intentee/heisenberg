@@ -1,4 +1,3 @@
-pub mod cycle_site;
 pub mod cycle_witness;
 mod lifted_dependency;
 pub mod module_cycle;
