@@ -8,7 +8,9 @@ pub enum WorkspaceBuildError {
     BuildPlan(#[source] Box<dyn Error + Send + Sync>),
     #[error("cargo cannot configure the build of the build scripts and procedural macros")]
     BuildConfiguration(#[source] Box<dyn Error + Send + Sync>),
-    #[error("the build scripts and procedural macros cannot be built or run:\n{output}")]
+    #[error(
+        "the build scripts and procedural macros cannot be built or run; a package whose build script cannot run on every host can declare its output in [workspace.metadata.heisenberg.out_dirs.<package>] instead:\n{output}"
+    )]
     Build {
         output: String,
         #[source]
@@ -25,7 +27,7 @@ pub enum WorkspaceBuildError {
     #[error("the standard library of {target} is not installed at `{}`", directory.display())]
     TargetLibraryMissing { directory: PathBuf, target: String },
     #[error(
-        "the build script of `{dependent}` needs the build script of `{substituted}`, which out_dirs declares instead of running it"
+        "the build script of `{dependent}` needs the build script of `{substituted}`, which out_dirs declares instead of running it; declare an out-dir for `{dependent}` too"
     )]
     SubstitutedBuildScriptRequired {
         dependent: String,

@@ -74,7 +74,7 @@ impl CheckReport {
         let mut sections: BTreeMap<&'static str, NonEmpty<&Issue>> = BTreeMap::new();
 
         for issue in &issues {
-            NonEmpty::push_into(&mut sections, issue.issue_type(), issue);
+            NonEmpty::push_into(&mut sections, issue.issue_type().text().name, issue);
         }
 
         for (issue_type, issues) in &sections {

@@ -14,6 +14,8 @@ pub struct HeisenbergSettings {
     #[serde(default)]
     pub out_dirs: BTreeMap<String, DeclaredOutDir>,
     pub targets: Vec<String>,
+    #[serde(default)]
+    pub test_crates: Vec<String>,
 }
 
 impl HeisenbergSettings {

@@ -18,11 +18,11 @@ fn items_produced_by_a_build_script_are_analysed() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ModuleNotNamedAfterItsItem: 2 violations\n\
-            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item.\n\
+            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item, or rename the item when its snake case reads badly: acronyms and one-letter words merge, as in OpenAIApiPath, whose snake case is open_aiapi_path.\n\
             \n\
-            - src/generated_module.rs:1:12: Module is named generated_module, but its public item names it generated\n    \
+            - src/generated_module.rs:1:12: Module is named generated_module, but its public item Generated names it generated\n    \
             pub struct Generated;\n\
-            - src/lib.rs:6:16: Module is named configured, but its public item names it item\n        \
+            - src/lib.rs:6:16: Module is named configured, but its public item Item names it item\n        \
             pub struct Item;\n\
             \n\
             ------------------------------\n\

@@ -3,12 +3,14 @@ use std::collections::BTreeSet;
 
 use heisenberg_graph_cycles::cycle_components::CycleComponents;
 use heisenberg_graph_cycles::graph_edge::GraphEdge;
+use heisenberg_graph_cycles::shortest_cycle::shortest_cycle;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
 use crate::dependency_document::DependencyDocument;
 use crate::member_target::MemberTarget;
 use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
+use crate::potential_owner::PotentialOwner;
 use crate::resolved_packages::ResolvedPackages;
 
 pub struct PackageRules<'rules> {
@@ -26,6 +28,31 @@ impl PackageRules<'_> {
         violations.extend(self.tests_without_test_libraries());
 
         violations.into_iter().collect()
+    }
+
+    fn blocking_cycle(
+        &self,
+        destination: &str,
+        dependencies: &BTreeSet<&str>,
+    ) -> Option<Vec<String>> {
+        shortest_cycle(
+            self.package_edges().chain(
+                dependencies
+                    .iter()
+                    .filter(|dependency| **dependency != destination)
+                    .map(|dependency| GraphEdge {
+                        from: destination,
+                        to: *dependency,
+                    }),
+            ),
+            destination,
+        )
+        .map(|cycle| {
+            cycle
+                .into_iter()
+                .map(|package| self.versioned_name(package))
+                .collect()
+        })
     }
 
     fn dependency_cycles(&self) -> Vec<PackageViolation> {
@@ -56,9 +83,7 @@ impl PackageRules<'_> {
                     .filter(|PackageDocument { metadata, .. }| {
                         component.contains(metadata.id.repr.as_str())
                     })
-                    .map(|package| {
-                        format!("{} v{}", package.metadata.name, package.metadata.version)
-                    })
+                    .map(PackageDocument::versioned_name)
                     .collect();
 
                 packages.sort();
@@ -92,26 +117,6 @@ impl PackageRules<'_> {
             && others.iter().all(|MemberTarget { crate_target, .. }| {
                 crate_target.kind == CrateTargetKind::Library && self.empty_libraries.contains(name)
             })
-    }
-
-    fn moving_tests_closes_a_cycle(
-        &self,
-        destination: &str,
-        dependencies: &BTreeSet<&str>,
-    ) -> bool {
-        CycleComponents::new(
-            self.package_edges().chain(
-                dependencies
-                    .iter()
-                    .filter(|dependency| **dependency != destination)
-                    .map(|dependency| GraphEdge {
-                        from: destination,
-                        to: *dependency,
-                    }),
-            ),
-        )
-        .component_of()
-        .contains_key(destination)
     }
 
     fn package_edges(&self) -> impl Iterator<Item = GraphEdge<&str>> {
@@ -149,26 +154,43 @@ impl PackageRules<'_> {
                     .iter()
                     .map(|DependencyDocument { package_id, .. }| package_id.as_str())
                     .collect();
-                let mut potential_owners: Vec<String> = members
+                let potential_owners: BTreeMap<&str, PotentialOwner> = members
                     .iter()
                     .filter(|PackageDocument { metadata, .. }| {
                         dependencies.contains(metadata.id.repr.as_str())
-                            && !self.moving_tests_closes_a_cycle(
-                                metadata.id.repr.as_str(),
-                                &dependencies,
-                            )
                     })
-                    .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
+                    .map(|PackageDocument { metadata, .. }| {
+                        (
+                            metadata.name.as_str(),
+                            self.blocking_cycle(metadata.id.repr.as_str(), &dependencies)
+                                .map_or_else(
+                                    || PotentialOwner::Free {
+                                        package: metadata.name.to_string(),
+                                    },
+                                    |cycle| PotentialOwner::Blocked {
+                                        cycle,
+                                        package: metadata.name.to_string(),
+                                    },
+                                ),
+                        )
+                    })
                     .collect();
-
-                potential_owners.sort();
 
                 PackageViolation::TestsOnlyPackageWithoutTestLibraries {
                     manifest: member.relative_manifest(&workspace_path),
                     package: member.metadata.name.to_string(),
-                    potential_owners,
+                    potential_owners: potential_owners.into_values().collect(),
                 }
             })
             .collect()
+    }
+
+    fn versioned_name(&self, id: &str) -> String {
+        self.resolved
+            .packages
+            .iter()
+            .map(|package| (package.metadata.id.repr.as_str(), package))
+            .collect::<BTreeMap<&str, &PackageDocument>>()[id]
+            .versioned_name()
     }
 }

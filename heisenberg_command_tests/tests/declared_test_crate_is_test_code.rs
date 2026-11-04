@@ -5,10 +5,10 @@ use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 
 #[test]
-fn environment_variable_named_by_an_expression_is_a_violation() {
+fn declared_test_crate_is_test_code() {
     let outcome = HeisenbergCheck {
         workspace: &FixtureWorkspace {
-            name: "computed_environment_variable_name",
+            name: "declared_test_crates",
         }
         .path(),
     }
@@ -17,17 +17,17 @@ fn environment_variable_named_by_an_expression_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ComputedEnvironmentVariableName: 1 violation\n\
-            Heisenberg accounts for the environment variable a macro call reads only when a string literal names it. Name the variable with a string literal.\n\
+        Ok("FunctionUsedOnlyByTests: 1 violation\n\
+            Production code holds only what production uses. Move a function that only tests use into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
             \n\
-            - src/constants.rs:1:32: Macro call does not name its environment variable with a readable string literal\n    \
-            pub const PACKAGE_NAME: &str = env!(concat!(\"CARGO_PKG_\", \"NAME\"));\n\
+            - shared/src/for_tests.rs:1:14: Function is used only by tests\n    \
+            pub const fn for_tests() -> u8 {\n\
             \n\
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
+            Analysed on x86_64-pc-windows-msvc: 7 crate targets, 9 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 7 crate targets, 9 modules\n\
             Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

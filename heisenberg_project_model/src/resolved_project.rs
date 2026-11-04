@@ -36,6 +36,7 @@ use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
 use crate::build_script_environment::BuildScriptEnvironment;
 use crate::cfg_atom::cfg_atom;
+use crate::declared_test_crates::DeclaredTestCrates;
 use crate::exact_crate_cfg::ExactCrateCfg;
 use crate::feature_graph::FeatureGraph;
 use crate::library_directory::library_directory;
@@ -76,6 +77,7 @@ fn build_script_atoms(
 
 pub struct ResolvedProject {
     pub build_outputs: BTreeMap<SupportedTarget, BuildOutputs>,
+    pub declared_test_crates: DeclaredTestCrates,
     pub library: FeatureGraph,
     pub project: FeatureGraph,
     pub sysroot: AbsPathBuf,
@@ -227,19 +229,13 @@ impl ResolvedProject {
                     database,
                     member_targets,
                     test_crates: self
-                        .project
-                        .resolved
-                        .members()
-                        .filter(|member| self.project.resolved.is_test_crate(member))
-                        .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
-                        .collect(),
+                        .declared_test_crates
+                        .test_crates(&self.project.resolved),
                     unpublished_packages: self
                         .project
                         .resolved
                         .members()
-                        .filter(|PackageDocument { metadata, .. }| {
-                            metadata.publish.as_ref().is_some_and(Vec::is_empty)
-                        })
+                        .filter(|member| member.is_unpublished())
                         .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
                         .collect(),
                     vfs,

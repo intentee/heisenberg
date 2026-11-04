@@ -3,6 +3,7 @@ use std::iter::repeat_n;
 use ra_ap_paths::Utf8Component;
 use ra_ap_paths::Utf8Path;
 
+use crate::constants::CARGO_MANIFEST_FILE;
 use crate::constants::PARENT_DIRECTORY;
 
 pub struct WorkspacePath<'root> {
@@ -10,6 +11,11 @@ pub struct WorkspacePath<'root> {
 }
 
 impl WorkspacePath<'_> {
+    #[must_use]
+    pub fn manifest(&self) -> String {
+        self.relative(&self.root.join(CARGO_MANIFEST_FILE))
+    }
+
     #[must_use]
     pub fn relative(&self, absolute: &Utf8Path) -> String {
         let root: Vec<Utf8Component<'_>> = self.root.components().collect();

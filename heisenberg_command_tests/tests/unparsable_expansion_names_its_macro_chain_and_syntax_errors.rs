@@ -1,0 +1,39 @@
+use std::str;
+
+use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+
+#[test]
+fn unparsable_expansion_names_its_macro_chain_and_syntax_errors() {
+    let outcome = HeisenbergCheck {
+        workspace: &FixtureWorkspace {
+            name: "unparsable_expansion_through_a_macro_chain",
+        }
+        .path(),
+    }
+    .run()
+    .expect("the arguments must parse");
+
+    assert_eq!(
+        str::from_utf8(&outcome.output),
+        Ok("UnparsableMacroExpansion: 1 violation\n\
+            A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust.\n\
+            \n\
+            - library/src/lib.rs:13:3: Macro expansion cannot be parsed\n    \
+            #[attributes::submitted]\n      \
+            in the expansion of submitted called at library/src/lib.rs:13:3\n      \
+            in the expansion of submit called at attributes/src/lib.rs:11:8\n      \
+            in the expansion of do_submit called at library/src/lib.rs:9:9\n      \
+            syntax error at library/src/lib.rs:13:3: expected `;`, `{`, or `(`\n      \
+            syntax error at library/src/lib.rs:13:3: expected a name\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n\
+            Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
+            Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
+            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+    );
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
+}

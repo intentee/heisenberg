@@ -38,7 +38,7 @@ impl DefinedItems<'_, '_> {
                     .flat_map(|written| self.defined(written))
                     .collect(),
                 ItemExpansion::Unexpanded => vec![item],
-                ItemExpansion::Unparsable => Vec::new(),
+                ItemExpansion::Unparsable { .. } => Vec::new(),
             }
         }
     }

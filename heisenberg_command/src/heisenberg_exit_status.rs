@@ -5,6 +5,7 @@ use std::process::Termination;
 pub enum HeisenbergExitStatus {
     Compliant,
     ErrorNotReported,
+    Explained,
     Failure,
     Violations,
 }
@@ -12,7 +13,7 @@ pub enum HeisenbergExitStatus {
 impl Termination for HeisenbergExitStatus {
     fn report(self) -> ExitCode {
         ExitCode::from(match self {
-            Self::Compliant => 0,
+            Self::Compliant | Self::Explained => 0,
             Self::Violations => 1,
             Self::Failure => 3,
             Self::ErrorNotReported => 4,

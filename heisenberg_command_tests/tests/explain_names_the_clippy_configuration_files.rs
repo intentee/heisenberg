@@ -1,0 +1,33 @@
+use std::collections::BTreeMap;
+use std::str;
+
+use clap::Parser;
+
+use heisenberg_command::heisenberg_command::HeisenbergCommand;
+use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+
+#[test]
+fn explain_names_the_clippy_configuration_files() {
+    let mut output = Vec::new();
+    let mut errors = Vec::new();
+    let status =
+        HeisenbergCommand::try_parse_from(["heisenberg", "explain", "ClippyConfigurationMissing"])
+            .expect("the arguments must parse")
+            .run(&BTreeMap::new(), &mut output, &mut errors);
+
+    assert_eq!(
+        str::from_utf8(&output),
+        Ok(
+            "ClippyConfigurationMissing: A workspace member without a clippy configuration\n\
+        \n\
+        A workspace member with no clippy configuration file in its directory or an ancestor within the workspace.\n\
+        \n\
+        Clippy configuration files: clippy.toml, .clippy.toml\n\
+        \n\
+        Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart. Add a clippy.toml with the test allowances.\n\
+        "
+        )
+    );
+    assert_eq!(errors, b"");
+    assert_eq!(status, HeisenbergExitStatus::Explained);
+}

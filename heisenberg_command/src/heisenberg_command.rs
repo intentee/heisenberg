@@ -1,14 +1,28 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
+use std::io;
 use std::io::Write;
 
 use clap::Parser;
 
 use heisenberg_error_context::error_chain::error_chain;
 
+use crate::explain_command::ExplainCommand;
 use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::heisenberg_subcommand::HeisenbergSubcommand;
+
+fn written<TOutput: Write>(
+    output: &mut TOutput,
+    text: &str,
+    status: HeisenbergExitStatus,
+    failure: fn(io::Error) -> HeisenbergCommandError,
+) -> Result<HeisenbergExitStatus, Vec<HeisenbergCommandError>> {
+    output
+        .write_all(text.as_bytes())
+        .map(|()| status)
+        .map_err(|error| vec![failure(error)])
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -28,14 +42,24 @@ impl HeisenbergCommand {
         output: &mut TOutput,
         errors: &mut TErrors,
     ) -> HeisenbergExitStatus {
-        let HeisenbergSubcommand::Check(check) = &self.subcommand;
+        let outcome = match &self.subcommand {
+            HeisenbergSubcommand::Check(check) => check.execute(environment).and_then(|report| {
+                written(
+                    output,
+                    &report.render(),
+                    report.status(),
+                    HeisenbergCommandError::WriteReport,
+                )
+            }),
+            HeisenbergSubcommand::Explain(ExplainCommand { issue_type }) => written(
+                output,
+                &issue_type.explanation(),
+                HeisenbergExitStatus::Explained,
+                HeisenbergCommandError::WriteExplanation,
+            ),
+        };
 
-        match check.execute(environment).and_then(|report| {
-            output
-                .write_all(report.render().as_bytes())
-                .map(|()| report.status())
-                .map_err(|error| vec![HeisenbergCommandError::WriteReport(error)])
-        }) {
+        match outcome {
             Ok(status) => status,
             Err(failures) => errors
                 .write_all(

@@ -5,7 +5,7 @@ use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 
 #[test]
-fn tests_package_using_only_packages_on_a_cycle_has_no_potential_owner() {
+fn tests_package_using_only_packages_on_a_cycle_names_each_cycle() {
     let outcome = HeisenbergCheck {
         workspace: &FixtureWorkspace {
             name: "tests_package_closing_a_cycle",
@@ -23,10 +23,11 @@ fn tests_package_using_only_packages_on_a_cycle_has_no_potential_owner() {
             - harness/Cargo.toml: Packages harness v0.1.0, library v0.1.0 depend on each other through dev-dependencies\n\
             \n\
             TestsOnlyPackageWithoutTestLibraries: 1 violation\n\
-            Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so the packages listed could take the tests without a cycle, but the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.\n\
+            Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so it lists every workspace member the tests use, either as a package that could take them or with the dependency cycle that moving them there would close; the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.\n\
             \n\
             - library_tests/Cargo.toml: Package library_tests holds only tests and no test library of its own, so the package its tests verify must own them\n      \
-            no package it uses can take its tests without a dependency cycle\n\
+            cannot move to harness: harness v0.1.0 -> library v0.1.0 -> harness v0.1.0\n      \
+            cannot move to library: library v0.1.0 -> harness v0.1.0 -> library v0.1.0\n\
             \n\
             ------------------------------\n\
             2 errors found\n\

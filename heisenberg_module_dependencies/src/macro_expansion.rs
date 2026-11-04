@@ -1,17 +1,16 @@
-use ra_ap_hir::HirFileId;
+use ra_ap_hir::MacroCallId;
 use ra_ap_ide_db::RootDatabase;
+use ra_ap_syntax::SyntaxError;
 
 pub struct MacroExpansion<'expansion> {
+    pub call: MacroCallId,
     pub database: &'expansion RootDatabase,
-    pub file: HirFileId,
 }
 
 impl MacroExpansion<'_> {
-    pub fn is_parsable(&self) -> bool {
-        self.file.macro_file().is_some_and(|call| {
-            let (parse, _) = &call.parse_macro_expansion(self.database).value;
+    pub fn syntax_errors(&self) -> Vec<SyntaxError> {
+        let (parse, _) = &self.call.parse_macro_expansion(self.database).value;
 
-            parse.errors().is_empty()
-        })
+        parse.errors()
     }
 }

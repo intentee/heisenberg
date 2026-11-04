@@ -3,5 +3,7 @@ pub enum FoldedFindingKind {
     FailingExpansion,
     ImplBlock,
     InactiveCode,
+    MacroExpansion { depth: usize, name: String },
+    SyntaxError { message: String },
     UnresolvedForeignReferences { count: usize, module: String },
 }

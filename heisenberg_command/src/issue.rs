@@ -12,7 +12,6 @@ use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::module_path::ModulePath;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
-use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::supported_target::SupportedTarget;
 
@@ -20,6 +19,7 @@ use crate::analysis_context::AnalysisContext;
 use crate::cycle_shape::CycleShape;
 use crate::issue_location::IssueLocation;
 use crate::issue_position::IssuePosition;
+use crate::issue_type::IssueType;
 use crate::module_inclusion::ModuleInclusion;
 use crate::narrowing::Narrowing;
 use crate::shared_file_inclusions::SharedFileInclusions;
@@ -193,15 +193,15 @@ impl Issue {
     }
 
     #[must_use]
-    pub const fn issue_type(&self) -> &'static str {
+    pub fn issue_type(&self) -> IssueType {
         match self {
-            Self::CodeActiveOnNoTarget { .. } => "CodeActiveOnNoTarget",
-            Self::DuplicatedFunctionBody { .. } => "DuplicatedFunctionBody",
-            Self::ModuleCycle { .. } => "ModuleCycle",
-            Self::Package(violation) => violation.issue_type(),
-            Self::SharedModuleFile { .. } => "SharedModuleFile",
-            Self::UnresolvedForeignReferences { .. } => ViolationKind::UnresolvedPath.issue_type(),
-            Self::Violation { violation, .. } => violation.kind.issue_type(),
+            Self::CodeActiveOnNoTarget { .. } => IssueType::CodeActiveOnNoTarget,
+            Self::DuplicatedFunctionBody { .. } => IssueType::DuplicatedFunctionBody,
+            Self::ModuleCycle { .. } => IssueType::ModuleCycle,
+            Self::Package(violation) => IssueType::from(violation),
+            Self::SharedModuleFile { .. } => IssueType::SharedModuleFile,
+            Self::UnresolvedForeignReferences { .. } => IssueType::UnresolvedPath,
+            Self::Violation { violation, .. } => IssueType::from(&violation.kind),
         }
     }
 
@@ -299,27 +299,6 @@ impl Issue {
                 format!("Path into {module} is unresolved")
             }
             Self::Violation { violation, .. } => violation.kind.to_string(),
-        }
-    }
-
-    #[must_use]
-    pub const fn purpose(&self) -> &'static str {
-        match self {
-            Self::CodeActiveOnNoTarget { .. } => {
-                "Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target."
-            }
-            Self::DuplicatedFunctionBody { .. } => {
-                "Duplicated code drifts apart when one copy changes. Keep one function and call it from every place that needs it."
-            }
-            Self::ModuleCycle { .. } => {
-                "Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers."
-            }
-            Self::Package(violation) => violation.purpose(),
-            Self::SharedModuleFile { .. } => {
-                "A file included as several modules has no single owner. Give each module its own file."
-            }
-            Self::UnresolvedForeignReferences { .. } => ViolationKind::UnresolvedPath.purpose(),
-            Self::Violation { violation, .. } => violation.kind.purpose(),
         }
     }
 }

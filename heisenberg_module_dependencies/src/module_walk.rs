@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::iter;
@@ -10,12 +9,14 @@ use ra_ap_hir::AsAssocItem;
 use ra_ap_hir::AssocItemContainer;
 use ra_ap_hir::Const;
 use ra_ap_hir::Crate;
+use ra_ap_hir::ExpandResult;
 use ra_ap_hir::FileRangeWrapper;
 use ra_ap_hir::Function;
 use ra_ap_hir::HasVisibility;
 use ra_ap_hir::HirFileId;
 use ra_ap_hir::Impl;
 use ra_ap_hir::InFile;
+use ra_ap_hir::MacroCallId;
 use ra_ap_hir::Module;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::ModuleId;
@@ -59,6 +60,7 @@ use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
+use heisenberg_module_graph::violation_set::ViolationSet;
 use heisenberg_module_graph::walked_code::WalkedCode;
 use heisenberg_module_graph::written_tokens::WrittenTokens;
 
@@ -67,6 +69,8 @@ use crate::ancestry::Ancestry;
 use crate::code_tokens::code_tokens;
 use crate::configured_node::ConfiguredNode;
 use crate::constants_module::ConstantsModule;
+use crate::environment_variable_name::environment_variable_name;
+use crate::expansion_chain::ExpansionChain;
 use crate::file_local_item::FileLocalItem;
 use crate::impl_home::ImplHome;
 use crate::implemented_type::ImplementedType;
@@ -167,17 +171,31 @@ impl ModuleWalk<'_, '_> {
         }
     }
 
-    fn constructs(&self, returned: &Type<'_>, constructed: &Type<'_>) -> bool {
-        returned == constructed
-            || FamousDefs(self.semantics, self.krate)
-                .core_result_Result()
-                .is_some_and(|result| {
-                    returned.as_adt() == Some(Adt::Enum(result))
+    fn constructs(&self, function: Function, constructed: &Type<'_>) -> bool {
+        let database = self.semantics.db;
+        let famous_definitions = FamousDefs(self.semantics, self.krate);
+
+        if function.is_async(database) {
+            function.async_ret_type(database)
+        } else {
+            Some(function.ret_type(database))
+        }
+        .is_some_and(|returned| {
+            returned == *constructed
+                || [
+                    famous_definitions.core_option_Option(),
+                    famous_definitions.core_result_Result(),
+                ]
+                .into_iter()
+                .flatten()
+                .any(|wrapper| {
+                    returned.as_adt() == Some(Adt::Enum(wrapper))
                         && returned
                             .type_arguments()
                             .next()
-                            .is_some_and(|succeeded| succeeded == *constructed)
+                            .is_some_and(|wrapped| wrapped == *constructed)
                 })
+        })
     }
 
     fn contains_unresolved_reference(&self, node: &SyntaxNode) -> bool {
@@ -222,22 +240,15 @@ impl ModuleWalk<'_, '_> {
     fn environment_variable_violation(
         &self,
         call: &ast::MacroCall,
+        expansion: MacroCallId,
         origin: &SubtreeOrigin,
     ) -> Option<Violation> {
+        let database = self.semantics.db;
         let location = self.locate_focus(call.syntax(), origin);
-        let variable = call
-            .token_tree()
-            .and_then(|tree| {
-                tree.syntax()
-                    .children_with_tokens()
-                    .filter_map(NodeOrToken::into_token)
-                    .filter(|token| !token.kind().is_trivia())
-                    .nth(1)
-            })
-            .and_then(ast::String::cast)
-            .and_then(|literal| literal.value().ok().map(Cow::into_owned));
+        let (argument, _, _) =
+            expansion.macro_arg_considering_derives(database, &expansion.lookup(database).kind);
 
-        match variable {
+        match environment_variable_name(argument) {
             None => Some(Violation {
                 kind: ViolationKind::ComputedEnvironmentVariableName,
                 location,
@@ -297,16 +308,15 @@ impl ModuleWalk<'_, '_> {
             {
                 graph
                     .violations
-                    .extend(self.environment_variable_violation(call, origin));
+                    .extend(self.environment_variable_violation(call, expansion, origin));
             }
 
-            self.push_expansion(
-                HirFileId::from(expansion),
-                call.syntax(),
-                origin,
-                pending,
-                graph,
-            );
+            pending.extend(expansion.eager_arg(database).map(|argument| Subtree {
+                origin: origin.expansion_of(call.syntax()),
+                root: self.semantics.parse_or_expand(HirFileId::from(argument)),
+            }));
+
+            self.push_expansion(expansion, call.syntax(), origin, pending, graph);
         }
     }
 
@@ -323,14 +333,11 @@ impl ModuleWalk<'_, '_> {
             .into_iter()
             .flatten()
             .flatten()
+            .filter_map(|ExpandResult { value, .. }| {
+                self.semantics.hir_file_for(&value).macro_file()
+            })
         {
-            self.push_expansion(
-                self.semantics.hir_file_for(&expansion.value),
-                derive.syntax(),
-                origin,
-                pending,
-                graph,
-            );
+            self.push_expansion(expansion, derive.syntax(), origin, pending, graph);
         }
     }
 
@@ -467,7 +474,7 @@ impl ModuleWalk<'_, '_> {
                     item.container(database),
                     AssocItemContainer::Impl(implementation)
                         if implementation.trait_(database).is_some()
-                            || self.constructs(&function.ret_type(database), &implementation.self_ty(database))
+                            || self.constructs(function, &implementation.self_ty(database))
                 )
             })
             || FileLocalItem {
@@ -770,11 +777,17 @@ impl ModuleWalk<'_, '_> {
                 .and_then(|module| {
                     ast::AnyHasName::cast(item.syntax().clone())
                         .and_then(|named| named.name())
-                        .map(|name| to_lower_snake_case(name.text()))
-                        .filter(|expected| *expected != module)
-                        .map(|expected| Violation {
-                            kind: ViolationKind::ModuleNotNamedAfterItsItem { expected, module },
-                            location: self.locate_focus(item.syntax(), origin),
+                        .and_then(|name| {
+                            let expected = to_lower_snake_case(name.text());
+
+                            (expected != module).then(|| Violation {
+                                kind: ViolationKind::ModuleNotNamedAfterItsItem {
+                                    expected,
+                                    item: name.text().to_owned(),
+                                    module,
+                                },
+                                location: self.locate_focus(item.syntax(), origin),
+                            })
                         })
                 })
         })
@@ -853,27 +866,25 @@ impl ModuleWalk<'_, '_> {
 
     fn push_expansion(
         &self,
-        expansion: HirFileId,
+        expansion: MacroCallId,
         call: &SyntaxNode,
         origin: &SubtreeOrigin,
         pending: &mut Vec<Subtree>,
         CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
     ) {
         if (MacroExpansion {
+            call: expansion,
             database: self.semantics.db,
-            file: expansion,
         })
-        .is_parsable()
+        .syntax_errors()
+        .is_empty()
         {
             pending.push(Subtree {
                 origin: origin.expansion_of(call),
-                root: self.semantics.parse_or_expand(expansion),
+                root: self.semantics.parse_or_expand(HirFileId::from(expansion)),
             });
         } else {
-            violations.insert(Violation {
-                kind: ViolationKind::UnparsableMacroExpansion,
-                location: self.locate(call, origin),
-            });
+            self.unparsable(expansion, self.locate(call, origin), violations);
         }
     }
 
@@ -1019,6 +1030,30 @@ impl ModuleWalk<'_, '_> {
             } else {
                 violations.insert(violation);
             }
+        }
+    }
+
+    fn unparsable(
+        &self,
+        call: MacroCallId,
+        location: SourceLocation,
+        violations: &mut ViolationSet,
+    ) {
+        let violation = Violation {
+            kind: ViolationKind::UnparsableMacroExpansion,
+            location,
+        };
+
+        violations.insert(violation.clone());
+
+        for finding in (ExpansionChain {
+            call,
+            locator: self.locator,
+            semantics: self.semantics,
+        })
+        .findings()
+        {
+            violations.fold(violation.clone(), finding);
         }
     }
 
@@ -1241,12 +1276,13 @@ impl ModuleWalk<'_, '_> {
                                     );
                                 }
                             },
-                            ItemExpansion::Unparsable => {
+                            ItemExpansion::Unparsable { call } => {
                                 preorder.skip_subtree();
-                                graph.violations.insert(Violation {
-                                    kind: ViolationKind::UnparsableMacroExpansion,
-                                    location: self.locate_focus(&node, &subtree.origin),
-                                });
+                                self.unparsable(
+                                    call,
+                                    self.locate_focus(&node, &subtree.origin),
+                                    &mut graph.violations,
+                                );
                             }
                         }
                     }

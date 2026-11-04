@@ -2,6 +2,7 @@
 name = "heisenberg_command_tests"
 edition.workspace = true
 version.workspace = true
+publish = false
 
 [dependencies]
 clap = { workspace = true }

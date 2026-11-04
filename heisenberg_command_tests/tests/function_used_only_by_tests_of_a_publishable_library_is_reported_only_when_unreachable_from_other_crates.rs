@@ -19,7 +19,7 @@ fn function_used_only_by_tests_of_a_publishable_library_is_reported_only_when_un
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("FunctionUsedOnlyByTests: 2 violations\n\
-            Production code holds only what production uses. Move a function that only tests use into a test crate: a leaf package with integration tests and at most a library for them.\n\
+            Production code holds only what production uses. Move a function that only tests use into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
             \n\
             - src/counter.rs:14:14: Function is used only by tests\n        \
             const fn doubled(&self) -> u8 {\n\

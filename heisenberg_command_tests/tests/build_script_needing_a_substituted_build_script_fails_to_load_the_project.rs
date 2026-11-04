@@ -19,7 +19,7 @@ fn build_script_needing_a_substituted_build_script_fails_to_load_the_project() {
         str::from_utf8(&outcome.errors),
         Ok("error: the project cannot be loaded\n\
             error: the build scripts and procedural macros of the workspace cannot be built for x86_64-pc-windows-msvc\n\
-            error: the build script of `wrapper` needs the build script of `native`, which out_dirs declares instead of running it\n")
+            error: the build script of `wrapper` needs the build script of `native`, which out_dirs declares instead of running it; declare an out-dir for `wrapper` too\n")
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Failure);
 }

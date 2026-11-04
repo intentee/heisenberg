@@ -138,6 +138,7 @@ pub struct CheckCommand {
     #[arg(
         long,
         env = "CARGO_HOME",
+        hide_env_values = true,
         value_parser = AbsolutePath::parse,
         help = "Absolute path of the Cargo home directory holding the downloaded dependency sources"
     )]
@@ -173,8 +174,12 @@ impl CheckCommand {
         }
         .resolve()
         .map_err(project_model_failure)?;
+        let test_crates = project
+            .declared_test_crates
+            .test_crates(&project.project.resolved);
         let clippy_violations = ClippyRequirements {
             resolved: &project.project.resolved,
+            test_crates: &test_crates,
         }
         .violations()
         .map_err(project_model_failure)?;
@@ -210,6 +215,11 @@ impl CheckCommand {
             .map(|analyses| {
                 let package_violations = clippy_violations
                     .into_iter()
+                    .chain(
+                        project
+                            .declared_test_crates
+                            .violations(&project.project.resolved),
+                    )
                     .chain(
                         ManifestLintAllowances {
                             resolved: &project.project.resolved,

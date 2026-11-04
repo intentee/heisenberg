@@ -27,7 +27,10 @@ impl IssueSection<'_> {
         };
 
         iter::once(format!("{issue_type}: {count} {noun}"))
-            .chain([issues.first.purpose().to_owned(), String::new()])
+            .chain([
+                issues.first.issue_type().text().purpose.to_owned(),
+                String::new(),
+            ])
             .chain(
                 issues
                     .iter()

@@ -18,7 +18,7 @@ fn crate_root_configured_out_is_reported_at_its_start() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("CodeActiveOnNoTarget: 1 violation\n\
-            Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target.\n\
+            Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
             \n\
             - src/lib.rs:1:1: Code is active on no declared target\n    \
             #![cfg(any())]\n\

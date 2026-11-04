@@ -18,7 +18,7 @@ fn function_used_only_by_tests_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("FunctionUsedOnlyByTests: 1 violation\n\
-            Production code holds only what production uses. Move a function that only tests use into a test crate: a leaf package with integration tests and at most a library for them.\n\
+            Production code holds only what production uses. Move a function that only tests use into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
             \n\
             - library/src/counter.rs:10:18: Function is used only by tests\n        \
             pub const fn for_tests() -> Self {\n\

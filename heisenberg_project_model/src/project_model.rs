@@ -12,6 +12,7 @@ use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
 use crate::declared_out_dirs::DeclaredOutDirs;
 use crate::declared_targets::declared_targets;
+use crate::declared_test_crates::DeclaredTestCrates;
 use crate::feature_graph::FeatureGraph;
 use crate::heisenberg_settings::HeisenbergSettings;
 use crate::library_directory::library_directory;
@@ -45,8 +46,11 @@ impl ProjectModel {
         }
         .resolve()?;
         let manifest_path = workspace_manifest(&self.workspace_directory);
-        let HeisenbergSettings { out_dirs, targets } =
-            HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
+        let HeisenbergSettings {
+            out_dirs,
+            targets,
+            test_crates,
+        } = HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
         let targets = declared_targets(targets, &manifest_path)?;
         let substituted = DeclaredOutDirs {
             manifest_path: &manifest_path,
@@ -112,6 +116,7 @@ impl ProjectModel {
 
                         build_outputs.map(|build_outputs| ResolvedProject {
                             build_outputs,
+                            declared_test_crates: DeclaredTestCrates { names: test_crates },
                             library,
                             project,
                             sysroot: self.sysroot.clone(),

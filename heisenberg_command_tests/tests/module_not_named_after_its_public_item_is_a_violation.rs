@@ -18,11 +18,11 @@ fn module_not_named_after_its_public_item_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ModuleNotNamedAfterItsItem: 2 violations\n\
-            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item.\n\
+            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item, or rename the item when its snake case reads badly: acronyms and one-letter words merge, as in OpenAIApiPath, whose snake case is open_aiapi_path.\n\
             \n\
-            - src/lib.rs:6:12: Module is named helpers, but its public item names it parse_map\n        \
+            - src/lib.rs:6:12: Module is named helpers, but its public item parse_map names it parse_map\n        \
             pub fn parse_map() -> u8 {\n\
-            - src/widget.rs:1:12: Module is named widget, but its public item names it foo_bar_baz\n    \
+            - src/widget.rs:1:12: Module is named widget, but its public item FooBarBaz names it foo_bar_baz\n    \
             pub struct FooBarBaz;\n\
             \n\
             ------------------------------\n\

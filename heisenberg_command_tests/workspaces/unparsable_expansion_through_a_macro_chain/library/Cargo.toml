@@ -1,0 +1,12 @@
+[package]
+name = "library"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+attributes = { path = "../attributes" }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

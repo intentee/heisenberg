@@ -1,0 +1,7 @@
+[workspace]
+members = ["fixtures", "helpers", "library", "shared"]
+resolver = "3"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+test_crates = ["fixtures", "helpers"]

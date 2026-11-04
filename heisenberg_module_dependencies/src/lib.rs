@@ -12,6 +12,8 @@ mod crate_module_files;
 mod defined_items;
 mod diagnostic_site;
 mod diagnostic_violation;
+mod environment_variable_name;
+mod expansion_chain;
 mod file_local_item;
 mod function_fingerprint;
 mod impl_home;

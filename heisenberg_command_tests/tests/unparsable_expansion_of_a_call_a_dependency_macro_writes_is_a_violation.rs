@@ -21,7 +21,11 @@ fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
             A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust.\n\
             \n\
             - src/lib.rs:1:1: Macro expansion cannot be parsed\n    \
-            macros::wrapping!();\n\
+            macros::wrapping!();\n      \
+            in the expansion of wrapping called at src/lib.rs:1:1\n      \
+            in the expansion of unparsable called at macros/src/lib.rs:10:9\n      \
+            syntax error at src/lib.rs:1:1: expected `;`, `{`, or `(`\n      \
+            syntax error at src/lib.rs:1:1: expected a name\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

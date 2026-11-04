@@ -5,5 +5,3 @@ pub const CARGO_BUILD_VARIABLES: [&str; 3] = [
     "CARGO_PRIMARY_PACKAGE",
     "CARGO_TARGET_TMPDIR",
 ];
-
-pub const UNIT_TEST_MODULE_NAME: &str = "tests";

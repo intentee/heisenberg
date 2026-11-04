@@ -6,6 +6,7 @@ use crate::clippy_lint_path::clippy_lint_path;
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
 use crate::lint_table::LintTable;
+use crate::potential_owner::PotentialOwner;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PackageViolation {
@@ -37,10 +38,27 @@ pub enum PackageViolation {
         manifest: String,
         package: String,
     },
+    PublishableTestCrate {
+        manifest: String,
+        package: String,
+    },
+    TestCrateDeclaredTwice {
+        manifest: String,
+        package: String,
+    },
+    TestCrateNotAMember {
+        manifest: String,
+        package: String,
+    },
+    TestCrateUsedByProduction {
+        dependent: String,
+        manifest: String,
+        package: String,
+    },
     TestsOnlyPackageWithoutTestLibraries {
         manifest: String,
         package: String,
-        potential_owners: Vec<String>,
+        potential_owners: Vec<PotentialOwner>,
     },
 }
 
@@ -50,26 +68,21 @@ impl PackageViolation {
         match self {
             Self::TestsOnlyPackageWithoutTestLibraries {
                 potential_owners, ..
-            } => {
-                if potential_owners.is_empty() {
-                    vec![
-                        "no package it uses can take its tests without a dependency cycle"
-                            .to_owned(),
-                    ]
-                } else {
-                    potential_owners
-                        .iter()
-                        .map(|owner| format!("could move without a dependency cycle to {owner}"))
-                        .collect()
-                }
-            }
+            } => potential_owners
+                .iter()
+                .map(PotentialOwner::to_string)
+                .collect(),
             Self::ClippyConfigurationAmbiguous { .. }
             | Self::ClippyConfigurationMissing { .. }
             | Self::ClippyLintNotDenied { .. }
             | Self::ClippyTestAllowanceMissing { .. }
             | Self::LintAllowedInManifest { .. }
             | Self::PackageDependencyCycle { .. }
-            | Self::PackageDependsOnItself { .. } => Vec::new(),
+            | Self::PackageDependsOnItself { .. }
+            | Self::PublishableTestCrate { .. }
+            | Self::TestCrateDeclaredTwice { .. }
+            | Self::TestCrateNotAMember { .. }
+            | Self::TestCrateUsedByProduction { .. } => Vec::new(),
         }
     }
 
@@ -81,55 +94,13 @@ impl PackageViolation {
             | Self::ClippyConfigurationMissing { manifest: file, .. }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
+            | Self::PublishableTestCrate { manifest: file, .. }
+            | Self::TestCrateDeclaredTwice { manifest: file, .. }
+            | Self::TestCrateNotAMember { manifest: file, .. }
+            | Self::TestCrateUsedByProduction { manifest: file, .. }
             | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. } => file,
             Self::ClippyLintNotDenied { table, .. } | Self::LintAllowedInManifest { table, .. } => {
                 table.manifest()
-            }
-        }
-    }
-
-    #[must_use]
-    pub const fn issue_type(&self) -> &'static str {
-        match self {
-            Self::ClippyConfigurationAmbiguous { .. } => "ClippyConfigurationAmbiguous",
-            Self::ClippyConfigurationMissing { .. } => "ClippyConfigurationMissing",
-            Self::ClippyLintNotDenied { .. } => "ClippyLintNotDenied",
-            Self::ClippyTestAllowanceMissing { .. } => "ClippyTestAllowanceMissing",
-            Self::LintAllowedInManifest { .. } => "LintAllowedInManifest",
-            Self::PackageDependencyCycle { .. } => "PackageDependencyCycle",
-            Self::PackageDependsOnItself { .. } => "PackageDependsOnItself",
-            Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
-                "TestsOnlyPackageWithoutTestLibraries"
-            }
-        }
-    }
-
-    #[must_use]
-    pub const fn purpose(&self) -> &'static str {
-        match self {
-            Self::ClippyConfigurationAmbiguous { .. } => {
-                "Clippy reads only one of clippy.toml and .clippy.toml, so keeping both hides which applies. Keep one of them."
-            }
-            Self::ClippyConfigurationMissing { .. } => {
-                "Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart. Add a clippy.toml with the test allowances."
-            }
-            Self::ClippyLintNotDenied { .. } => {
-                "Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a leaf package of integration tests and at most a library for them, may leave it undenied, in its own lints table."
-            }
-            Self::ClippyTestAllowanceMissing { .. } => {
-                "Tests may fail fast with expect, unwrap and panic. Set the allowance to true in the clippy configuration."
-            }
-            Self::LintAllowedInManifest { .. } => {
-                "Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code."
-            }
-            Self::PackageDependencyCycle { .. } => {
-                "Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library."
-            }
-            Self::PackageDependsOnItself { .. } => {
-                "A package depending on itself is built twice and blurs what it owns. Remove the self-dependency."
-            }
-            Self::TestsOnlyPackageWithoutTestLibraries { .. } => {
-                "Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so the packages listed could take the tests without a cycle, but the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it."
             }
         }
     }
@@ -170,6 +141,24 @@ impl Display for PackageViolation {
             Self::PackageDependsOnItself { package, .. } => write!(
                 formatter,
                 "Package {package} depends on itself through dev-dependencies"
+            ),
+            Self::PublishableTestCrate { package, .. } => write!(
+                formatter,
+                "Package {package} is declared a test crate but can be published"
+            ),
+            Self::TestCrateDeclaredTwice { package, .. } => write!(
+                formatter,
+                "Package {package} is declared a test crate more than once"
+            ),
+            Self::TestCrateNotAMember { package, .. } => write!(
+                formatter,
+                "Package {package} is declared a test crate but is not a workspace member"
+            ),
+            Self::TestCrateUsedByProduction {
+                dependent, package, ..
+            } => write!(
+                formatter,
+                "Package {dependent} depends on test crate {package} through a normal or build dependency"
             ),
             Self::TestsOnlyPackageWithoutTestLibraries { package, .. } => write!(
                 formatter,

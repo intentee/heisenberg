@@ -18,7 +18,7 @@ fn custom_harness_target_is_built_without_libtest_and_enters_through_main() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("CodeActiveOnNoTarget: 1 violation\n\
-            Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target.\n\
+            Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
             \n\
             - tests/trials.rs:16:4: Code is active on no declared target\n    \
             fn compiled_only_with_libtest() {}\n\

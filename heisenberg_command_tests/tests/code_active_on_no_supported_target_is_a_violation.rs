@@ -18,7 +18,7 @@ fn code_active_on_no_supported_target_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("CodeActiveOnNoTarget: 6 violations\n\
-            Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target.\n\
+            Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
             \n\
             - src/lib.rs:2:9: Code is active on no declared target\n    \
             pub mod mac;\n\

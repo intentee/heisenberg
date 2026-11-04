@@ -18,7 +18,7 @@ fn clippy_lint_not_denied_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 2 violations\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a leaf package of integration tests and at most a library for them, may leave it undenied, in its own lints table.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave it undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::expect_used\n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::panic\n\

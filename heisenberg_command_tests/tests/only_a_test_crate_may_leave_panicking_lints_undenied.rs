@@ -18,7 +18,7 @@ fn only_a_test_crate_may_leave_panicking_lints_undenied() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("ClippyLintNotDenied: 6 violations\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a leaf package of integration tests and at most a library for them, may leave it undenied, in its own lints table.\n\
+            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave it undenied, in its own lints table.\n\
             \n\
             - shared_tests/Cargo.toml: Package shared_tests does not deny clippy::expect_used\n\
             - shared_tests/Cargo.toml: Package shared_tests does not deny clippy::panic\n\

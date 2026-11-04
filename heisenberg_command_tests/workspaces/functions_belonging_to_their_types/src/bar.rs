@@ -9,6 +9,18 @@ impl Bar {
         Self { value: foo.value }
     }
 
+    pub fn acquired(foo: &Foo) -> Option<Self> {
+        foo.value.checked_sub(1).map(|value| Self { value })
+    }
+
+    pub async fn fetched(foo: &Foo) -> Result<Self, u8> {
+        Self::parsed(foo)
+    }
+
+    pub async fn loaded(foo: &Foo) -> Self {
+        Self { value: foo.value }
+    }
+
     pub fn parsed(foo: &Foo) -> Result<Self, u8> {
         foo.value
             .checked_add(1)

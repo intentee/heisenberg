@@ -16,6 +16,7 @@ fn member_violations(
     member: &PackageDocument,
     configuration: ClippyConfigurationFile,
     resolved: &ResolvedPackages,
+    test_crates: &BTreeSet<String>,
 ) -> Vec<PackageViolation> {
     let workspace_path = &resolved.workspace_path();
     let PackageDocument {
@@ -24,7 +25,7 @@ fn member_violations(
     let name = metadata.name.to_string();
     let manifest = member.relative_manifest(workspace_path);
     let table = member.lint_table(workspace_path);
-    let may_panic = resolved.is_test_crate(member);
+    let may_panic = test_crates.contains(&name);
     let mut violations: Vec<PackageViolation> = CLIPPY_DENIED_LINTS
         .iter()
         .filter(|_| !may_panic)
@@ -69,6 +70,7 @@ fn member_violations(
 
 pub struct ClippyRequirements<'requirements> {
     pub resolved: &'requirements ResolvedPackages,
+    pub test_crates: &'requirements BTreeSet<String>,
 }
 
 impl ClippyRequirements<'_> {
@@ -86,7 +88,9 @@ impl ClippyRequirements<'_> {
                     &package.metadata.manifest_path,
                     workspace_path.root,
                 )
-                .map(|configuration| member_violations(package, configuration, self.resolved))
+                .map(|configuration| {
+                    member_violations(package, configuration, self.resolved, self.test_crates)
+                })
             })
             .collect::<Result<Vec<Vec<PackageViolation>>, ProjectModelError>>()
             .map(|violations| {

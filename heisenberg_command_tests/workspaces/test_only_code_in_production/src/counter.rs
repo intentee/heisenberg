@@ -42,4 +42,15 @@ mod tests {
     fn counter_increments() {
         assert_eq!(super::Counter::for_tests().doubled(), 0);
     }
+
+    #[test]
+    fn sample_doubles() {
+        assert_eq!(
+            super::Counter {
+                value: crate::sample_value::sample_value()
+            }
+            .doubled(),
+            6
+        );
+    }
 }

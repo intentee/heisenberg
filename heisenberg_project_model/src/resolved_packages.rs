@@ -5,8 +5,6 @@ use ra_ap_paths::Utf8Path;
 use serde_json::Value;
 use serde_json::json;
 
-use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
-
 use crate::build_selection::BuildSelection;
 use crate::dependency_document::DependencyDocument;
 use crate::member_target::MemberTarget;
@@ -24,31 +22,6 @@ pub struct ResolvedPackages {
 }
 
 impl ResolvedPackages {
-    pub fn is_leaf(&self, PackageDocument { metadata, .. }: &PackageDocument) -> bool {
-        !self.members().any(|PackageDocument { dependencies, .. }| {
-            dependencies
-                .iter()
-                .any(|DependencyDocument { package_id, .. }| *package_id == metadata.id.repr)
-        })
-    }
-
-    pub fn is_test_crate(&self, package: &PackageDocument) -> bool {
-        let kinds: Vec<CrateTargetKind> = self
-            .member_targets
-            .iter()
-            .filter(|MemberTarget { crate_target, .. }| {
-                crate_target.package_name == package.metadata.name.as_str()
-            })
-            .map(|MemberTarget { crate_target, .. }| crate_target.kind)
-            .collect();
-
-        self.is_leaf(package)
-            && kinds.contains(&CrateTargetKind::IntegrationTest)
-            && kinds.iter().all(|kind| {
-                *kind == CrateTargetKind::IntegrationTest || *kind == CrateTargetKind::Library
-            })
-    }
-
     pub fn members(&self) -> impl Iterator<Item = &PackageDocument> {
         self.packages
             .iter()

@@ -18,7 +18,7 @@ fn paths_written_inside_an_own_macro_are_checked() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok("CodeActiveOnNoTarget: 1 violation\n\
-            Code active on no declared target is never built or analysed. Remove it, or make it active on a declared target.\n\
+            Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
             \n\
             - src/lib.rs:2:9: Code is active on no declared target\n    \
             pub mod configured {\n\

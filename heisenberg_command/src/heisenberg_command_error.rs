@@ -21,6 +21,8 @@ pub enum HeisenbergCommandError {
     ProjectModel(#[from] ProjectModelError),
     #[error("the project cannot be loaded for {}", .0.context.triple())]
     TargetProjectModel(#[source] ContextualError<SupportedTarget, Box<ProjectModelError>>),
+    #[error("the explanation cannot be written")]
+    WriteExplanation(#[source] io::Error),
     #[error("the report cannot be written")]
     WriteReport(#[source] io::Error),
 }

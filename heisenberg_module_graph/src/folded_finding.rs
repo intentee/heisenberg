@@ -23,6 +23,14 @@ impl Display for FoldedFinding {
                 "code active on no declared target at {}",
                 self.location
             ),
+            FoldedFindingKind::MacroExpansion { name, .. } => write!(
+                formatter,
+                "in the expansion of {name} called at {}",
+                self.location
+            ),
+            FoldedFindingKind::SyntaxError { message } => {
+                write!(formatter, "syntax error at {}: {message}", self.location)
+            }
             FoldedFindingKind::UnresolvedForeignReferences { count, module } => write!(
                 formatter,
                 "unresolved paths into {module}: {count}, the first at {}",
