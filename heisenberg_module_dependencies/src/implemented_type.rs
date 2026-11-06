@@ -1,14 +1,12 @@
 use ra_ap_hir::Adt;
 use ra_ap_hir::Crate;
-use ra_ap_hir::HasSource;
 use ra_ap_hir::Impl;
-use ra_ap_hir::InFile;
 use ra_ap_hir::Trait;
 use ra_ap_hir::Type;
 use ra_ap_ide_db::RootDatabase;
 
 use crate::impl_home::ImplHome;
-use crate::original_file_id::original_file_id;
+use crate::local_impl_home::LocalImplHome;
 
 pub struct ImplementedType<'database> {
     pub database: &'database RootDatabase,
@@ -26,48 +24,25 @@ impl ImplementedType<'_> {
     }
 
     pub fn home(&self, trait_arguments: &[Type<'_>]) -> ImplHome {
-        let database = self.database;
-
         self.adt()
-            .and_then(|adt| adt.source(database))
-            .map(|InFile { file_id, .. }| ImplHome::LocalType {
-                file: original_file_id(database, file_id),
-            })
+            .map(|owner| LocalImplHome::Type { owner })
             .or_else(|| {
                 self.blanket_trait()
-                    .and_then(|blanket_trait| blanket_trait.source(database))
-                    .map(|InFile { file_id, .. }| ImplHome::LocalTraitBlanket {
-                        file: original_file_id(database, file_id),
-                    })
+                    .map(|owner| LocalImplHome::TraitBlanket { owner })
             })
             .or_else(|| {
                 self.trait_object()
-                    .and_then(|object_trait| object_trait.source(database))
-                    .map(|InFile { file_id, .. }| ImplHome::LocalTraitObject {
-                        file: original_file_id(database, file_id),
-                    })
+                    .map(|owner| LocalImplHome::TraitObject { owner })
             })
             .or_else(|| {
-                self.local_trait().and_then(|local_trait| {
-                    local_trait.source(database).map(|InFile { file_id, .. }| {
-                        ImplHome::LocalTraitForeignType {
-                            file: original_file_id(database, file_id),
-                            trait_name: local_trait
-                                .name(database)
-                                .display(database, self.krate.edition(database))
-                                .to_string(),
-                        }
-                    })
-                })
+                self.local_trait()
+                    .map(|owner| LocalImplHome::TraitForeignType { owner })
             })
             .or_else(|| {
                 self.local_type_argument(trait_arguments)
-                    .and_then(|adt| adt.source(database))
-                    .map(|InFile { file_id, .. }| ImplHome::LocalTypeArgument {
-                        file: original_file_id(database, file_id),
-                    })
+                    .map(|owner| LocalImplHome::TypeArgument { owner })
             })
-            .unwrap_or(ImplHome::Foreign)
+            .map_or(ImplHome::Foreign, |home| ImplHome::Local { home })
     }
 
     fn blanket_trait(&self) -> Option<Trait> {

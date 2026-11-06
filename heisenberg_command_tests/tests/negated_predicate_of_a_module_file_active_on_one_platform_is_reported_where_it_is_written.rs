@@ -3,6 +3,21 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const NEGATED_PREDICATE: &str = "- src/platform.rs:1:1: Configuration predicate negates a feature, test or debug_assertions\n    \
+    #![cfg(any(unix, not(feature = \"optional\")))]\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const HOST_MODULES: usize = 2;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const NEGATED_PREDICATE: &str = "- src/lib.rs:1:9: Configuration predicate negates a feature, test or debug_assertions\n    \
+    pub mod platform;\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const HOST_MODULES: usize = 1;
 
 #[test]
 fn negated_predicate_of_a_module_file_active_on_one_platform_is_reported_where_it_is_written() {
@@ -17,18 +32,19 @@ fn negated_predicate_of_a_module_file_active_on_one_platform_is_reported_where_i
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("NegatedConfiguration: 1 violation\n\
-            Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
-            \n\
-            - src/platform.rs:1:1: Configuration predicate negates a feature, test or debug_assertions\n    \
-            #![cfg(any(unix, not(feature = \"optional\")))]\n\
-            \n\
-            ------------------------------\n\
-            1 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+        Ok(format!(
+            "NegatedConfiguration: 1 violation\n\
+             Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
+             \n\
+             {NEGATED_PREDICATE}\
+             \n\
+             ------------------------------\n\
+             1 errors found\n\
+             ------------------------------\n\
+             {}",
+            host_footer(1, HOST_MODULES)
+        )
+        .as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

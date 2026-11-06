@@ -2403,6 +2403,7 @@ dependencies = [
  "clap",
  "heisenberg_command",
  "heisenberg_command_tests",
+ "heisenberg_project_model",
 ]
 
 [[package]]
@@ -2443,6 +2444,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "heisenberg_command",
+ "heisenberg_error_context",
  "thiserror",
  "toml",
 ]
@@ -2481,7 +2483,6 @@ dependencies = [
  "ra_ap_ide_db",
  "ra_ap_intern",
  "ra_ap_paths",
- "ra_ap_stdx",
  "ra_ap_syntax",
  "ra_ap_vfs",
  "thiserror",

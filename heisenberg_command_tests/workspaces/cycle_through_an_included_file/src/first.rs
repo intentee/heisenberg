@@ -1,3 +1,3 @@
-pub struct First;
-
 include!("../snippets/second.rs");
+
+pub struct First;

@@ -10,23 +10,30 @@ use heisenberg_workspace_build::configured_context::ConfiguredContext;
 
 use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
+use crate::constants::RUSTC_VARIABLE;
 use crate::declared_out_dirs::DeclaredOutDirs;
 use crate::declared_targets::declared_targets;
 use crate::declared_test_crates::DeclaredTestCrates;
 use crate::feature_graph::FeatureGraph;
+use crate::feature_selection::FeatureSelection;
 use crate::heisenberg_settings::HeisenbergSettings;
 use crate::library_directory::library_directory;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_project::ResolvedProject;
+use crate::run_scope::RunScope;
+use crate::sysroot_compiler::sysroot_compiler;
 use crate::target_builds::TargetBuilds;
+use crate::target_selection::TargetSelection;
 use crate::utf8_environment::utf8_environment;
 use crate::workspace_manifest::workspace_manifest;
 
 pub struct ProjectModel {
     pub cargo_home: AbsPathBuf,
     pub environment: BTreeMap<OsString, OsString>,
+    pub features: FeatureSelection,
     pub sysroot: AbsPathBuf,
+    pub targets: TargetSelection,
     pub workspace_directory: AbsPathBuf,
 }
 
@@ -48,14 +55,18 @@ impl ProjectModel {
         let manifest_path = workspace_manifest(&self.workspace_directory);
         let HeisenbergSettings {
             out_dirs,
-            targets,
+            targets: declared_triples,
             test_crates,
         } = HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
-        let targets = declared_targets(targets, &manifest_path)?;
+        let declared = declared_targets(declared_triples, &manifest_path)?;
+        let targets = self.targets.analysed(&declared, &manifest_path)?;
+
+        self.features.validate(&project, &manifest_path)?;
+
         let substituted = DeclaredOutDirs {
             manifest_path: &manifest_path,
             resolved: &project,
-            targets: &targets,
+            targets: &declared,
         }
         .validated(out_dirs)?;
         let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
@@ -100,13 +111,21 @@ impl ProjectModel {
                     .map_err(Box::new)
                     .map_err(ProjectModelError::LibraryPackageGraph)
                     .and_then(|library| {
+                        let compiler = sysroot_compiler(&self.sysroot);
+                        let mut build_environment = environment.clone();
+
+                        build_environment
+                            .insert(RUSTC_VARIABLE.to_owned(), compiler.as_str().to_owned());
+
                         let build_outputs = TargetBuilds {
+                            compiler: &compiler,
                             context: &ConfiguredContext {
                                 cargo_home: self.cargo_home.as_ref(),
-                                environment: &environment,
+                                environment: &build_environment,
                                 nightly_features_allowed: false,
                                 workspace_directory: self.workspace_directory.as_ref(),
                             },
+                            features: &self.features.cli_features(),
                             manifest_path: &manifest_path,
                             resolved: &project.resolved,
                             substituted: &substituted,
@@ -119,6 +138,10 @@ impl ProjectModel {
                             declared_test_crates: DeclaredTestCrates { names: test_crates },
                             library,
                             project,
+                            scope: RunScope {
+                                features: self.features.clone(),
+                                left_out_targets: declared.difference(&targets).copied().collect(),
+                            },
                             sysroot: self.sysroot.clone(),
                             targets,
                         })

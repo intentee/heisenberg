@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn impl_of_a_local_trait_with_a_local_type_argument_belongs_beside_its_trait() {
@@ -17,7 +18,7 @@ fn impl_of_a_local_trait_with_a_local_type_argument_belongs_beside_its_trait() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("MisplacedForeignTypeImpl: 1 violation\n\
+        Ok(["MisplacedForeignTypeImpl: 1 violation\n\
             An impl of a trait of this crate for a type it does not define belongs beside the trait, so every impl has exactly one place. Move the impl into the file that defines the trait.\n\
             \n\
             - src/local.rs:5:25: Impl block of Convert for a foreign type belongs in src/convert.rs\n    \
@@ -25,10 +26,7 @@ fn impl_of_a_local_trait_with_a_local_type_argument_belongs_beside_its_trait() {
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

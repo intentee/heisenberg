@@ -31,6 +31,11 @@ impl Display for FoldedFinding {
             FoldedFindingKind::SyntaxError { message } => {
                 write!(formatter, "syntax error at {}: {message}", self.location)
             }
+            FoldedFindingKind::UnreadableLiteral { text } => write!(
+                formatter,
+                "literal {text} at {} cannot be read back by rust-analyzer, as a negative number that a procedural macro emits as one literal token cannot; emit the sign as a separate - token",
+                self.location
+            ),
             FoldedFindingKind::UnresolvedForeignReferences { count, module } => write!(
                 formatter,
                 "unresolved paths into {module}: {count}, the first at {}",

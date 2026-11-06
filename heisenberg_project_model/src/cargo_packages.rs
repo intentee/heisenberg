@@ -16,6 +16,7 @@ use heisenberg_workspace_build::configured_context::ConfiguredContext;
 use crate::cargo_configuration_overrides::CargoConfigurationOverrides;
 use crate::cargo_metadata_document::CargoMetadataDocument;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
+use crate::command_line_feature_scope::CommandLineFeatureScope;
 use crate::configured_environment::ConfiguredEnvironment;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
@@ -119,6 +120,11 @@ impl CargoPackages<'_> {
                     }
                     .variables()
                     .map(|configured_environment| ResolvedPackages {
+                        command_line_features: if workspace.allows_new_cli_feature_behavior() {
+                            CommandLineFeatureScope::EveryMember
+                        } else {
+                            CommandLineFeatureScope::RootPackage
+                        },
                         configured_environment,
                         member_targets,
                         packages: package_documents,

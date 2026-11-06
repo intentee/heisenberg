@@ -27,3 +27,27 @@ impl Display for TargetNarrowing<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use heisenberg_project_model::supported_target::SupportedTarget;
+
+    use super::TargetNarrowing;
+
+    #[test]
+    fn targets_narrower_than_every_analysed_target_are_named() {
+        assert_eq!(
+            TargetNarrowing {
+                all: &BTreeSet::from([
+                    SupportedTarget::X86_64PcWindowsMsvc,
+                    SupportedTarget::X86_64UnknownLinuxGnu,
+                ]),
+                targets: &BTreeSet::from([SupportedTarget::X86_64PcWindowsMsvc]),
+            }
+            .to_string(),
+            " (only on x86_64-pc-windows-msvc)"
+        );
+    }
+}

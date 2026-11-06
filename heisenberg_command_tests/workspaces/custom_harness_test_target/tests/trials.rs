@@ -8,14 +8,14 @@ fn library_is_constructible() -> bool {
     true
 }
 
-pub fn shared_helper() -> u8 {
-    1
-}
-
 #[cfg(test)]
 fn compiled_only_with_libtest() {}
 
 fn main() {
     assert!(library_is_constructible(), "{TRIAL_NAME} failed");
     assert_eq!(shared_helper(), 1);
+}
+
+pub fn shared_helper() -> u8 {
+    1
 }

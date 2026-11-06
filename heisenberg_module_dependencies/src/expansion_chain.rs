@@ -8,6 +8,7 @@ use ra_ap_hir::Semantics;
 use ra_ap_hir_expand::FileRange;
 use ra_ap_hir_expand::Lookup;
 use ra_ap_ide_db::RootDatabase;
+use ra_ap_syntax::TextRange;
 use ra_ap_syntax::ast::HasName;
 
 use heisenberg_module_graph::folded_finding::FoldedFinding;
@@ -26,6 +27,10 @@ pub struct ExpansionChain<'chain, 'database> {
 impl ExpansionChain<'_, '_> {
     pub fn findings(&self) -> Vec<FoldedFinding> {
         let database = self.semantics.db;
+        let expansion = MacroExpansion {
+            call: self.call,
+            database,
+        };
         let calls: Vec<MacroCallId> = iter::successors(Some(self.call), |call| {
             call.lookup(database).kind.file_id().macro_file()
         })
@@ -65,22 +70,26 @@ impl ExpansionChain<'_, '_> {
                     })
             })
             .chain(
-                MacroExpansion {
-                    call: self.call,
-                    database,
-                }
-                .syntax_errors()
-                .into_iter()
-                .map(|error| FoldedFinding {
-                    kind: FoldedFindingKind::SyntaxError {
-                        message: error.to_string(),
-                    },
-                    location: self.locate(
-                        InFile::new(HirFileId::from(self.call), error.range())
-                            .original_node_file_range(database)
-                            .0,
-                    ),
-                }),
+                expansion
+                    .syntax_errors()
+                    .into_iter()
+                    .map(|error| FoldedFinding {
+                        kind: FoldedFindingKind::SyntaxError {
+                            message: error.to_string(),
+                        },
+                        location: self.located_in_expansion(error.range()),
+                    }),
+            )
+            .chain(
+                expansion
+                    .unreadable_literals()
+                    .into_iter()
+                    .map(|literal| FoldedFinding {
+                        kind: FoldedFindingKind::UnreadableLiteral {
+                            text: literal.text().to_owned(),
+                        },
+                        location: self.located_in_expansion(literal.text_range()),
+                    }),
             )
             .collect()
     }
@@ -90,5 +99,13 @@ impl ExpansionChain<'_, '_> {
             file_id: file_id.file_id(self.semantics.db),
             range,
         })
+    }
+
+    fn located_in_expansion(&self, range: TextRange) -> SourceLocation {
+        self.locate(
+            InFile::new(HirFileId::from(self.call), range)
+                .original_node_file_range(self.semantics.db)
+                .0,
+        )
     }
 }

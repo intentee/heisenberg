@@ -1,9 +1,3 @@
-#[allow(dead_code)]
-struct Unused;
-
-#[expect(clippy::expect_used, reason = "the fixture expects")]
-pub fn suppressed() {}
-
 #[cfg_attr(unix, allow(unused_variables))]
 fn platform() {}
 
@@ -27,3 +21,9 @@ fn suppressed_statement() {
     #[allow(unused)]
     println!("suppressed");
 }
+
+#[allow(dead_code)]
+struct Unused;
+
+#[expect(clippy::expect_used, reason = "the fixture expects")]
+pub fn suppressed() {}

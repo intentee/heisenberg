@@ -1,12 +1,12 @@
-pub struct Marker;
-
 Marker!();
 
 crate::missing!();
 crate::absent::missing!();
 
+#[missing_attribute]
+fn attributed() {}
+
 #[derive(MissingDerive)]
 struct Derived;
 
-#[missing_attribute]
-fn attributed() {}
+pub struct Marker;

@@ -5,27 +5,27 @@ pub struct Bar {
 }
 
 impl Bar {
-    pub const fn new(foo: &Foo) -> Self {
-        Self { value: foo.value }
-    }
-
-    pub fn acquired(foo: &Foo) -> Option<Self> {
-        foo.value.checked_sub(1).map(|value| Self { value })
+    pub fn acquired(Foo { value }: &Foo) -> Option<Self> {
+        value.checked_sub(1).map(|value| Self { value })
     }
 
     pub async fn fetched(foo: &Foo) -> Result<Self, u8> {
         Self::parsed(foo)
     }
 
-    pub async fn loaded(foo: &Foo) -> Self {
-        Self { value: foo.value }
+    pub async fn loaded(Foo { value }: &Foo) -> Self {
+        Self { value: *value }
     }
 
-    pub fn parsed(foo: &Foo) -> Result<Self, u8> {
-        foo.value
+    pub const fn new(Foo { value }: &Foo) -> Self {
+        Self { value: *value }
+    }
+
+    pub fn parsed(Foo { value }: &Foo) -> Result<Self, u8> {
+        value
             .checked_add(1)
             .map(|value| Self { value })
-            .ok_or(foo.value)
+            .ok_or(*value)
     }
 }
 

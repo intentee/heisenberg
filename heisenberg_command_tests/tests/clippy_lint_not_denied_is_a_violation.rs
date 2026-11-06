@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn clippy_lint_not_denied_is_a_violation() {
@@ -17,7 +18,7 @@ fn clippy_lint_not_denied_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ClippyLintNotDenied: 2 violations\n\
+        Ok(["ClippyLintNotDenied: 2 violations\n\
             Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave it undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::expect_used\n\
@@ -25,10 +26,7 @@ fn clippy_lint_not_denied_is_a_violation() {
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

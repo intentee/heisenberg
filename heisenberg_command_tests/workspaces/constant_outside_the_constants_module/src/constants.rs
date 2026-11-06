@@ -1,10 +1,10 @@
+const PRIVATE: u8 = 4;
+
 pub const FIRST: u8 = 1;
 
 pub const SECOND: u8 = 2;
 
 pub(crate) const THIRD: u8 = 3;
-
-const PRIVATE: u8 = 4;
 
 pub const FOURTH: u8 = PRIVATE;
 

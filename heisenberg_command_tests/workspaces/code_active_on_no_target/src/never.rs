@@ -1,3 +1,12 @@
+macro_rules! never_item {
+    () => {
+        #[cfg(any())]
+        pub fn generated_never() {}
+    };
+}
+
+never_item!();
+
 pub struct Never;
 
 impl Never {
@@ -9,12 +18,3 @@ impl Never {
         return;
     }
 }
-
-macro_rules! never_item {
-    () => {
-        #[cfg(any())]
-        pub fn generated_never() {}
-    };
-}
-
-never_item!();

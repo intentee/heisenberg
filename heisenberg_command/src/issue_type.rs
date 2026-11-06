@@ -17,7 +17,6 @@ use crate::constants::CLIPPY_CONFIGURATION_MISSING;
 use crate::constants::CLIPPY_LINT_NOT_DENIED;
 use crate::constants::CLIPPY_TEST_ALLOWANCE_MISSING;
 use crate::constants::CODE_ACTIVE_ON_NO_TARGET;
-use crate::constants::COMPUTED_ENVIRONMENT_VARIABLE_NAME;
 use crate::constants::CONFIGURATION_SELECTION_MACRO;
 use crate::constants::DUPLICATED_FUNCTION_BODY;
 use crate::constants::FAILED_MACRO_EXPANSION;
@@ -25,8 +24,10 @@ use crate::constants::FUNCTION_USED_ONLY_BY_TESTS;
 use crate::constants::GLOB_IMPORT;
 use crate::constants::IMPL_WITHOUT_LOCAL_TYPE;
 use crate::constants::INVALID_MACRO_DEFINITION;
+use crate::constants::ITEM_OUT_OF_ORDER;
 use crate::constants::LINT_ALLOWED_IN_MANIFEST;
 use crate::constants::LINT_SUPPRESSION;
+use crate::constants::METHOD_OUT_OF_ORDER;
 use crate::constants::MISPLACED_BLANKET_IMPL;
 use crate::constants::MISPLACED_FOREIGN_TYPE_IMPL;
 use crate::constants::MISPLACED_IMPL;
@@ -46,15 +47,18 @@ use crate::constants::PUBLIC_CONSTANT_OUTSIDE_CONSTANTS_MODULE;
 use crate::constants::PUBLISHABLE_TEST_CRATE;
 use crate::constants::REEXPORT;
 use crate::constants::SHARED_MODULE_FILE;
+use crate::constants::SINGLE_LETTER_NAME;
 use crate::constants::TEST_CRATE_DECLARED_TWICE;
 use crate::constants::TEST_CRATE_NOT_A_MEMBER;
 use crate::constants::TEST_CRATE_USED_BY_PRODUCTION;
 use crate::constants::TEST_ONLY_CODE_IN_PRODUCTION;
 use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
-use crate::constants::UNDECLARED_ENVIRONMENT_VARIABLE;
+use crate::constants::TUPLE_IN_SIGNATURE;
+use crate::constants::UNDESTRUCTURED_PARAMETER;
 use crate::constants::UNIMPLEMENTED_BUILTIN_MACRO;
 use crate::constants::UNMAPPED_ITEM;
 use crate::constants::UNPARSABLE_MACRO_EXPANSION;
+use crate::constants::UNPREFIXED_TYPE_PARAMETER;
 use crate::constants::UNRESOLVED_EXTERN_CRATE;
 use crate::constants::UNRESOLVED_MACRO_CALL;
 use crate::constants::UNRESOLVED_METHOD_CALL;
@@ -70,7 +74,6 @@ pub enum IssueType {
     ClippyLintNotDenied,
     ClippyTestAllowanceMissing,
     CodeActiveOnNoTarget,
-    ComputedEnvironmentVariableName,
     ConfigurationSelectionMacro,
     DuplicatedFunctionBody,
     FailedMacroExpansion,
@@ -78,8 +81,10 @@ pub enum IssueType {
     GlobImport,
     ImplWithoutLocalType,
     InvalidMacroDefinition,
+    ItemOutOfOrder,
     LintAllowedInManifest,
     LintSuppression,
+    MethodOutOfOrder,
     MisplacedBlanketImpl,
     MisplacedForeignTypeImpl,
     MisplacedImpl,
@@ -99,15 +104,18 @@ pub enum IssueType {
     PublishableTestCrate,
     Reexport,
     SharedModuleFile,
+    SingleLetterName,
     TestCrateDeclaredTwice,
     TestCrateNotAMember,
     TestCrateUsedByProduction,
     TestOnlyCodeInProduction,
     TestsOnlyPackageWithoutTestLibraries,
-    UndeclaredEnvironmentVariable,
+    TupleInSignature,
+    UndestructuredParameter,
     UnimplementedBuiltinMacro,
     UnmappedItem,
     UnparsableMacroExpansion,
+    UnprefixedTypeParameter,
     UnresolvedExternCrate,
     UnresolvedMacroCall,
     UnresolvedMethodCall,
@@ -148,7 +156,6 @@ impl IssueType {
             Self::ClippyLintNotDenied => CLIPPY_LINT_NOT_DENIED,
             Self::ClippyTestAllowanceMissing => CLIPPY_TEST_ALLOWANCE_MISSING,
             Self::CodeActiveOnNoTarget => CODE_ACTIVE_ON_NO_TARGET,
-            Self::ComputedEnvironmentVariableName => COMPUTED_ENVIRONMENT_VARIABLE_NAME,
             Self::ConfigurationSelectionMacro => CONFIGURATION_SELECTION_MACRO,
             Self::DuplicatedFunctionBody => DUPLICATED_FUNCTION_BODY,
             Self::FailedMacroExpansion => FAILED_MACRO_EXPANSION,
@@ -156,8 +163,10 @@ impl IssueType {
             Self::GlobImport => GLOB_IMPORT,
             Self::ImplWithoutLocalType => IMPL_WITHOUT_LOCAL_TYPE,
             Self::InvalidMacroDefinition => INVALID_MACRO_DEFINITION,
+            Self::ItemOutOfOrder => ITEM_OUT_OF_ORDER,
             Self::LintAllowedInManifest => LINT_ALLOWED_IN_MANIFEST,
             Self::LintSuppression => LINT_SUPPRESSION,
+            Self::MethodOutOfOrder => METHOD_OUT_OF_ORDER,
             Self::MisplacedBlanketImpl => MISPLACED_BLANKET_IMPL,
             Self::MisplacedForeignTypeImpl => MISPLACED_FOREIGN_TYPE_IMPL,
             Self::MisplacedImpl => MISPLACED_IMPL,
@@ -177,15 +186,18 @@ impl IssueType {
             Self::PublishableTestCrate => PUBLISHABLE_TEST_CRATE,
             Self::Reexport => REEXPORT,
             Self::SharedModuleFile => SHARED_MODULE_FILE,
+            Self::SingleLetterName => SINGLE_LETTER_NAME,
             Self::TestCrateDeclaredTwice => TEST_CRATE_DECLARED_TWICE,
             Self::TestCrateNotAMember => TEST_CRATE_NOT_A_MEMBER,
             Self::TestCrateUsedByProduction => TEST_CRATE_USED_BY_PRODUCTION,
             Self::TestOnlyCodeInProduction => TEST_ONLY_CODE_IN_PRODUCTION,
             Self::TestsOnlyPackageWithoutTestLibraries => TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES,
-            Self::UndeclaredEnvironmentVariable => UNDECLARED_ENVIRONMENT_VARIABLE,
+            Self::TupleInSignature => TUPLE_IN_SIGNATURE,
+            Self::UndestructuredParameter => UNDESTRUCTURED_PARAMETER,
             Self::UnimplementedBuiltinMacro => UNIMPLEMENTED_BUILTIN_MACRO,
             Self::UnmappedItem => UNMAPPED_ITEM,
             Self::UnparsableMacroExpansion => UNPARSABLE_MACRO_EXPANSION,
+            Self::UnprefixedTypeParameter => UNPREFIXED_TYPE_PARAMETER,
             Self::UnresolvedExternCrate => UNRESOLVED_EXTERN_CRATE,
             Self::UnresolvedMacroCall => UNRESOLVED_MACRO_CALL,
             Self::UnresolvedMethodCall => UNRESOLVED_METHOD_CALL,
@@ -218,14 +230,15 @@ impl From<&ViolationKind> for IssueType {
     fn from(kind: &ViolationKind) -> Self {
         match kind {
             ViolationKind::AdditionalPublicItem => Self::AdditionalPublicItem,
-            ViolationKind::ComputedEnvironmentVariableName => Self::ComputedEnvironmentVariableName,
             ViolationKind::ConfigurationSelectionMacro => Self::ConfigurationSelectionMacro,
             ViolationKind::FailedMacroExpansion => Self::FailedMacroExpansion,
             ViolationKind::FunctionUsedOnlyByTests => Self::FunctionUsedOnlyByTests,
             ViolationKind::GlobImport => Self::GlobImport,
             ViolationKind::ImplWithoutLocalType => Self::ImplWithoutLocalType,
+            ViolationKind::ItemOutOfOrder { .. } => Self::ItemOutOfOrder,
             ViolationKind::InvalidMacroDefinition => Self::InvalidMacroDefinition,
             ViolationKind::LintSuppression => Self::LintSuppression,
+            ViolationKind::MethodOutOfOrder { .. } => Self::MethodOutOfOrder,
             ViolationKind::MisplacedBlanketImpl { .. } => Self::MisplacedBlanketImpl,
             ViolationKind::MisplacedForeignTypeImpl { .. } => Self::MisplacedForeignTypeImpl,
             ViolationKind::MisplacedImpl { .. } => Self::MisplacedImpl,
@@ -242,13 +255,14 @@ impl From<&ViolationKind> for IssueType {
                 Self::PublicConstantOutsideConstantsModule
             }
             ViolationKind::Reexport => Self::Reexport,
+            ViolationKind::SingleLetterName => Self::SingleLetterName,
             ViolationKind::TestOnlyCodeInProduction => Self::TestOnlyCodeInProduction,
-            ViolationKind::UndeclaredEnvironmentVariable { .. } => {
-                Self::UndeclaredEnvironmentVariable
-            }
+            ViolationKind::TupleInSignature => Self::TupleInSignature,
+            ViolationKind::UndestructuredParameter { .. } => Self::UndestructuredParameter,
             ViolationKind::UnimplementedBuiltinMacro => Self::UnimplementedBuiltinMacro,
             ViolationKind::UnmappedItem => Self::UnmappedItem,
             ViolationKind::UnparsableMacroExpansion => Self::UnparsableMacroExpansion,
+            ViolationKind::UnprefixedTypeParameter => Self::UnprefixedTypeParameter,
             ViolationKind::UnresolvedExternCrate => Self::UnresolvedExternCrate,
             ViolationKind::UnresolvedMacroCall => Self::UnresolvedMacroCall,
             ViolationKind::UnresolvedMethodCall => Self::UnresolvedMethodCall,
@@ -294,7 +308,6 @@ impl ValueEnum for IssueType {
             Self::ClippyLintNotDenied,
             Self::ClippyTestAllowanceMissing,
             Self::CodeActiveOnNoTarget,
-            Self::ComputedEnvironmentVariableName,
             Self::ConfigurationSelectionMacro,
             Self::DuplicatedFunctionBody,
             Self::FailedMacroExpansion,
@@ -302,8 +315,10 @@ impl ValueEnum for IssueType {
             Self::GlobImport,
             Self::ImplWithoutLocalType,
             Self::InvalidMacroDefinition,
+            Self::ItemOutOfOrder,
             Self::LintAllowedInManifest,
             Self::LintSuppression,
+            Self::MethodOutOfOrder,
             Self::MisplacedBlanketImpl,
             Self::MisplacedForeignTypeImpl,
             Self::MisplacedImpl,
@@ -323,15 +338,18 @@ impl ValueEnum for IssueType {
             Self::PublishableTestCrate,
             Self::Reexport,
             Self::SharedModuleFile,
+            Self::SingleLetterName,
             Self::TestCrateDeclaredTwice,
             Self::TestCrateNotAMember,
             Self::TestCrateUsedByProduction,
             Self::TestOnlyCodeInProduction,
             Self::TestsOnlyPackageWithoutTestLibraries,
-            Self::UndeclaredEnvironmentVariable,
+            Self::TupleInSignature,
+            Self::UndestructuredParameter,
             Self::UnimplementedBuiltinMacro,
             Self::UnmappedItem,
             Self::UnparsableMacroExpansion,
+            Self::UnprefixedTypeParameter,
             Self::UnresolvedExternCrate,
             Self::UnresolvedMacroCall,
             Self::UnresolvedMethodCall,

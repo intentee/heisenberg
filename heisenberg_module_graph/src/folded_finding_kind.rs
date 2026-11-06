@@ -5,5 +5,6 @@ pub enum FoldedFindingKind {
     InactiveCode,
     MacroExpansion { depth: usize, name: String },
     SyntaxError { message: String },
+    UnreadableLiteral { text: String },
     UnresolvedForeignReferences { count: usize, module: String },
 }

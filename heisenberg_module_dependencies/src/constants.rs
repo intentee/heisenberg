@@ -1,7 +1,5 @@
-pub const CARGO_BINARY_PATH_VARIABLE_PREFIX: &str = "CARGO_BIN_EXE_";
+pub const LIFETIME_PREFIX: char = '\'';
 
-pub const CARGO_BUILD_VARIABLES: [&str; 3] = [
-    "CARGO_BIN_NAME",
-    "CARGO_PRIMARY_PACKAGE",
-    "CARGO_TARGET_TMPDIR",
-];
+pub const TYPE_PARAMETER_PREFIX: char = 'T';
+
+pub const WORD_SEPARATOR: char = '_';

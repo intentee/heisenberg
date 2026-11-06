@@ -1,11 +1,5 @@
 use non_test_item_in_test_target::Library;
 
-mod helpers {
-    pub fn helpers() -> super::Library {
-        super::Library
-    }
-}
-
 fn root_helper() -> Library {
     Library
 }
@@ -22,3 +16,9 @@ fn attribute_macro_test() {}
 #[test]
 #[ignore = "the scenario needs no run"]
 fn ignored_test() {}
+
+mod helpers {
+    pub fn helpers() -> super::Library {
+        super::Library
+    }
+}

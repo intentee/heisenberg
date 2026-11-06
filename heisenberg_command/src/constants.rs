@@ -51,13 +51,6 @@ pub const CODE_ACTIVE_ON_NO_TARGET: IssueText = IssueText {
     summary: "Code that no declared target builds",
 };
 
-pub const COMPUTED_ENVIRONMENT_VARIABLE_NAME: IssueText = IssueText {
-    definition: "An env! or option_env! call whose argument, read after eager expansion as rustc reads it, does not start with a string literal.",
-    name: "ComputedEnvironmentVariableName",
-    purpose: "Heisenberg accounts for the environment variable a macro call reads only when its argument expands to a string literal. Name the variable with a string literal, or with a macro that expands to one.",
-    summary: "An env! or option_env! argument that is no string literal",
-};
-
 pub const CONFIGURATION_SELECTION_MACRO: IssueText = IssueText {
     definition: "A cfg_select! call, whose unselected arms escape the analysis.",
     name: "ConfigurationSelectionMacro",
@@ -107,6 +100,13 @@ pub const INVALID_MACRO_DEFINITION: IssueText = IssueText {
     summary: "A macro definition that is not valid",
 };
 
+pub const ITEM_OUT_OF_ORDER: IssueText = IssueText {
+    definition: "An item of a module file or inline module, among the items written in module files, that follows an item of a later group. The groups, in order: module declarations; imports from vendor crates, which are std, core, alloc and every crate outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics, macro_rules! macros and macro calls; private structs, enums, unions, type aliases and traits with their impl blocks; public items with their impl blocks; inline modules. An import takes the group of the crate that the first segment of each of its paths resolves to, an impl block the group of the item of its file it belongs to, and an item is public when its visibility reaches beyond its own module. The item is reported at its name, with the first earlier item of a later group.",
+    name: "ItemOutOfOrder",
+    purpose: "Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names.",
+    summary: "An item that follows an item of a later group",
+};
+
 pub const LINT_ALLOWED_IN_MANIFEST: IssueText = IssueText {
     definition: "A workspace member whose lints, after workspace inheritance, allow any lint of any tool. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].",
     name: "LintAllowedInManifest",
@@ -119,6 +119,13 @@ pub const LINT_SUPPRESSION: IssueText = IssueText {
     name: "LintSuppression",
     purpose: "Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports.",
     summary: "An attribute that allows or expects a lint, or lowers a required one",
+};
+
+pub const METHOD_OUT_OF_ORDER: IssueText = IssueText {
+    definition: "A function of an impl block, among the items written in module files, that follows a function of a later group, or of its own group with a later name. The groups, in order: constructors, which return Self, Option<Self> or Result<Self, _>, an async function by the output of its future, with or without a self receiver; then, by visibility, pub, pub(crate), pub(super) or pub(in path), and private functions. The functions of a trait impl other than its constructors form one group. Names compare as Rust strings. The function is reported at its name, with the first earlier function it belongs before.",
+    name: "MethodOutOfOrder",
+    purpose: "Constructors come first and wider visibility before narrower, so the interface of a type reads from the top and each function is found by its name. Move the function before the function the message names.",
+    summary: "An impl function that follows one it belongs before",
 };
 
 pub const MISPLACED_BLANKET_IMPL: IssueText = IssueText {
@@ -164,9 +171,9 @@ pub const MODULE_FILE_INSIDE_BLOCK: IssueText = IssueText {
 };
 
 pub const MODULE_NOT_NAMED_AFTER_ITS_ITEM: IssueText = IssueText {
-    definition: "A module other than a crate root whose file, or whose name for an inline module or the directory of a mod.rs, is not the snake case of its public item, as rustc converts names, so that pub struct FooBarBaz lives in foo_bar_baz.rs.",
+    definition: "A module other than a crate root whose file, or whose name for an inline module or the directory of a mod.rs, does not spell the words of its public item in order and in lowercase, each joined to the next by an underscore or by nothing. The words of a name are split at its underscores, before an uppercase letter that follows a lowercase letter or a digit, and before the last letter of an uppercase run that a lowercase letter follows, with digits kept in the word before them, so that pub struct OpenAIApiPath lives in open_ai_api_path.rs, openai_api_path.rs or openaiapipath.rs, while Ministral3ClusterParams does not live in ministral_3_cluster_params.rs.",
     name: "ModuleNotNamedAfterItsItem",
-    purpose: "A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item, or rename the item when its snake case reads badly: acronyms and one-letter words merge, as in OpenAIApiPath, whose snake case is open_aiapi_path.",
+    purpose: "A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the words of its public item, keeping each word whole and joining it to the next by an underscore or by nothing, or rename the item.",
     summary: "A module that is not named after its public item",
 };
 
@@ -254,6 +261,13 @@ pub const SHARED_MODULE_FILE: IssueText = IssueText {
     summary: "A module file included as several modules",
 };
 
+pub const SINGLE_LETTER_NAME: IssueText = IssueText {
+    definition: "A lifetime, type or const parameter, those of a for<...> binder included, or a name in the pattern of a function, closure or function pointer parameter, whose name is a single character.",
+    name: "SingleLetterName",
+    purpose: "A single character says nothing about what a name stands for. Name it after its meaning, such as 'database for a lifetime or TNode for a type parameter.",
+    summary: "A parameter name of a single character",
+};
+
 pub const TEST_CRATE_DECLARED_TWICE: IssueText = IssueText {
     definition: "A package that test_crates lists more than once.",
     name: "TestCrateDeclaredTwice",
@@ -289,11 +303,18 @@ pub const TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES: IssueText = IssueText {
     summary: "A package of tests that holds no test library of its own",
 };
 
-pub const UNDECLARED_ENVIRONMENT_VARIABLE: IssueText = IssueText {
-    definition: "An env! or option_env! call whose variable is neither one cargo or the package's build script sets for the build nor one the [env] table of the cargo configuration declares, which the shell would set out of sight. The variable is read after eager expansion of the argument, as rustc reads it, and calls inside the arguments of other eager macros, such as concat! and include!, are checked too.",
-    name: "UndeclaredEnvironmentVariable",
-    purpose: "A compile-time environment variable that only the shell sets is an input Heisenberg cannot see, so the analysis would use a wrong value. Read only variables that cargo or a build script sets, declare the variable in the [env] table of the cargo configuration, or read it at run time.",
-    summary: "An env! or option_env! read of a variable only the shell sets",
+pub const TUPLE_IN_SIGNATURE: IssueText = IssueText {
+    definition: "A tuple type of two or more elements written in an item signature or type definition: the type of a function parameter, a return type, a field, a type alias, the type of a constant or static, an associated type, an impl header or a trait definition, nested types included. The functions and constants of a trait impl, whose types the trait dictates, and types written inside function bodies are not checked.",
+    name: "TupleInSignature",
+    purpose: "A tuple names none of its values, so its readers must remember what each position holds. Declare a struct with named fields instead.",
+    summary: "A tuple type in an item signature",
+};
+
+pub const UNDESTRUCTURED_PARAMETER: IssueText = IssueText {
+    definition: "A function or closure parameter bound by an identifier, other than self, whose every use, at least one, accesses a field of the struct or tuple the parameter holds, directly or behind references, with the field name written in a module file. Fields reached through Box or another Deref implementation, and fields of unions, do not count.",
+    name: "UndestructuredParameter",
+    purpose: "A parameter used only through its fields reads better as a pattern that names those fields. Destructure the parameter in its pattern.",
+    summary: "A parameter used only through its fields",
 };
 
 pub const UNIMPLEMENTED_BUILTIN_MACRO: IssueText = IssueText {
@@ -311,10 +332,17 @@ pub const UNMAPPED_ITEM: IssueText = IssueText {
 };
 
 pub const UNPARSABLE_MACRO_EXPANSION: IssueText = IssueText {
-    definition: "A macro expansion that cannot be parsed. It is reported at the macro call written in the source, even when a macro of another crate wrote the call that produced it, listed with the macros whose expansions lead to it and the syntax errors rust-analyzer finds, and it is not analysed further.",
+    definition: "A macro expansion that cannot be parsed. It is reported at the macro call written in the source, even when a macro of another crate wrote the call that produced it, listed with the macros whose expansions lead to it, the syntax errors rust-analyzer finds and the literal tokens it cannot read back, such as a negative number that a procedural macro emits as one literal token, whose sign belongs in a separate - token, and it is not analysed further.",
     name: "UnparsableMacroExpansion",
     purpose: "A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust.",
     summary: "A macro expansion that does not parse",
+};
+
+pub const UNPREFIXED_TYPE_PARAMETER: IssueText = IssueText {
+    definition: "A type parameter whose name of more than one character is not T followed by an uppercase letter, such as TNode. A single-character name is a SingleLetterName issue instead.",
+    name: "UnprefixedTypeParameter",
+    purpose: "The T prefix tells type parameters apart from concrete types. Rename the parameter to T followed by a capitalized word, such as TNode.",
+    summary: "A type parameter not named T followed by a capitalized word",
 };
 
 pub const UNRESOLVED_EXTERN_CRATE: IssueText = IssueText {

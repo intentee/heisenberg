@@ -1,8 +1,5 @@
 //! The crate is documented by a doc comment.
 
-/// The item is documented by a doc comment.
-pub struct Documented;
-
 /** The block doc comment documents a constant. */
 const LIMIT: u8 = 1;
 
@@ -26,3 +23,6 @@ macro_rules! commented {
         // A comment in a macro body.
     };
 }
+
+/// The item is documented by a doc comment.
+pub struct Documented;

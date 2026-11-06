@@ -1,3 +1,3 @@
-pub struct Thing;
-
 dep::export!(Thing);
+
+pub struct Thing;

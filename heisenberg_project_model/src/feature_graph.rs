@@ -8,13 +8,16 @@ use guppy::graph::DependencyDirection;
 use guppy::graph::PackageGraph;
 use guppy::graph::cargo::CargoOptions;
 use guppy::graph::cargo::CargoSet;
+use guppy::graph::feature::FeatureFilter;
 use guppy::graph::feature::StandardFeatures;
+use guppy::graph::feature::named_feature_filter;
 use guppy::platform::Platform;
 use guppy::platform::PlatformSpec;
 use serde_json::error;
 use serde_json::from_value;
 
 use crate::build_selection::BuildSelection;
+use crate::feature_selection::FeatureSelection;
 use crate::package_edge::PackageEdge;
 use crate::resolved_build::ResolvedBuild;
 use crate::resolved_packages::ResolvedPackages;
@@ -30,9 +33,9 @@ impl FeatureGraph {
             .map(|graph| Self { graph, resolved })
     }
 
-    pub fn build(
-        &self,
-        features: StandardFeatures,
+    pub fn build<'graph>(
+        &'graph self,
+        features: impl FeatureFilter<'graph>,
         platform: &Arc<Platform>,
     ) -> Result<ResolvedBuild, Error> {
         let initials = self.graph.resolve_workspace().to_feature_set(features);
@@ -77,6 +80,30 @@ impl FeatureGraph {
                 features,
             }
         })
+    }
+
+    pub fn build_selected(
+        &self,
+        selection: &FeatureSelection,
+        platform: &Arc<Platform>,
+    ) -> Result<ResolvedBuild, Error> {
+        match selection {
+            FeatureSelection::All => self.build(StandardFeatures::All, platform),
+            FeatureSelection::Listed {
+                default_features,
+                features,
+            } => self.build(
+                named_feature_filter(
+                    if *default_features {
+                        StandardFeatures::Default
+                    } else {
+                        StandardFeatures::None
+                    },
+                    features.iter().map(String::as_str),
+                ),
+                platform,
+            ),
+        }
     }
 
     pub fn metadata(&self, build: ResolvedBuild) -> Result<Metadata, error::Error> {

@@ -50,6 +50,43 @@ pub enum ProjectModelError {
         manifest_path: AbsPathBuf,
         target: String,
     },
+    #[error(
+        "`{target}` is selected with --target, but `{manifest_path}` does not declare it; the declared targets are {}",
+        declared.join(", ")
+    )]
+    SelectedTargetNotDeclared {
+        declared: Vec<String>,
+        manifest_path: AbsPathBuf,
+        target: String,
+    },
+    #[error(
+        "`{host}` is the host target, but `{manifest_path}` does not declare it; the declared targets are {}, which --target can select",
+        declared.join(", ")
+    )]
+    HostTargetNotDeclared {
+        declared: Vec<String>,
+        host: &'static str,
+        manifest_path: AbsPathBuf,
+    },
+    #[error("`{target}` is selected twice with --target")]
+    TargetSelectedTwice { target: String },
+    #[error(
+        "feature `{feature}` is selected with --features, but no member of `{manifest_path}` defines it"
+    )]
+    UnknownSelectedFeature {
+        feature: String,
+        manifest_path: AbsPathBuf,
+    },
+    #[error(
+        "`{feature}` is not the name of a feature; --features takes only the names of features that workspace members define"
+    )]
+    SelectedFeatureNotAName { feature: String },
+    #[error(
+        "`{manifest_path}` uses resolver 1 with a root package and other members, so cargo applies --features and --no-default-features to the root package only"
+    )]
+    SelectedFeaturesReachOnlyTheRootPackage { manifest_path: AbsPathBuf },
+    #[error("cargo rejects the features selected with --features")]
+    SelectedFeaturesRejected(#[source] Box<dyn Error + Send + Sync>),
     #[error("the cargo configuration of `{manifest_path}` cannot be loaded")]
     CargoConfiguration {
         manifest_path: PathBuf,
@@ -112,6 +149,8 @@ pub enum ProjectModelError {
         variable = CLIPPY_ARGUMENTS_VARIABLE
     )]
     ConfiguredClippyArguments { definition: Definition },
+    #[error("`{key}` is set in {definition}, and Heisenberg builds with the rustc of the sysroot")]
+    ConfiguredCompiler { definition: Definition, key: String },
     #[error("`{key}` is set in {definition}, and Heisenberg cannot account for rustflags")]
     ConfiguredRustflags { definition: Definition, key: String },
     #[error(
@@ -128,6 +167,10 @@ pub enum ProjectModelError {
         "`{variable}` is set in the environment, and Heisenberg cannot account for nightly features"
     )]
     EnvironmentNightlyFeatures { variable: &'static str },
+    #[error(
+        "`{variable}` is set in the environment, and Heisenberg builds with the rustc of the sysroot"
+    )]
+    EnvironmentCompiler { variable: &'static str },
     #[error("`{variable}` is set in the environment, and Heisenberg cannot account for rustflags")]
     EnvironmentRustflags { variable: &'static str },
     #[error("the embedded crate cfg table of the target is not `rustc --print cfg` output")]
@@ -213,6 +256,8 @@ pub enum ProjectModelError {
     UnreadableBuildScriptOutput(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the procedural macros of `{}` cannot be loaded", .0.context)]
     ProcMacroLoad(#[source] ContextualError<AbsPathBuf, ProcMacroLoadingError>),
+    #[error("the sysroot has no rustc at `{compiler}`")]
+    SysrootWithoutCompiler { compiler: AbsPathBuf },
     #[error("the sysroot has no procedural macro server")]
     ProcMacroServerMissing(#[source] Box<dyn Error + Send + Sync>),
     #[error("the procedural macro server `{}` cannot be started", .0.context)]

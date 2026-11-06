@@ -1,13 +1,13 @@
 use crate::sized::Sized;
 
-pub struct IntoIter<A: Sized> {
-    pub storage: A,
+pub struct IntoIter<TStorage: Sized> {
+    pub storage: TStorage,
 }
 
-impl<A: Sized> Iterator for IntoIter<A> {
-    type Item = A::Item;
+impl<TStorage: Sized> Iterator for IntoIter<TStorage> {
+    type Item = TStorage::Item;
 
-    fn next(&mut self) -> Option<A::Item> {
+    fn next(&mut self) -> Option<TStorage::Item> {
         None
     }
 }

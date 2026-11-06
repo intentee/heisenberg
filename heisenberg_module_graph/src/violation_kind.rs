@@ -3,18 +3,25 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use crate::constants::CONSTANTS_MODULE_NAME;
+use crate::item_placement::ItemPlacement;
+use crate::method_placement::MethodPlacement;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ViolationKind {
     AdditionalPublicItem,
-    ComputedEnvironmentVariableName,
     ConfigurationSelectionMacro,
     FailedMacroExpansion,
     FunctionUsedOnlyByTests,
     GlobImport,
     InvalidMacroDefinition,
     ImplWithoutLocalType,
+    ItemOutOfOrder {
+        placement: ItemPlacement,
+    },
     LintSuppression,
+    MethodOutOfOrder {
+        placement: MethodPlacement,
+    },
     ModuleFileInsideBlock,
     ModuleNotNamedAfterItsItem {
         expected: String,
@@ -44,18 +51,21 @@ pub enum ViolationKind {
     PublicAssociatedConstant,
     PublicConstantOutsideConstantsModule,
     Reexport,
+    SingleLetterName,
     TestOnlyCodeInProduction,
+    TupleInSignature,
+    UndestructuredParameter {
+        type_name: String,
+    },
     UnimplementedBuiltinMacro,
     UnmappedItem,
     UnparsableMacroExpansion,
+    UnprefixedTypeParameter,
     UnresolvedExternCrate,
     UnresolvedMacroCall,
     UnresolvedMethodCall,
     UnresolvedModule,
     UnresolvedPath,
-    UndeclaredEnvironmentVariable {
-        variable: String,
-    },
 }
 
 impl Display for ViolationKind {
@@ -64,9 +74,6 @@ impl Display for ViolationKind {
             Self::AdditionalPublicItem => {
                 formatter.write_str("Module already has a public item")
             }
-            Self::ComputedEnvironmentVariableName => formatter.write_str(
-                "Macro call argument does not expand to a string literal",
-            ),
             Self::ConfigurationSelectionMacro => formatter.write_str(
                 "Configuration selection macro keeps the arms it does not select out of the analysis",
             ),
@@ -76,7 +83,9 @@ impl Display for ViolationKind {
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
                 .write_str("Impl block belongs to no single type or trait of this crate"),
+            Self::ItemOutOfOrder { placement } => placement.fmt(formatter),
             Self::LintSuppression => formatter.write_str("Attribute suppresses lints"),
+            Self::MethodOutOfOrder { placement } => placement.fmt(formatter),
             Self::ModuleFileInsideBlock => {
                 formatter.write_str("Module file declared inside a block is not analysed")
             }
@@ -126,8 +135,14 @@ impl Display for ViolationKind {
                 "Public constant belongs in crate::{CONSTANTS_MODULE_NAME}"
             ),
             Self::Reexport => formatter.write_str("Re-export"),
+            Self::SingleLetterName => formatter.write_str("Name is a single character"),
             Self::TestOnlyCodeInProduction => formatter
                 .write_str("Code exists only under cfg(test) outside a test module"),
+            Self::TupleInSignature => formatter.write_str("Tuple type in a signature"),
+            Self::UndestructuredParameter { type_name } => write!(
+                formatter,
+                "Parameter is used only through the fields of {type_name}"
+            ),
             Self::UnimplementedBuiltinMacro => {
                 formatter.write_str("Built-in macro is not implemented")
             }
@@ -135,15 +150,14 @@ impl Display for ViolationKind {
             Self::UnparsableMacroExpansion => {
                 formatter.write_str("Macro expansion cannot be parsed")
             }
+            Self::UnprefixedTypeParameter => {
+                formatter.write_str("Type parameter name is not T followed by a capitalized word")
+            }
             Self::UnresolvedExternCrate => formatter.write_str("Extern crate is unresolved"),
             Self::UnresolvedMacroCall => formatter.write_str("Macro call is unresolved"),
             Self::UnresolvedMethodCall => formatter.write_str("Method call is unresolved"),
             Self::UnresolvedModule => formatter.write_str("Module file is unresolved"),
             Self::UnresolvedPath => formatter.write_str("Path is unresolved"),
-            Self::UndeclaredEnvironmentVariable { variable } => write!(
-                formatter,
-                "Macro call reads {variable}, which neither cargo, a build script nor the [env] configuration sets"
-            ),
         }
     }
 }

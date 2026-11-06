@@ -1,7 +1,7 @@
 pub mod summary;
 
-fn line_count(report: &Report) -> u8 {
-    report.lines
+fn line_count(Report { lines }: &Report) -> u8 {
+    *lines
 }
 
 pub struct Report {

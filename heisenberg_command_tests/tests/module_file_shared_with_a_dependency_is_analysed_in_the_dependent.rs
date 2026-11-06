@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn module_file_shared_with_a_dependency_is_analysed_in_the_dependent() {
@@ -17,7 +18,7 @@ fn module_file_shared_with_a_dependency_is_analysed_in_the_dependent() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ModuleCycle: 2 violations\n\
+        Ok(["ModuleCycle: 2 violations\n\
             Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
             - src/lib.rs:7:9: Parts of crate depend on each other\n            \
@@ -27,10 +28,10 @@ fn module_file_shared_with_a_dependency_is_analysed_in_the_dependent() {
             crate::support -> crate (own code):\n        \
             crate::support uses crate at src/support.rs:1:21\n        \
             crate::support uses crate at src/support.rs:2:5\n\
-            - src/main.rs:6:5: Parts of crate depend on each other\n        \
+            - src/main.rs:4:5: Parts of crate depend on each other\n        \
             support::support();\n      \
             crate (own code) -> crate::support:\n        \
-            crate uses crate::support at src/main.rs:6:5\n      \
+            crate uses crate::support at src/main.rs:4:5\n      \
             crate::support -> crate (own code):\n        \
             crate::support uses crate at src/support.rs:1:21\n        \
             crate::support uses crate at src/support.rs:2:5\n\
@@ -44,10 +45,7 @@ fn module_file_shared_with_a_dependency_is_analysed_in_the_dependent() {
             \n\
             ------------------------------\n\
             3 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 2 crate targets, 4 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

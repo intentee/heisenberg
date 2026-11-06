@@ -1,23 +1,27 @@
+use std::path::Path;
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
-use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
+use heisenberg_command_tests::full_run_footer::full_run_footer;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_only_fixture::HostOnlyFixture;
 
 #[test]
 fn tests_package_using_only_packages_on_a_cycle_names_each_cycle() {
     let outcome = HeisenbergCheck {
-        workspace: &FixtureWorkspace {
+        workspace: &HostOnlyFixture {
+            directory: Path::new(env!("CARGO_TARGET_TMPDIR")),
             name: "tests_package_closing_a_cycle",
         }
-        .path(),
+        .path()
+        .expect("the host-only fixture must be prepared"),
     }
     .run()
     .expect("the arguments must parse");
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("PackageDependencyCycle: 1 violation\n\
+        Ok(["PackageDependencyCycle: 1 violation\n\
             Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library.\n\
             \n\
             - harness/Cargo.toml: Packages harness v0.1.0, library v0.1.0 depend on each other through dev-dependencies\n\
@@ -31,10 +35,7 @@ fn tests_package_using_only_packages_on_a_cycle_names_each_cycle() {
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 4 crate targets, 4 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 4 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", full_run_footer(4, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

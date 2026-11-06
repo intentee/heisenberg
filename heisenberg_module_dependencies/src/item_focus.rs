@@ -60,4 +60,8 @@ impl ItemFocus<'_, '_> {
             })
             .unwrap_or(whole)
     }
+
+    pub fn text(&self) -> String {
+        self.node.covering_element(self.range()).to_string()
+    }
 }

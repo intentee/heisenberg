@@ -94,6 +94,7 @@ fn proc_macro_artifact(message: &Message) -> Option<&Artifact> {
 
 pub struct WorkspaceBuild<'build> {
     pub context: &'build ConfiguredContext<'build>,
+    pub features: &'build CliFeatures,
     pub manifest_path: &'build Path,
     pub substituted_packages: &'build BTreeSet<String>,
     pub target: &'build str,
@@ -313,7 +314,7 @@ impl WorkspaceBuild<'_> {
 
             let options = CompileOptions {
                 build_config,
-                cli_features: CliFeatures::new_all(true),
+                cli_features: self.features.clone(),
                 spec: Packages::All(Vec::new()),
                 filter: CompileFilter::new_all_targets(),
                 target_rustdoc_args: None,

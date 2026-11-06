@@ -64,3 +64,44 @@ impl Display for Narrowing<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use heisenberg_module_graph::crate_target::CrateTarget;
+    use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
+    use heisenberg_module_graph::test_harness::TestHarness;
+    use heisenberg_project_model::supported_target::SupportedTarget;
+
+    use super::Narrowing;
+    use crate::analysis_context::AnalysisContext;
+
+    #[test]
+    fn crate_target_reported_on_some_of_its_platforms_names_them() {
+        let library = CrateTarget {
+            kind: CrateTargetKind::Library,
+            name: "shared".to_owned(),
+            package_name: "shared".to_owned(),
+            target_description: "lib".to_owned(),
+            test_harness: TestHarness::Libtest,
+        };
+        let windows = AnalysisContext {
+            crate_target: library.clone(),
+            target: SupportedTarget::X86_64PcWindowsMsvc,
+        };
+        let linux = AnalysisContext {
+            crate_target: library,
+            target: SupportedTarget::X86_64UnknownLinuxGnu,
+        };
+
+        assert_eq!(
+            Narrowing {
+                base: &BTreeSet::from([windows.clone(), linux]),
+                reported: &BTreeSet::from([windows]),
+            }
+            .to_string(),
+            " (only in shared lib on x86_64-pc-windows-msvc)"
+        );
+    }
+}

@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn blanket_impl_outside_the_file_of_its_trait_is_a_violation() {
@@ -17,7 +18,7 @@ fn blanket_impl_outside_the_file_of_its_trait_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("MisplacedBlanketImpl: 1 violation\n\
+        Ok(["MisplacedBlanketImpl: 1 violation\n\
             A blanket impl reaches every type its bounds admit, so it belongs beside its trait. Move the impl into the file that defines the trait.\n\
             \n\
             - src/counted.rs:3:40: Blanket impl belongs in src/counting.rs\n    \
@@ -25,10 +26,7 @@ fn blanket_impl_outside_the_file_of_its_trait_is_a_violation() {
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

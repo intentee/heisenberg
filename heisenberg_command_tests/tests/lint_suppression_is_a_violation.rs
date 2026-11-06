@@ -3,6 +3,22 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const UNIX_SUPPRESSIONS: &str = "- src/suppressed.rs:1:18: Attribute suppresses lints\n    \
+    #[cfg_attr(unix, allow(unused_variables))]\n\
+    - src/suppressed.rs:9:3: Attribute suppresses lints\n    \
+    #[allow(dead_code)]\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const SUPPRESSIONS: usize = 8;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const UNIX_SUPPRESSIONS: &str = "";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const SUPPRESSIONS: usize = 6;
 
 #[test]
 fn lint_suppression_is_a_violation() {
@@ -17,32 +33,31 @@ fn lint_suppression_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("LintSuppression: 8 violations\n\
-            Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports.\n\
-            \n\
-            - src/lib.rs:1:4: Attribute suppresses lints\n    \
-            #![allow(unused)]\n\
-            - src/suppressed.rs:1:3: Attribute suppresses lints\n    \
-            #[allow(dead_code)]\n\
-            - src/suppressed.rs:4:3: Attribute suppresses lints\n    \
-            #[expect(clippy::expect_used, reason = \"the fixture expects\")]\n\
-            - src/suppressed.rs:7:18: Attribute suppresses lints (only in lint_suppressions lib on x86_64-unknown-linux-gnu)\n    \
-            #[cfg_attr(unix, allow(unused_variables))]\n\
-            - src/suppressed.rs:15:3: Attribute suppresses lints (only in lint_suppressions lib on x86_64-unknown-linux-gnu)\n    \
-            #[allow(dead_code)]\n\
-            - src/suppressed.rs:18:3: Attribute suppresses lints\n    \
-            #[warn(clippy::unwrap_used)]\n\
-            - src/suppressed.rs:21:3: Attribute suppresses lints\n    \
-            #[warn(clippy::restriction)]\n\
-            - src/suppressed.rs:27:7: Attribute suppresses lints\n        \
-            #[allow(unused)]\n\
-            \n\
-            ------------------------------\n\
-            8 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 2 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+        Ok(format!(
+            "LintSuppression: {SUPPRESSIONS} violations\n\
+             Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports.\n\
+             \n\
+             - src/lib.rs:1:4: Attribute suppresses lints\n    \
+             #![allow(unused)]\n\
+             {UNIX_SUPPRESSIONS}\
+             - src/suppressed.rs:12:3: Attribute suppresses lints\n    \
+             #[warn(clippy::unwrap_used)]\n\
+             - src/suppressed.rs:15:3: Attribute suppresses lints\n    \
+             #[warn(clippy::restriction)]\n\
+             - src/suppressed.rs:21:7: Attribute suppresses lints\n        \
+             #[allow(unused)]\n\
+             - src/suppressed.rs:25:3: Attribute suppresses lints\n    \
+             #[allow(dead_code)]\n\
+             - src/suppressed.rs:28:3: Attribute suppresses lints\n    \
+             #[expect(clippy::expect_used, reason = \"the fixture expects\")]\n\
+             \n\
+             ------------------------------\n\
+             {SUPPRESSIONS} errors found\n\
+             ------------------------------\n\
+             {}",
+            host_footer(1, 2)
+        )
+        .as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

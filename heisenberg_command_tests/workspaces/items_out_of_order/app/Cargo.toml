@@ -1,0 +1,12 @@
+[package]
+name = "app"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+shapes = { path = "../shapes" }
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"

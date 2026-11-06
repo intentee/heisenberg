@@ -1,6 +1,9 @@
 pub mod check_outcome;
 pub mod constants;
 pub mod fixture_workspace;
+pub mod full_run_footer;
 pub mod heisenberg_check;
 pub mod heisenberg_check_error;
+pub mod host_footer;
+pub mod host_only_fixture;
 pub mod non_utf8_os_string;

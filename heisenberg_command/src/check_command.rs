@@ -19,12 +19,14 @@ use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
 use heisenberg_project_model::constants::CARGO_MANIFEST_FILE;
+use heisenberg_project_model::feature_selection::FeatureSelection;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::project_model_error::ProjectModelError;
 use heisenberg_project_model::resolved_project::ResolvedProject;
 use heisenberg_project_model::supported_target::SupportedTarget;
+use heisenberg_project_model::target_selection::TargetSelection;
 
 use crate::check_report::CheckReport;
 use crate::constants::SUPPORTED_RUST_VERSION;
@@ -137,6 +139,11 @@ fn test_library_packages(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
 pub struct CheckCommand {
     #[arg(
         long,
+        help = "Analyse every feature of every workspace member, which is the default"
+    )]
+    pub all_features: bool,
+    #[arg(
+        long,
         env = "CARGO_HOME",
         hide_env_values = true,
         value_parser = AbsolutePath::parse,
@@ -145,10 +152,28 @@ pub struct CheckCommand {
     pub cargo_home: AbsolutePath,
     #[arg(
         long,
+        conflicts_with = "all_features",
+        help = "Analyse these features, separated by commas or spaces, on top of the default ones, each enabled on every workspace member that defines it"
+    )]
+    pub features: Vec<String>,
+    #[arg(
+        long,
+        conflicts_with = "all_features",
+        help = "Leave out the default features of every workspace member"
+    )]
+    pub no_default_features: bool,
+    #[arg(
+        long,
         value_parser = AbsolutePath::parse,
         help = format!("Absolute path of the Rust {SUPPORTED_RUST_VERSION} sysroot that contains the rust-src component")
     )]
     pub sysroot: AbsolutePath,
+    #[arg(
+        long = "target",
+        value_name = "TRIPLE",
+        help = "Analyse this declared target instead of the host's; repeat it to select several"
+    )]
+    pub targets: Vec<String>,
     #[arg(
         long,
         value_parser = AbsolutePath::parse,
@@ -166,14 +191,20 @@ impl CheckCommand {
         &self,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<CheckReport, Vec<HeisenbergCommandError>> {
-        let project = ProjectModel {
-            cargo_home: self.cargo_home.path.clone(),
-            environment: environment.clone(),
-            sysroot: self.sysroot.path.clone(),
-            workspace_directory: self.workspace.path.clone(),
-        }
-        .resolve()
-        .map_err(project_model_failure)?;
+        let project = self
+            .feature_selection()
+            .and_then(|features| {
+                ProjectModel {
+                    cargo_home: self.cargo_home.path.clone(),
+                    environment: environment.clone(),
+                    features,
+                    sysroot: self.sysroot.path.clone(),
+                    targets: self.target_selection(),
+                    workspace_directory: self.workspace.path.clone(),
+                }
+                .resolve()
+            })
+            .map_err(project_model_failure)?;
         let test_crates = project
             .declared_test_crates
             .test_crates(&project.project.resolved);
@@ -228,7 +259,11 @@ impl CheckCommand {
                     )
                     .chain(
                         PackageRules {
-                            empty_libraries: &empty_libraries(&analyses),
+                            empty_libraries: &if project.scope.is_partial() {
+                                BTreeSet::new()
+                            } else {
+                                empty_libraries(&analyses)
+                            },
                             resolved: &project.project.resolved,
                             test_library_packages: &test_library_packages(&analyses),
                         }
@@ -239,7 +274,26 @@ impl CheckCommand {
                 CheckReport {
                     analyses,
                     package_violations,
+                    scope: project.scope.clone(),
                 }
             })
+    }
+
+    fn feature_selection(&self) -> Result<FeatureSelection, ProjectModelError> {
+        if self.features.is_empty() && !self.no_default_features {
+            Ok(FeatureSelection::All)
+        } else {
+            FeatureSelection::listed(!self.no_default_features, &self.features)
+        }
+    }
+
+    fn target_selection(&self) -> TargetSelection {
+        if self.targets.is_empty() {
+            TargetSelection::Host
+        } else {
+            TargetSelection::Selected {
+                triples: self.targets.clone(),
+            }
+        }
     }
 }

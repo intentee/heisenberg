@@ -1,9 +1,3 @@
-pub struct Settings;
-
-pub mod constants {
-    pub const DEFAULT: u8 = 6;
-}
-
 macro_rules! generated_constant {
     () => {
         pub const GENERATED: u8 = 7;
@@ -11,3 +5,9 @@ macro_rules! generated_constant {
 }
 
 generated_constant!();
+
+pub struct Settings;
+
+pub mod constants {
+    pub const DEFAULT: u8 = 6;
+}

@@ -43,7 +43,6 @@ use crate::test_target_findings::TestTargetFindings;
 use crate::token_origin::TokenOrigin;
 
 pub struct CrateExtraction<'extraction, 'database> {
-    pub cargo_variables: &'extraction BTreeSet<String>,
     pub crate_target: &'extraction CrateTarget,
     pub krate: Crate,
     pub locator: &'extraction SourceLocator<'extraction>,
@@ -84,7 +83,6 @@ impl CrateExtraction<'_, '_> {
         }
 
         let walk = ModuleWalk {
-            cargo_variables: self.cargo_variables,
             crate_target: self.crate_target,
             inactive_code: &inactive_code,
             krate: self.krate,

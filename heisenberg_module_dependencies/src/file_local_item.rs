@@ -1,4 +1,3 @@
-use ra_ap_hir::HasVisibility;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::Semantics;
 use ra_ap_ide_db::RootDatabase;
@@ -19,12 +18,11 @@ impl FileLocalItem<'_, '_> {
     }
 
     pub fn is_private(&self) -> bool {
-        let database = self.semantics.db;
-
-        self.definition.module(database).is_some_and(|module| {
-            !OutsideVisibility { database }
-                .reaches_outside(self.definition.visibility(database), module)
-        })
+        self.definition.module(self.semantics.db).is_some()
+            && !OutsideVisibility {
+                database: self.semantics.db,
+            }
+            .definition_reaches_outside(self.definition)
     }
 
     fn is_used_only_in_its_file(&self) -> bool {

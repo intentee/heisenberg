@@ -1,0 +1,14 @@
+[package]
+name = "import_out_of_order_on_windows"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]

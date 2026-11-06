@@ -1,5 +1,5 @@
-fn incremented_value(foo: &Foo) -> u8 {
-    foo.value + 1
+fn incremented_value(Foo { value }: &Foo) -> u8 {
+    value + 1
 }
 
 pub struct Foo {

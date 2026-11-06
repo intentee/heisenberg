@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn item_of_an_expanded_attribute_macro_is_analysed_through_its_expansion() {
@@ -17,7 +18,7 @@ fn item_of_an_expanded_attribute_macro_is_analysed_through_its_expansion() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("AdditionalPublicItem: 1 violation\n\
+        Ok(["AdditionalPublicItem: 1 violation\n\
             Each module exposes a single public item, so every file has one responsibility. Move each additional public item into its own module.\n\
             \n\
             - src/allocator.rs:6:8: Module already has a public item\n    \
@@ -31,10 +32,7 @@ fn item_of_an_expanded_attribute_macro_is_analysed_through_its_expansion() {
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

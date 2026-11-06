@@ -1,0 +1,19 @@
+[package]
+name = "resolver_one_workspace_with_members"
+edition = "2024"
+version = "0.1.0"
+
+[features]
+fast = []
+
+[workspace]
+members = ["member"]
+resolver = "1"
+
+[lints.clippy]
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]

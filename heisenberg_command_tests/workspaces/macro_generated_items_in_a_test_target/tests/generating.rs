@@ -6,9 +6,9 @@ macro_rules! generated_type {
 
 generated_type!();
 
+#[test]
+fn generates() {}
+
 impl Generated {
     fn generated() {}
 }
-
-#[test]
-fn generates() {}

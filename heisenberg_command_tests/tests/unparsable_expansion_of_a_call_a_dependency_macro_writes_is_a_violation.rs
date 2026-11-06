@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
@@ -17,7 +18,7 @@ fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("UnparsableMacroExpansion: 1 violation\n\
+        Ok(["UnparsableMacroExpansion: 1 violation\n\
             A macro expansion that does not parse cannot be analysed. Fix the macro so its output is valid Rust.\n\
             \n\
             - src/lib.rs:1:1: Macro expansion cannot be parsed\n    \
@@ -29,10 +30,7 @@ fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 2 crate targets, 2 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 2 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

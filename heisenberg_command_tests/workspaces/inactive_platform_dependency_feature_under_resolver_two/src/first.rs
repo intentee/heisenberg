@@ -1,3 +1,3 @@
-pub struct First;
-
 shared::link!();
+
+pub struct First;

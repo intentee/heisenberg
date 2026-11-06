@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn items_produced_by_a_build_script_are_analysed() {
@@ -17,20 +18,17 @@ fn items_produced_by_a_build_script_are_analysed() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ModuleNotNamedAfterItsItem: 2 violations\n\
-            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item, or rename the item when its snake case reads badly: acronyms and one-letter words merge, as in OpenAIApiPath, whose snake case is open_aiapi_path.\n\
+        Ok(["ModuleNotNamedAfterItsItem: 2 violations\n\
+            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the words of its public item, keeping each word whole and joining it to the next by an underscore or by nothing, or rename the item.\n\
             \n\
             - src/generated_module.rs:1:12: Module is named generated_module, but its public item Generated names it generated\n    \
             pub struct Generated;\n\
-            - src/lib.rs:6:16: Module is named configured, but its public item Item names it item\n        \
+            - src/lib.rs:23:16: Module is named configured, but its public item Item names it item\n        \
             pub struct Item;\n\
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 2 crate targets, 4 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 2 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

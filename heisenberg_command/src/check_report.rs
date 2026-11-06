@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use itertools::Itertools;
+
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
@@ -13,10 +15,13 @@ use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignRefe
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::package_violation::PackageViolation;
+use heisenberg_project_model::run_scope::RunScope;
 use heisenberg_project_model::supported_target::SupportedTarget;
 
 use crate::analysis_context::AnalysisContext;
+use crate::constants::CODE_ACTIVE_ON_NO_TARGET;
 use crate::constants::SUPPORTED_RUST_VERSION;
+use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
 use crate::cycle_shape::CycleShape;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::inactive_code::InactiveCode;
@@ -63,6 +68,7 @@ fn shared_module_file_issues(
 pub struct CheckReport {
     pub analyses: Vec<TargetAnalysis>,
     pub package_violations: Vec<PackageViolation>,
+    pub scope: RunScope,
 }
 
 impl CheckReport {
@@ -104,9 +110,13 @@ impl CheckReport {
                     )
                 }),
         );
-        lines.push(format!(
-            "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace for every declared target"
-        ));
+        if self.scope.is_partial() {
+            lines.extend(self.partial_run_lines());
+        } else {
+            lines.push(format!(
+                "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace for every declared target"
+            ));
+        }
 
         lines.join("\n") + "\n"
     }
@@ -303,7 +313,10 @@ impl CheckReport {
 
         let mut issues = Vec::new();
 
-        issues.extend(self.inactive_code_issues(&mut violations));
+        if !self.scope.is_partial() {
+            issues.extend(self.inactive_code_issues(&mut violations));
+        }
+
         issues.extend(self.unresolved_foreign_reference_issues(&mut violations));
 
         for (violation, occurrences) in violations {
@@ -332,6 +345,37 @@ impl CheckReport {
 
         issues
     }
+
+    fn partial_run_lines(&self) -> Vec<String> {
+        let RunScope {
+            features,
+            left_out_targets,
+        } = &self.scope;
+
+        (!left_out_targets.is_empty())
+            .then(|| {
+                format!(
+                    "Not analysed: {}",
+                    left_out_targets
+                        .iter()
+                        .map(|target| target.triple())
+                        .join(", ")
+                )
+            })
+            .into_iter()
+            .chain([
+                format!("Features: {features}"),
+                format!(
+                    "Not evaluated in a partial run: {}, the empty-library check of {}",
+                    CODE_ACTIVE_ON_NO_TARGET.name, TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name
+                ),
+                format!(
+                    "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace for every analysed target with the selected features"
+                ),
+            ])
+            .collect()
+    }
+
     fn unresolved_foreign_reference_issues<'report>(
         &'report self,
         violations: &mut BTreeMap<&'report Violation, ViolationOccurrences>,

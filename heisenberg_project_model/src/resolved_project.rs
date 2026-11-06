@@ -47,6 +47,7 @@ use crate::member_target::MemberTarget;
 use crate::out_dir_files::OutDirFiles;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
+use crate::run_scope::RunScope;
 use crate::supported_target::SupportedTarget;
 use crate::target_cfg::TargetCfg;
 use crate::workspace_manifest::workspace_manifest;
@@ -80,6 +81,7 @@ pub struct ResolvedProject {
     pub declared_test_crates: DeclaredTestCrates,
     pub library: FeatureGraph,
     pub project: FeatureGraph,
+    pub scope: RunScope,
     pub sysroot: AbsPathBuf,
     pub targets: BTreeSet<SupportedTarget>,
 }
@@ -113,7 +115,7 @@ impl ResolvedProject {
         platform: &Arc<Platform>,
     ) -> Result<CargoWorkspace, ProjectModelError> {
         self.project
-            .build(StandardFeatures::All, platform)
+            .build_selected(&self.scope.features, platform)
             .map_err(Box::new)
             .map_err(ProjectModelError::ProjectFeatureResolution)
             .and_then(|build| {

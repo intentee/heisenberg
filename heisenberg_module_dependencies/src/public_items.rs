@@ -1,6 +1,4 @@
 use ra_ap_cfg::CfgOptions;
-use ra_ap_hir::HasVisibility;
-use ra_ap_hir::ModuleDef;
 use ra_ap_hir::Semantics;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstNode;
@@ -8,8 +6,7 @@ use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
 use crate::defined_items::DefinedItems;
-use crate::item_definition::ItemDefinition;
-use crate::outside_visibility::OutsideVisibility;
+use crate::item_visibility::ItemVisibility;
 
 pub struct PublicItems<'items, 'database> {
     pub container: &'items SyntaxNode,
@@ -43,30 +40,11 @@ impl PublicItems<'_, '_> {
     fn is_public_non_constant(&self, item: &ast::Item) -> bool {
         match item {
             ast::Item::Const(_) | ast::Item::Module(_) => false,
-            _ => match ItemDefinition::new(item, self.semantics) {
-                ItemDefinition::ModuleDef(definition) => {
-                    if matches!(item, ast::Item::MacroRules(_)) {
-                        definition.visibility(self.semantics.db).is_public()
-                    } else {
-                        self.reaches_outside(definition)
-                    }
-                }
-                ItemDefinition::Const(_)
-                | ItemDefinition::ExternBlock
-                | ItemDefinition::ExternCrate(_)
-                | ItemDefinition::Impl(_)
-                | ItemDefinition::Module(_)
-                | ItemDefinition::NotDefining
-                | ItemDefinition::Unmapped => false,
-            },
+            _ => ItemVisibility {
+                item,
+                semantics: self.semantics,
+            }
+            .is_public(),
         }
-    }
-
-    fn reaches_outside(&self, definition: ModuleDef) -> bool {
-        let database = self.semantics.db;
-
-        definition.module(database).is_some_and(|module| {
-            OutsideVisibility { database }.reaches_outside(definition.visibility(database), module)
-        })
     }
 }

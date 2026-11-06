@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn identical_function_bodies_are_one_duplication_issue() {
@@ -17,7 +18,7 @@ fn identical_function_bodies_are_one_duplication_issue() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("DuplicatedFunctionBody: 1 violation\n\
+        Ok(["DuplicatedFunctionBody: 1 violation\n\
             Duplicated code drifts apart when one copy changes. Keep one function and call it from every place that needs it.\n\
             \n\
             - src/first.rs:1:8: Function body is duplicated\n    \
@@ -26,10 +27,7 @@ fn identical_function_bodies_are_one_duplication_issue() {
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

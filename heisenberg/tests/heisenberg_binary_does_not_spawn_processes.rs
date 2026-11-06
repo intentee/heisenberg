@@ -11,6 +11,7 @@ use heisenberg_command_tests::constants::LLVM_PROFILE_FILE_VARIABLE;
 use heisenberg_command_tests::constants::PATH_VARIABLE;
 use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
+use heisenberg_command_tests::host_footer::host_footer;
 
 fn heisenberg_check(cargo_home: &Path, sysroot: &Path, workspace: &Path) -> io::Result<Output> {
     Command::new(env!("CARGO_BIN_EXE_heisenberg"))
@@ -45,12 +46,14 @@ fn heisenberg_binary_analyses_the_real_sysroot_without_spawning_processes() {
     assert_eq!(str::from_utf8(&output.stderr), Ok(""));
     assert_eq!(
         str::from_utf8(&output.stdout),
-        Ok("------------------------------\n\
-            No errors found!\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 4 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 4 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+        Ok([
+            "------------------------------\n\
+             No errors found!\n\
+             ------------------------------\n",
+            host_footer(1, 4).as_str()
+        ]
+        .concat()
+        .as_str())
     );
     assert_eq!(output.status.code(), Some(0));
 }
@@ -75,12 +78,14 @@ fn heisenberg_binary_runs_without_spawning_processes() {
     assert_eq!(str::from_utf8(&output.stderr), Ok(""));
     assert_eq!(
         str::from_utf8(&output.stdout),
-        Ok("------------------------------\n\
-            No errors found!\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+        Ok([
+            "------------------------------\n\
+             No errors found!\n\
+             ------------------------------\n",
+            host_footer(1, 1).as_str()
+        ]
+        .concat()
+        .as_str())
     );
     assert_eq!(output.status.code(), Some(0));
 }

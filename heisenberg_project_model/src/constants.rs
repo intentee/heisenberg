@@ -15,6 +15,12 @@ pub const CARGO_MANIFEST_FILE: &str = "Cargo.toml";
 
 pub const CARGO_OUT_DIR_VARIABLE: &str = "OUT_DIR";
 
+pub const CARGO_RUSTC: &str = "rustc";
+
+pub const CARGO_RUSTC_WORKSPACE_WRAPPER: &str = "rustc-workspace-wrapper";
+
+pub const CARGO_RUSTC_WRAPPER: &str = "rustc-wrapper";
+
 pub const CARGO_RUSTFLAGS: &str = "rustflags";
 
 pub const CARGO_TARGET_TABLE: &str = "target";
@@ -52,7 +58,16 @@ pub const CLIPPY_TEST_ALLOWANCES: [&str; 3] = [
 
 pub const CLIPPY_TOOL: &str = "clippy";
 
+pub const COMPILER_VARIABLES: [&str; 3] =
+    [RUSTC_VARIABLE, "RUSTC_WORKSPACE_WRAPPER", "RUSTC_WRAPPER"];
+
 pub const HEISENBERG_SETTINGS_KEY: &str = "heisenberg";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+pub const HOST_TARGET: SupportedTarget = SupportedTarget::X86_64UnknownLinuxGnu;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+pub const HOST_TARGET: SupportedTarget = SupportedTarget::X86_64PcWindowsMsvc;
 
 pub const LINT_NAME_SEPARATOR: &str = "_";
 
@@ -66,6 +81,8 @@ pub const NIGHTLY_FEATURE_VARIABLES: [&str; 2] = [
 ];
 
 pub const PARENT_DIRECTORY: &str = "..";
+
+pub const RUSTC_VARIABLE: &str = "RUSTC";
 
 pub const RUSTFLAGS_VARIABLES: [&str; 2] = ["CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS"];
 

@@ -1,3 +1,4 @@
+pub mod ministral_3_cluster_params;
 pub mod widget;
 
 pub struct Library;

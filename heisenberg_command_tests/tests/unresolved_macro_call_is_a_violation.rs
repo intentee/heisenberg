@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn unresolved_macro_call_is_a_violation() {
@@ -17,26 +18,28 @@ fn unresolved_macro_call_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("UnresolvedMacroCall: 5 violations\n\
+        Ok([
+            "UnresolvedMacroCall: 5 violations\n\
             Every name must resolve for the analysis to be complete. Define or import the macro.\n\
             \n\
-            - src/lib.rs:3:1: Macro call is unresolved\n    \
+            - src/lib.rs:1:1: Macro call is unresolved\n    \
             Marker!();\n\
-            - src/lib.rs:5:8: Macro call is unresolved\n    \
+            - src/lib.rs:3:8: Macro call is unresolved\n    \
             crate::missing!();\n\
-            - src/lib.rs:6:16: Macro call is unresolved\n    \
+            - src/lib.rs:4:16: Macro call is unresolved\n    \
             crate::absent::missing!();\n\
-            - src/lib.rs:8:10: Macro call is unresolved\n    \
-            #[derive(MissingDerive)]\n\
-            - src/lib.rs:11:3: Macro call is unresolved\n    \
+            - src/lib.rs:6:3: Macro call is unresolved\n    \
             #[missing_attribute]\n\
+            - src/lib.rs:9:10: Macro call is unresolved\n    \
+            #[derive(MissingDerive)]\n\
             \n\
             ------------------------------\n\
             5 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n",
+            host_footer(1, 1).as_str()
+        ]
+        .concat()
+        .as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

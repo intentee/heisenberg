@@ -6,6 +6,7 @@ use serde_json::Value;
 use serde_json::json;
 
 use crate::build_selection::BuildSelection;
+use crate::command_line_feature_scope::CommandLineFeatureScope;
 use crate::dependency_document::DependencyDocument;
 use crate::member_target::MemberTarget;
 use crate::package_document::PackageDocument;
@@ -14,6 +15,7 @@ use crate::workspace_document::WorkspaceDocument;
 use crate::workspace_path::WorkspacePath;
 
 pub struct ResolvedPackages {
+    pub command_line_features: CommandLineFeatureScope,
     pub configured_environment: BTreeMap<String, String>,
     pub member_targets: Vec<MemberTarget>,
     pub packages: Vec<PackageDocument>,

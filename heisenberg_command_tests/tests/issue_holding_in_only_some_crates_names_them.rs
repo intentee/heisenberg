@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn issue_holding_in_only_some_crates_names_them() {
@@ -17,7 +18,7 @@ fn issue_holding_in_only_some_crates_names_them() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("NonTestItemInTestTarget: 1 violation\n\
+        Ok(["NonTestItemInTestTarget: 1 violation\n\
             A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.\n\
             \n\
             - tests/support/mod.rs:1:8: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file (only in issue_narrowed_to_some_crates test \"first\"; issue_narrowed_to_some_crates test \"second\")\n    \
@@ -33,10 +34,7 @@ fn issue_holding_in_only_some_crates_names_them() {
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 4 crate targets, 7 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 4 crate targets, 7 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(4, 7).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

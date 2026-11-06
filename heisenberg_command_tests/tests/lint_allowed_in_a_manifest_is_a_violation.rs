@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn lint_allowed_in_a_manifest_is_a_violation() {
@@ -17,7 +18,7 @@ fn lint_allowed_in_a_manifest_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("LintAllowedInManifest: 2 violations\n\
+        Ok(["LintAllowedInManifest: 2 violations\n\
             Allowing a lint is a suppression, and suppressions are a slippery slope. Remove the allow; if the lint then reports code, fix that code.\n\
             \n\
             - Cargo.toml: Package lint_allowed_in_a_manifest allows dead_code in its rust lints\n\
@@ -25,10 +26,7 @@ fn lint_allowed_in_a_manifest_is_a_violation() {
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 1 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 1 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            ------------------------------\n", host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -3,6 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn module_not_named_after_its_public_item_is_a_violation() {
@@ -17,20 +18,19 @@ fn module_not_named_after_its_public_item_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("ModuleNotNamedAfterItsItem: 2 violations\n\
-            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the snake case of its public item, or rename the item when its snake case reads badly: acronyms and one-letter words merge, as in OpenAIApiPath, whose snake case is open_aiapi_path.\n\
+        Ok(["ModuleNotNamedAfterItsItem: 3 violations\n\
+            A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the words of its public item, keeping each word whole and joining it to the next by an underscore or by nothing, or rename the item.\n\
             \n\
-            - src/lib.rs:6:12: Module is named helpers, but its public item parse_map names it parse_map\n        \
+            - src/lib.rs:7:12: Module is named helpers, but its public item parse_map names it parse_map\n        \
             pub fn parse_map() -> u8 {\n\
+            - src/ministral_3_cluster_params.rs:1:12: Module is named ministral_3_cluster_params, but its public item Ministral3ClusterParams names it ministral3_cluster_params\n    \
+            pub struct Ministral3ClusterParams;\n\
             - src/widget.rs:1:12: Module is named widget, but its public item FooBarBaz names it foo_bar_baz\n    \
             pub struct FooBarBaz;\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 1 crate targets, 3 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 1 crate targets, 3 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+            3 errors found\n\
+            ------------------------------\n", host_footer(1, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

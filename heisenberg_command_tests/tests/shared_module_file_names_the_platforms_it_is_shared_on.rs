@@ -3,6 +3,36 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const WINDOWS_SHARED_FILES: &str = "";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const SHARED_FILES: &str = "1 violation";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const ERRORS: usize = 1;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const HOST_MODULES: usize = 6;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const WINDOWS_SHARED_FILES: &str = "- tests/gated/mod.rs: Module file belongs to 2 modules\n      \
+    crate::gated in module_file_shared_on_some_platforms example \"demo\"\n      \
+    crate::gated in module_file_shared_on_some_platforms test \"first\"\n\
+    - tests/platform/mod.rs: Module file belongs to 2 modules\n      \
+    crate::platform in module_file_shared_on_some_platforms example \"demo\"\n      \
+    crate::platform in module_file_shared_on_some_platforms test \"first\"\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const SHARED_FILES: &str = "3 violations";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const ERRORS: usize = 3;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const HOST_MODULES: usize = 9;
 
 #[test]
 fn shared_module_file_names_the_platforms_it_is_shared_on() {
@@ -17,25 +47,22 @@ fn shared_module_file_names_the_platforms_it_is_shared_on() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok("SharedModuleFile: 3 violations\n\
-            A file included as several modules has no single owner. Give each module its own file.\n\
-            \n\
-            - tests/gated/mod.rs: Module file belongs to 2 modules\n      \
-            crate::gated in module_file_shared_on_some_platforms example \"demo\"\n      \
-            crate::gated in module_file_shared_on_some_platforms test \"first\"\n\
-            - tests/platform/mod.rs: Module file belongs to 2 modules (only on x86_64-pc-windows-msvc)\n      \
-            crate::platform in module_file_shared_on_some_platforms example \"demo\"\n      \
-            crate::platform in module_file_shared_on_some_platforms test \"first\"\n\
-            - tests/support/mod.rs: Module file belongs to 2 modules\n      \
-            crate::support in module_file_shared_on_some_platforms example \"demo\"\n      \
-            crate::support in module_file_shared_on_some_platforms test \"first\"\n\
-            \n\
-            ------------------------------\n\
-            3 errors found\n\
-            ------------------------------\n\
-            Analysed on x86_64-pc-windows-msvc: 3 crate targets, 9 modules\n\
-            Analysed on x86_64-unknown-linux-gnu: 3 crate targets, 6 modules\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every declared target\n")
+        Ok(format!(
+            "SharedModuleFile: {SHARED_FILES}\n\
+             A file included as several modules has no single owner. Give each module its own file.\n\
+             \n\
+             {WINDOWS_SHARED_FILES}\
+             - tests/support/mod.rs: Module file belongs to 2 modules\n      \
+             crate::support in module_file_shared_on_some_platforms example \"demo\"\n      \
+             crate::support in module_file_shared_on_some_platforms test \"first\"\n\
+             \n\
+             ------------------------------\n\
+             {ERRORS} errors found\n\
+             ------------------------------\n\
+             {}",
+            host_footer(3, HOST_MODULES)
+        )
+        .as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

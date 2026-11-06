@@ -16,7 +16,7 @@ fn build_for_a_target_without_its_standard_library_fails_to_load_the_project() {
         }
         .path(),
     }
-    .run()
+    .run_with_arguments(&["--target", "aarch64-apple-darwin"])
     .expect("the arguments must parse");
 
     assert_eq!(

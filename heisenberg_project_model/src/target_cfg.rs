@@ -38,3 +38,21 @@ impl TargetCfg {
             })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::TargetCfg;
+    use crate::constants::SUPPORTED_TARGETS;
+    use crate::supported_target::SupportedTarget;
+
+    #[test]
+    fn every_supported_target_has_tables_that_parse() {
+        let unparsable: Vec<&str> = SUPPORTED_TARGETS
+            .into_iter()
+            .filter(|target| TargetCfg::parse(*target).is_err())
+            .map(SupportedTarget::triple)
+            .collect();
+
+        assert_eq!(unparsable, Vec::<&str>::new());
+    }
+}

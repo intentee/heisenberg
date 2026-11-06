@@ -1,0 +1,7 @@
+[package]
+name = "literal_emitter"
+edition = "2024"
+version = "0.1.0"
+
+[lib]
+proc-macro = true

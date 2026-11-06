@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::path::Path;
 
+use cargo::resolver::features::CliFeatures;
 use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPath;
@@ -17,7 +19,9 @@ use crate::substituted_build_script::SubstitutedBuildScript;
 use crate::supported_target::SupportedTarget;
 
 pub struct TargetBuilds<'builds> {
+    pub compiler: &'builds AbsPath,
     pub context: &'builds ConfiguredContext<'builds>,
+    pub features: &'builds CliFeatures,
     pub manifest_path: &'builds AbsPath,
     pub resolved: &'builds ResolvedPackages,
     pub substituted: &'builds BTreeMap<String, SubstitutedBuildScript>,
@@ -39,12 +43,19 @@ impl TargetBuilds<'_> {
                     })
                 });
 
+        if builds_anything && !AsRef::<Path>::as_ref(self.compiler).is_file() {
+            return Err(ProjectModelError::SysrootWithoutCompiler {
+                compiler: self.compiler.to_path_buf(),
+            });
+        }
+
         self.targets
             .iter()
             .map(|target| {
                 if builds_anything {
                     WorkspaceBuild {
                         context: self.context,
+                        features: self.features,
                         manifest_path: self.manifest_path.as_ref(),
                         substituted_packages: &substituted_packages,
                         target: target.triple(),

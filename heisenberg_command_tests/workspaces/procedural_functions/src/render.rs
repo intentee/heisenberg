@@ -1,5 +1,5 @@
 use crate::report::Report;
 
-pub fn render(report: &Report) -> u8 {
-    report.lines * 2
+pub fn render(Report { lines }: &Report) -> u8 {
+    lines * 2
 }
