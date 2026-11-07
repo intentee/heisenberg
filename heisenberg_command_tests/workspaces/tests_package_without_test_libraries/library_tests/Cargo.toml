@@ -8,7 +8,13 @@ base = { path = "../base" }
 harness = { path = "../harness" }
 library = { path = "../library" }
 
+[lints.rust]
+warnings = "deny"
+
 [lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
 expect_used = "deny"
 panic = "deny"
 unwrap_used = "deny"

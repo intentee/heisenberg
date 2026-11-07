@@ -21,16 +21,16 @@ fn paths_written_inside_an_own_macro_are_checked() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["CodeActiveOnNoTarget: 1 violation\n\
-            Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
+        Ok(["CodeActiveInNoConfiguration: 1 violation\n\
+            Code active in no declared configuration is never built or analysed. Remove it, declare a configuration it is active in, or make it active in a declared configuration.\n\
             \n\
-            - src/lib.rs:2:9: Code is active on no declared target\n    \
+            - src/lib.rs:2:9: Code is active in no declared configuration\n    \
             pub mod configured {\n\
             \n\
             UnresolvedPath: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/lib.rs:13:17: Path is unresolved\n        \
+            - src/lib.rs:13:17: Path compiles, but rust-analyzer cannot resolve it\n        \
             let _item = configured_item!();\n\
             \n\
             ------------------------------\n\

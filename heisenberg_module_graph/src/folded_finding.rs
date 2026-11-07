@@ -20,7 +20,7 @@ impl Display for FoldedFinding {
             FoldedFindingKind::ImplBlock => write!(formatter, "impl block at {}", self.location),
             FoldedFindingKind::InactiveCode => write!(
                 formatter,
-                "code active on no declared target at {}",
+                "code active in no declared configuration at {}",
                 self.location
             ),
             FoldedFindingKind::MacroExpansion { name, .. } => write!(

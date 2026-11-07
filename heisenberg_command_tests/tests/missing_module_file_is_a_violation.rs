@@ -19,9 +19,9 @@ fn missing_module_file_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["UnresolvedModule: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Create the module file or remove the declaration.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Create the module file or remove the declaration.\n\
             \n\
-            - src/lib.rs:1:9: Module file is unresolved\n    \
+            - src/lib.rs:1:9: Module declaration compiles, but rust-analyzer cannot resolve its file\n    \
             pub mod missing;\n\
             \n\
             ------------------------------\n\

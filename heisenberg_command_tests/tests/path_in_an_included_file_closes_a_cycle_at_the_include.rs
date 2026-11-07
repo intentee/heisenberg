@@ -18,7 +18,13 @@ fn path_in_an_included_file_closes_a_cycle_at_the_include() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["ModuleCycle: 1 violation\n\
+        Ok(["IncludedSourceFile: 1 violation\n\
+            An included file is trusted as generated text, so code written by hand escapes every rule once it is included. Make the file a module, or have a build script generate it into OUT_DIR.\n\
+            \n\
+            - src/first.rs:1:1: Included file snippets/second.rs is not a build script output\n    \
+            include!(\"../snippets/second.rs\");\n\
+            \n\
+            ModuleCycle: 1 violation\n\
             Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
             - src/first.rs:1:1: Parts of crate depend on each other\n    \
@@ -30,7 +36,7 @@ fn path_in_an_included_file_closes_a_cycle_at_the_include() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            2 errors found\n\
             ------------------------------\n", host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

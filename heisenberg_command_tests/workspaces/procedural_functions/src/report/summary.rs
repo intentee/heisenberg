@@ -11,4 +11,8 @@ impl Summary {
             total: line_count(report),
         }
     }
+
+    pub fn combined(&self, Report { lines }: &Report) -> u8 {
+        self.total + lines
+    }
 }

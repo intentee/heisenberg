@@ -19,9 +19,9 @@ fn unresolved_extern_crate_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["UnresolvedExternCrate: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Declare the crate as a dependency or remove the declaration.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Declare the crate as a dependency or remove the declaration.\n\
             \n\
-            - src/lib.rs:1:14: Extern crate is unresolved\n    \
+            - src/lib.rs:1:14: Extern crate compiles, but rust-analyzer cannot resolve it\n    \
             extern crate missing_dependency;\n\
             \n\
             ------------------------------\n\

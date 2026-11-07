@@ -84,26 +84,23 @@ impl FeatureGraph {
 
     pub fn build_selected(
         &self,
-        selection: &FeatureSelection,
+        FeatureSelection {
+            default_features,
+            features,
+        }: &FeatureSelection,
         platform: &Arc<Platform>,
     ) -> Result<ResolvedBuild, Error> {
-        match selection {
-            FeatureSelection::All => self.build(StandardFeatures::All, platform),
-            FeatureSelection::Listed {
-                default_features,
-                features,
-            } => self.build(
-                named_feature_filter(
-                    if *default_features {
-                        StandardFeatures::Default
-                    } else {
-                        StandardFeatures::None
-                    },
-                    features.iter().map(String::as_str),
-                ),
-                platform,
+        self.build(
+            named_feature_filter(
+                if *default_features {
+                    StandardFeatures::Default
+                } else {
+                    StandardFeatures::None
+                },
+                features.iter().map(String::as_str),
             ),
-        }
+            platform,
+        )
     }
 
     pub fn metadata(&self, build: ResolvedBuild) -> Result<Metadata, error::Error> {

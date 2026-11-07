@@ -1,4 +1,6 @@
-use crate::clippy_lint::ClippyLint;
+use crate::lint_tool::LintTool;
+use crate::required_clippy_setting::RequiredClippySetting;
+use crate::required_lint::RequiredLint;
 use crate::supported_target::SupportedTarget;
 
 pub const SUPPORTED_TARGETS: [SupportedTarget; 3] = [
@@ -31,43 +33,14 @@ pub const CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE: &str = "CLIPPY_CONF_DIR";
 
 pub const CLIPPY_CONFIGURATION_FILE: &str = "clippy.toml";
 
-pub const CLIPPY_DENIED_LINTS: [ClippyLint; 3] = [
-    ClippyLint {
-        former_names: &["option_expect_used", "result_expect_used"],
-        name: "expect_used",
-    },
-    ClippyLint {
-        former_names: &[],
-        name: "panic",
-    },
-    ClippyLint {
-        former_names: &["option_unwrap_used", "result_unwrap_used"],
-        name: "unwrap_used",
-    },
-];
-
-pub const CLIPPY_DENIED_LINTS_GROUP: &str = "restriction";
-
 pub const CLIPPY_HIDDEN_CONFIGURATION_FILE: &str = ".clippy.toml";
 
-pub const CLIPPY_TEST_ALLOWANCES: [&str; 3] = [
-    "allow-expect-in-tests",
-    "allow-panic-in-tests",
-    "allow-unwrap-in-tests",
-];
-
-pub const CLIPPY_TOOL: &str = "clippy";
+pub const CLIPPY_RESTRICTION_GROUP: &str = "restriction";
 
 pub const COMPILER_VARIABLES: [&str; 3] =
     [RUSTC_VARIABLE, "RUSTC_WORKSPACE_WRAPPER", "RUSTC_WRAPPER"];
 
 pub const HEISENBERG_SETTINGS_KEY: &str = "heisenberg";
-
-#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
-pub const HOST_TARGET: SupportedTarget = SupportedTarget::X86_64UnknownLinuxGnu;
-
-#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
-pub const HOST_TARGET: SupportedTarget = SupportedTarget::X86_64PcWindowsMsvc;
 
 pub const LINT_NAME_SEPARATOR: &str = "_";
 
@@ -80,12 +53,87 @@ pub const NIGHTLY_FEATURE_VARIABLES: [&str; 2] = [
     "__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS",
 ];
 
+pub const PANICKING_LINTS: [RequiredLint; 3] = [
+    RequiredLint {
+        former_names: &["option_expect_used", "result_expect_used"],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "expect_used",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "panic",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &["option_unwrap_used", "result_unwrap_used"],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "unwrap_used",
+        tool: LintTool::Clippy,
+    },
+];
+
 pub const PARENT_DIRECTORY: &str = "..";
+
+pub const REQUIRED_CLIPPY_SETTINGS: [RequiredClippySetting; 4] = [
+    RequiredClippySetting {
+        name: "allow-expect-in-tests",
+        value: true,
+    },
+    RequiredClippySetting {
+        name: "allow-panic-in-tests",
+        value: true,
+    },
+    RequiredClippySetting {
+        name: "allow-unwrap-in-tests",
+        value: true,
+    },
+    RequiredClippySetting {
+        name: "avoid-breaking-exported-api",
+        value: false,
+    },
+];
+
+pub const REQUIRED_LINT_GROUPS: [RequiredLint; 4] = [
+    RequiredLint {
+        former_names: &[],
+        groups: &[],
+        name: "all",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[],
+        name: "nursery",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[],
+        name: "pedantic",
+        tool: LintTool::Clippy,
+    },
+    RUST_WARNINGS_LINT,
+];
+
+pub const RESTRICTING_CLIPPY_SETTINGS: [&str; 5] = [
+    "absolute-paths-allowed-crates",
+    "absolute-paths-max-segments",
+    "disallowed-macros",
+    "disallowed-methods",
+    "disallowed-types",
+];
 
 pub const RUSTC_VARIABLE: &str = "RUSTC";
 
 pub const RUSTFLAGS_VARIABLES: [&str; 2] = ["CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS"];
 
-pub const RUST_TOOL: &str = "rust";
+pub const RUST_WARNINGS_LINT: RequiredLint = RequiredLint {
+    former_names: &[],
+    groups: &[],
+    name: "warnings",
+    tool: LintTool::Rust,
+};
 
-pub const RUST_WARNINGS_GROUP: &str = "warnings";
+pub const SYSROOT_BINARY_DIRECTORY: &str = "bin";

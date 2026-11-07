@@ -20,9 +20,9 @@ fn unresolved_paths_into_a_foreign_module_are_one_issue_per_module() {
         str::from_utf8(&outcome.output),
         Ok([
             "UnresolvedPath: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/lib.rs:2:18: Path into outside is unresolved\n        \
+            - src/lib.rs:2:18: Path into outside compiles, but rust-analyzer cannot resolve it\n        \
             pub binding: outside::Binding,\n\
             \n\
             ------------------------------\n\

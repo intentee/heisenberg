@@ -2434,7 +2434,6 @@ dependencies = [
  "heisenberg_module_dependencies",
  "heisenberg_module_graph",
  "heisenberg_project_model",
- "itertools",
  "thiserror",
 ]
 
@@ -2484,6 +2483,7 @@ dependencies = [
  "ra_ap_intern",
  "ra_ap_paths",
  "ra_ap_syntax",
+ "ra_ap_syntax-bridge",
  "ra_ap_vfs",
  "thiserror",
 ]
@@ -2513,6 +2513,7 @@ dependencies = [
  "ra_ap_paths",
  "ra_ap_proc_macro_api",
  "ra_ap_project_model",
+ "ra_ap_toolchain",
  "ra_ap_vfs",
  "serde",
  "serde_json",
@@ -2528,6 +2529,7 @@ dependencies = [
  "cargo",
  "cargo-util-terminal",
  "cargo_metadata",
+ "object",
  "thiserror",
 ]
 
@@ -3401,6 +3403,15 @@ checksum = "9df9128cbbfef73cda168416ccf7f837b62737d748333bfe9ab71c245d76613e"
 dependencies = [
  "objc2",
  "objc2-foundation",
+]
+
+[[package]]
+name = "object"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd229a0361b9d0d4396176e02d65897f487eebeab7caa6d443855ee152ca0b9c"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

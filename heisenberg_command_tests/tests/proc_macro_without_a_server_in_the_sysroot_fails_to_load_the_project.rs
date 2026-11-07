@@ -10,7 +10,7 @@ use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::check_outcome::CheckOutcome;
-use heisenberg_command_tests::constants::HOST_TRIPLE;
+use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
@@ -54,7 +54,7 @@ fn proc_macro_without_a_server_in_the_sysroot_fails_to_load_the_project() {
     assert_eq!(
         str::from_utf8(&outcome.errors),
         Ok(format!(
-            "error: the project cannot be loaded for {HOST_TRIPLE}\n\
+            "error: the project cannot be loaded for the configuration `{HOST_CONFIGURATION}`\n\
              {missing}"
         )
         .as_str())

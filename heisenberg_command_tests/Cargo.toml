@@ -3,6 +3,7 @@ name = "heisenberg_command_tests"
 edition.workspace = true
 version.workspace = true
 publish = false
+autotests = false
 
 [dependencies]
 clap = { workspace = true }
@@ -10,6 +11,10 @@ heisenberg_command = { workspace = true }
 heisenberg_error_context = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
+
+[[test]]
+name = "heisenberg_command_tests"
+path = "tests/main.rs"
 
 [lints]
 workspace = true

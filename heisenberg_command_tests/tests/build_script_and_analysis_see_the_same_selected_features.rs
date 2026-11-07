@@ -1,10 +1,9 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
-use heisenberg_command_tests::constants::HOST_TRIPLE;
-use heisenberg_command_tests::constants::LEFT_OUT_TRIPLE;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
 
 #[test]
 fn build_script_and_analysis_see_the_same_selected_features() {
@@ -14,7 +13,7 @@ fn build_script_and_analysis_see_the_same_selected_features() {
         }
         .path(),
     }
-    .run_with_arguments(&["--no-default-features", "--features", "fast"])
+    .run()
     .expect("the arguments must parse");
 
     assert_eq!(
@@ -34,11 +33,7 @@ fn build_script_and_analysis_see_the_same_selected_features() {
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
-            Analysed on {HOST_TRIPLE}: 2 crate targets, 4 modules\n\
-            Not analysed: {LEFT_OUT_TRIPLE}\n\
-            Features: fast\n\
-            Not evaluated in a partial run: CodeActiveOnNoTarget, the empty-library check of TestsOnlyPackageWithoutTestLibraries\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every analysed target with the selected features\n").as_str())
+            {footer}", footer = host_footer(2, 4)).as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

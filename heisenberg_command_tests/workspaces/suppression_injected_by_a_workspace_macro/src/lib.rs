@@ -1,0 +1,2 @@
+#[quieting::quiet]
+fn unused() {}

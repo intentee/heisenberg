@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 
@@ -30,6 +31,7 @@ fn read(path: &Utf8Path) -> Result<Option<String>, ProjectModelError> {
     }
 }
 
+#[derive(Clone)]
 pub enum ClippyConfigurationFile {
     Ambiguous { file: Utf8PathBuf },
     Missing,
@@ -40,30 +42,48 @@ impl ClippyConfigurationFile {
     pub fn discover(
         manifest_path: &Utf8Path,
         workspace_root: &Utf8Path,
+        found: &mut BTreeMap<Utf8PathBuf, Self>,
     ) -> Result<Self, ProjectModelError> {
+        let mut visited: Vec<&Utf8Path> = Vec::new();
+        let mut discovered = Self::Missing;
+
         for directory in manifest_path
             .ancestors()
             .skip(1)
             .take_while(|directory| directory.starts_with(workspace_root))
         {
-            let hidden = directory.join(CLIPPY_HIDDEN_CONFIGURATION_FILE);
-            let visible = directory.join(CLIPPY_CONFIGURATION_FILE);
+            if let Some(known) = found.get(directory) {
+                discovered = known.clone();
+                break;
+            }
 
-            match read(&hidden)? {
-                Some(hidden_text) => {
-                    return match read(&visible)? {
-                        Some(_) => Ok(Self::Ambiguous { file: visible }),
-                        None => parse(hidden, &hidden_text),
-                    };
-                }
-                None => {
-                    if let Some(text) = read(&visible)? {
-                        return parse(visible, &text);
-                    }
-                }
+            visited.push(directory);
+
+            if let Some(own) = Self::in_directory(directory)? {
+                discovered = own;
+                break;
             }
         }
 
-        Ok(Self::Missing)
+        for directory in visited {
+            found.insert(directory.to_owned(), discovered.clone());
+        }
+
+        Ok(discovered)
+    }
+
+    fn in_directory(directory: &Utf8Path) -> Result<Option<Self>, ProjectModelError> {
+        let hidden = directory.join(CLIPPY_HIDDEN_CONFIGURATION_FILE);
+        let visible = directory.join(CLIPPY_CONFIGURATION_FILE);
+
+        match read(&hidden)? {
+            Some(hidden_text) => match read(&visible)? {
+                Some(_) => Ok(Some(Self::Ambiguous { file: visible })),
+                None => parse(hidden, &hidden_text).map(Some),
+            },
+            None => read(&visible)?
+                .map(|text| parse(visible, &text))
+                .transpose(),
+        }
     }
 }

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
@@ -29,21 +30,35 @@ use heisenberg_module_graph::violation_set::ViolationSet;
 use heisenberg_module_graph::walked_code::WalkedCode;
 
 use crate::covering_ancestors::CoveringAncestors;
-use crate::crate_module_files::crate_module_files;
+use crate::crate_findings::CrateFindings;
 use crate::diagnostic_violation::DiagnosticViolation;
 use crate::function_fingerprint::FunctionFingerprint;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
+use crate::macro_inputs::MacroInputs;
+use crate::main_function::MainFunction;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
 use crate::production_options::production_options;
 use crate::source_locator::SourceLocator;
 use crate::test_code::TestCode;
-use crate::test_target_findings::TestTargetFindings;
 use crate::token_origin::TokenOrigin;
 
+fn inactive_code(diagnostics: &[AnyDiagnostic<'_>]) -> HashMap<InFile<SyntaxNodePtr>, CfgExpr> {
+    diagnostics
+        .iter()
+        .filter_map(|diagnostic| match diagnostic {
+            AnyDiagnostic::InactiveCode(inactive) => Some((inactive.node, inactive.cfg.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
 pub struct CrateExtraction<'extraction, 'database> {
+    pub build_script_output_files: &'extraction BTreeSet<FileId>,
     pub crate_target: &'extraction CrateTarget,
+    pub file_modules: &'extraction HashMap<FileId, Vec<Module>>,
+    pub files: &'extraction BTreeSet<FileId>,
     pub krate: Crate,
     pub locator: &'extraction SourceLocator<'extraction>,
     pub semantics: &'extraction Semantics<'database, RootDatabase>,
@@ -55,35 +70,28 @@ pub struct CrateExtraction<'extraction, 'database> {
 impl CrateExtraction<'_, '_> {
     pub fn graph(&self) -> CrateModuleGraph {
         let database = self.semantics.db;
-        let module_paths = ModulePaths { database };
+        let module_paths = ModulePaths::new(database);
         let modules = self.krate.modules(database);
-        let own_files = crate_module_files(database, self.krate);
+        let macro_inputs = MacroInputs::new(database);
         let token_origin = TokenOrigin {
-            own_files: &own_files,
+            macro_inputs: &macro_inputs,
+            own_files: self.files,
             semantics: self.semantics,
             workspace_files: self.workspace_files,
         };
         let options = self.krate.cfg(database);
-        let test_code = TestCode {
-            files: self.test_code_files,
-            semantics: self.semantics,
-        };
+        let test_code = TestCode::new(self.test_code_files, self.semantics);
         let mut diagnostics = Vec::new();
 
-        for module in &modules {
+        for module in modules.iter().filter(|module| !module.is_inline(database)) {
             module.diagnostics(database, &mut diagnostics, false);
         }
 
-        let mut inactive_code: HashMap<InFile<SyntaxNodePtr>, CfgExpr> = HashMap::new();
-
-        for diagnostic in &diagnostics {
-            if let AnyDiagnostic::InactiveCode(inactive) = diagnostic {
-                inactive_code.insert(inactive.node, inactive.cfg.clone());
-            }
-        }
-
+        let inactive_code = inactive_code(&diagnostics);
         let walk = ModuleWalk {
+            build_script_output_files: self.build_script_output_files,
             crate_target: self.crate_target,
+            file_modules: self.file_modules,
             inactive_code: &inactive_code,
             krate: self.krate,
             locator: self.locator,
@@ -92,6 +100,7 @@ impl CrateExtraction<'_, '_> {
             production_options: &production_options(options),
             semantics: self.semantics,
             test_code: &test_code,
+            test_gated_code: RefCell::default(),
             token_origin: &token_origin,
             unpublished_packages: self.unpublished_packages,
         };
@@ -114,13 +123,13 @@ impl CrateExtraction<'_, '_> {
             violations: ViolationSet::default(),
             walked_code: WalkedCode::default(),
         };
-        let mut test_target = TestTargetFindings::default();
+        let mut findings = CrateFindings::default();
 
         for module in &modules {
-            walk.module(*module, &mut graph, &mut test_target);
+            walk.module(*module, &mut graph, &mut findings);
         }
 
-        test_target.fold(&mut graph);
+        findings.fold(&mut graph);
 
         let located: Vec<LocatedViolation> = diagnostics
             .iter()
@@ -186,7 +195,15 @@ impl CrateExtraction<'_, '_> {
                     .is_some_and(|statements| {
                         statements.statements().next().is_some() || statements.tail_expr().is_some()
                     })
-                    && self.semantics.to_def(function).is_some()
+                    && self.semantics.to_def(function).is_some_and(|definition| {
+                        !MainFunction {
+                            crate_target: self.crate_target,
+                            database,
+                            function: definition,
+                        }
+                        .enters_its_target()
+                            && definition.as_proc_macro(database).is_none()
+                    })
             })
             .map(|function| FunctionBody {
                 fingerprint: FunctionFingerprint {

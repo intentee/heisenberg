@@ -12,10 +12,11 @@ use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::module_path::ModulePath;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
+use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::package_violation::PackageViolation;
-use heisenberg_project_model::supported_target::SupportedTarget;
 
 use crate::analysis_context::AnalysisContext;
+use crate::configuration_narrowing::ConfigurationNarrowing;
 use crate::cycle_shape::CycleShape;
 use crate::issue_location::IssueLocation;
 use crate::issue_position::IssuePosition;
@@ -23,10 +24,24 @@ use crate::issue_type::IssueType;
 use crate::module_inclusion::ModuleInclusion;
 use crate::narrowing::Narrowing;
 use crate::shared_file_inclusions::SharedFileInclusions;
-use crate::target_narrowing::TargetNarrowing;
 use crate::violation_occurrences::ViolationOccurrences;
 
 const CONTINUATION_INDENT: &str = "    ";
+
+fn configuration_narrowing<'contexts>(
+    analysed: impl Iterator<Item = &'contexts AnalysisContext>,
+    configurations: &BTreeSet<Configuration>,
+) -> String {
+    ConfigurationNarrowing {
+        all: &analysed
+            .map(|AnalysisContext { configuration, .. }| configuration)
+            .chain(configurations)
+            .cloned()
+            .collect(),
+        configurations,
+    }
+    .to_string()
+}
 
 fn cycle_site(witnesses: &NonEmpty<CycleWitness>) -> &SourceLocation {
     witnesses
@@ -38,12 +53,12 @@ fn cycle_site(witnesses: &NonEmpty<CycleWitness>) -> &SourceLocation {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Issue {
-    CodeActiveOnNoTarget {
+    CodeActiveInNoConfiguration {
         focus: SourceLocation,
     },
     DuplicatedFunctionBody {
+        configurations: BTreeSet<Configuration>,
         copies: NonEmpty<SourceLocation>,
-        targets: BTreeSet<SupportedTarget>,
     },
     ModuleCycle {
         container: ModulePath,
@@ -56,9 +71,9 @@ pub enum Issue {
         inclusions: SharedFileInclusions,
     },
     UnresolvedForeignReferences {
+        configurations: BTreeSet<Configuration>,
         module: ForeignModule,
         sites: NonEmpty<SourceLocation>,
-        targets: BTreeSet<SupportedTarget>,
     },
     Violation {
         occurrences: ViolationOccurrences,
@@ -85,20 +100,20 @@ impl Issue {
     #[must_use]
     pub fn new_duplicated_function_body(
         NonEmpty { first, others }: &NonEmpty<&SourceLocation>,
-        targets: BTreeSet<SupportedTarget>,
+        configurations: BTreeSet<Configuration>,
     ) -> Self {
         Self::DuplicatedFunctionBody {
+            configurations,
             copies: NonEmpty {
                 first: (*first).clone(),
                 others: others.iter().map(|copy| (*copy).clone()).collect(),
             },
-            targets,
         }
     }
 
     #[must_use]
     pub fn new_inactive_code(focus: &SourceLocation) -> Self {
-        Self::CodeActiveOnNoTarget {
+        Self::CodeActiveInNoConfiguration {
             focus: focus.clone(),
         }
     }
@@ -111,7 +126,7 @@ impl Issue {
     #[must_use]
     pub fn new_shared_module_file(
         file: &str,
-        inclusions: BTreeMap<ModuleInclusion, BTreeMap<SupportedTarget, ModuleFileAnalysis>>,
+        inclusions: BTreeMap<ModuleInclusion, BTreeMap<Configuration, ModuleFileAnalysis>>,
         submodule_files: BTreeSet<String>,
     ) -> Self {
         Self::SharedModuleFile {
@@ -127,15 +142,15 @@ impl Issue {
     pub fn new_unresolved_foreign_references(
         module: &ForeignModule,
         NonEmpty { first, others }: &NonEmpty<&SourceLocation>,
-        targets: BTreeSet<SupportedTarget>,
+        configurations: BTreeSet<Configuration>,
     ) -> Self {
         Self::UnresolvedForeignReferences {
+            configurations,
             module: module.clone(),
             sites: NonEmpty {
                 first: (*first).clone(),
                 others: others.iter().map(|site| (*site).clone()).collect(),
             },
-            targets,
         }
     }
 
@@ -188,14 +203,14 @@ impl Issue {
                 .iter()
                 .map(|line| format!("  {line}"))
                 .collect(),
-            Self::CodeActiveOnNoTarget { .. } => Vec::new(),
+            Self::CodeActiveInNoConfiguration { .. } => Vec::new(),
         }
     }
 
     #[must_use]
     pub fn issue_type(&self) -> IssueType {
         match self {
-            Self::CodeActiveOnNoTarget { .. } => IssueType::CodeActiveOnNoTarget,
+            Self::CodeActiveInNoConfiguration { .. } => IssueType::CodeActiveInNoConfiguration,
             Self::DuplicatedFunctionBody { .. } => IssueType::DuplicatedFunctionBody,
             Self::ModuleCycle { .. } => IssueType::ModuleCycle,
             Self::Package(violation) => IssueType::from(violation),
@@ -223,27 +238,13 @@ impl Issue {
             }
             .to_string(),
             Self::SharedModuleFile { inclusions, .. } => {
-                let targets = inclusions.targets();
-
-                TargetNarrowing {
-                    all: &analysed
-                        .map(|AnalysisContext { target, .. }| *target)
-                        .chain(targets.iter().copied())
-                        .collect(),
-                    targets: &targets,
-                }
-                .to_string()
+                configuration_narrowing(analysed, &inclusions.configurations())
             }
-            Self::DuplicatedFunctionBody { targets, .. }
-            | Self::UnresolvedForeignReferences { targets, .. } => TargetNarrowing {
-                all: &analysed
-                    .map(|AnalysisContext { target, .. }| *target)
-                    .chain(targets.iter().copied())
-                    .collect(),
-                targets,
+            Self::DuplicatedFunctionBody { configurations, .. }
+            | Self::UnresolvedForeignReferences { configurations, .. } => {
+                configuration_narrowing(analysed, configurations)
             }
-            .to_string(),
-            Self::CodeActiveOnNoTarget { .. } | Self::Package(_) => String::new(),
+            Self::CodeActiveInNoConfiguration { .. } | Self::Package(_) => String::new(),
         };
 
         iter::once(format!("- {location}: {}{narrowing}", self.message()))
@@ -264,7 +265,7 @@ impl Issue {
     #[must_use]
     pub fn location(&self) -> IssueLocation {
         match self {
-            Self::CodeActiveOnNoTarget { focus } => IssueLocation::new_position(focus),
+            Self::CodeActiveInNoConfiguration { focus } => IssueLocation::new_position(focus),
             Self::DuplicatedFunctionBody { copies, .. } => {
                 IssueLocation::new_position(&copies.first)
             }
@@ -283,7 +284,9 @@ impl Issue {
     #[must_use]
     pub fn message(&self) -> String {
         match self {
-            Self::CodeActiveOnNoTarget { .. } => "Code is active on no declared target".to_owned(),
+            Self::CodeActiveInNoConfiguration { .. } => {
+                "Code is active in no declared configuration".to_owned()
+            }
             Self::DuplicatedFunctionBody { .. } => "Function body is duplicated".to_owned(),
             Self::ModuleCycle { container, .. } => {
                 format!("Parts of {container} depend on each other")
@@ -296,7 +299,7 @@ impl Issue {
                 format!("Module file belongs to {} modules", inclusions.len())
             }
             Self::UnresolvedForeignReferences { module, .. } => {
-                format!("Path into {module} is unresolved")
+                format!("Path into {module} compiles, but rust-analyzer cannot resolve it")
             }
             Self::Violation { violation, .. } => violation.kind.to_string(),
         }

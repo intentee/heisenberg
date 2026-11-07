@@ -3,15 +3,25 @@ members = ["bindings", "bindings_sys"]
 resolver = "3"
 
 [workspace.metadata.heisenberg]
-targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
 
-[workspace.metadata.heisenberg.out_dirs.bindings_sys]
+[workspace.metadata.heisenberg.out_dirs.bindings_sys.configurations.x86_64-pc-windows-msvc]
 directory = "../elsewhere"
-
-[workspace.metadata.heisenberg.out_dirs.bindings_sys.targets.x86_64-pc-windows-msvc]
 cfgs = []
 env = {}
 
-[workspace.metadata.heisenberg.out_dirs.bindings_sys.targets.x86_64-unknown-linux-gnu]
+[workspace.metadata.heisenberg.out_dirs.bindings_sys.configurations.x86_64-unknown-linux-gnu]
+directory = "../elsewhere"
 cfgs = []
 env = {}
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

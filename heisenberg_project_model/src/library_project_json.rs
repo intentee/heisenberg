@@ -59,9 +59,16 @@ impl LibraryProjectJson<'_> {
             indices.insert(&library.package.id, indices.len());
         }
 
+        let nodes: BTreeMap<&PackageId, &Node> = self
+            .metadata
+            .resolve
+            .iter()
+            .flat_map(|Resolve { nodes, .. }| nodes)
+            .map(|node| (&node.id, node))
+            .collect();
         let crates: Vec<Value> = libraries
             .iter()
-            .map(|library| self.crate_json(library, &indices))
+            .map(|library| Self::crate_json(library, &indices, &nodes))
             .collect();
         from_value::<ProjectJsonData>(json!({"crates": crates}))
             .map_err(ProjectModelError::LibraryProjectJson)
@@ -69,24 +76,20 @@ impl LibraryProjectJson<'_> {
     }
 
     fn crate_json(
-        &self,
         LibraryCrate { package, target }: &LibraryCrate<'_>,
         indices: &BTreeMap<&PackageId, usize>,
+        nodes: &BTreeMap<&PackageId, &Node>,
     ) -> Value {
-        let nodes = self
-            .metadata
-            .resolve
-            .iter()
-            .flat_map(|Resolve { nodes, .. }| nodes)
-            .filter(|Node { id, .. }| *id == package.id);
+        let node = nodes.get(&package.id);
 
         json!({
-            "cfg": nodes
-                .clone()
+            "cfg": node
+                .into_iter()
                 .flat_map(|node| &node.features)
                 .map(|feature| format!("feature=\"{feature}\""))
                 .collect::<Vec<String>>(),
-            "deps": nodes
+            "deps": node
+                .into_iter()
                 .flat_map(|node| &node.deps)
                 .filter(|dependency| {
                     dependency

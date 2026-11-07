@@ -5,30 +5,44 @@ use std::fmt::Formatter;
 use crate::method_group::MethodGroup;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MethodPlacement {
-    pub group: MethodGroup,
-    pub preceding: String,
-    pub preceding_group: MethodGroup,
+pub enum MethodPlacement {
+    Declared {
+        preceding: String,
+        trait_name: String,
+    },
+    Grouped {
+        group: MethodGroup,
+        preceding: String,
+        preceding_group: MethodGroup,
+    },
 }
 
 impl Display for MethodPlacement {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let Self {
-            group,
-            preceding,
-            preceding_group,
-        } = self;
-
-        if group == preceding_group {
-            write!(
+        match self {
+            Self::Declared {
+                preceding,
+                trait_name,
+            } => write!(
+                formatter,
+                "Method belongs before {preceding}: {trait_name} declares it earlier"
+            ),
+            Self::Grouped {
+                group,
+                preceding,
+                preceding_group,
+            } if group == preceding_group => write!(
                 formatter,
                 "Method belongs before {preceding}: {group} are sorted by name"
-            )
-        } else {
-            write!(
+            ),
+            Self::Grouped {
+                group,
+                preceding,
+                preceding_group,
+            } => write!(
                 formatter,
                 "Method belongs before {preceding}: {group} precede {preceding_group}"
-            )
+            ),
         }
     }
 }

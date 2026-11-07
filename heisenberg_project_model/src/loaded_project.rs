@@ -1,18 +1,16 @@
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_paths::AbsPathBuf;
-use ra_ap_vfs::Vfs;
-use ra_ap_vfs::VfsPath;
+use ra_ap_vfs::FileId;
 
-use heisenberg_module_graph::crate_target::CrateTarget;
+use crate::source_files::SourceFiles;
+use crate::workspace_packages::WorkspacePackages;
 
-pub struct LoadedProject {
+pub struct LoadedProject<'resolved> {
+    pub build_script_output_files: BTreeSet<FileId>,
     pub database: RootDatabase,
-    pub member_targets: HashMap<VfsPath, CrateTarget>,
-    pub test_crates: BTreeSet<String>,
-    pub unpublished_packages: BTreeSet<String>,
-    pub vfs: Vfs,
-    pub workspace_root: AbsPathBuf,
+    pub files: SourceFiles,
+    pub packages: &'resolved WorkspacePackages,
+    pub workspace_root: &'resolved AbsPathBuf,
 }

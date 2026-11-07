@@ -18,14 +18,20 @@ fn predicate_of_a_module_declared_in_an_included_file_is_reported_where_it_is_wr
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["NegatedConfiguration: 1 violation\n\
+        Ok(["IncludedSourceFile: 1 violation\n\
+            An included file is trusted as generated text, so code written by hand escapes every rule once it is included. Make the file a module, or have a build script generate it into OUT_DIR.\n\
+            \n\
+            - src/lib.rs:1:1: Included file src/declarations.rs is not a build script output\n    \
+            include!(\"declarations.rs\");\n\
+            \n\
+            NegatedConfiguration: 1 violation\n\
             Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
             \n\
             - src/limits.rs:1:1: Configuration predicate negates a feature, test or debug_assertions\n    \
             #![cfg_attr(not(test), allow(dead_code))]\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            2 errors found\n\
             ------------------------------\n", host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

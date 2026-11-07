@@ -21,6 +21,7 @@ ra_ap_load-cargo = { workspace = true }
 ra_ap_paths = { workspace = true }
 ra_ap_proc_macro_api = { workspace = true }
 ra_ap_project_model = { workspace = true }
+ra_ap_toolchain = { workspace = true }
 ra_ap_vfs = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

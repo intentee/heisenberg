@@ -1,15 +1,18 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use toml::Value;
 
 use crate::clippy_configuration_file::ClippyConfigurationFile;
-use crate::clippy_lint::ClippyLint;
-use crate::clippy_lint_level::ClippyLintLevel;
-use crate::constants::CLIPPY_DENIED_LINTS;
-use crate::constants::CLIPPY_TEST_ALLOWANCES;
+use crate::constants::PANICKING_LINTS;
+use crate::constants::REQUIRED_CLIPPY_SETTINGS;
+use crate::constants::REQUIRED_LINT_GROUPS;
+use crate::constants::RESTRICTING_CLIPPY_SETTINGS;
+use crate::lint_level::LintLevel;
 use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
 use crate::project_model_error::ProjectModelError;
+use crate::required_clippy_setting::RequiredClippySetting;
 use crate::resolved_packages::ResolvedPackages;
 
 fn member_violations(
@@ -26,16 +29,14 @@ fn member_violations(
     let manifest = member.relative_manifest(workspace_path);
     let table = member.lint_table(workspace_path);
     let may_panic = test_crates.contains(&name);
-    let mut violations: Vec<PackageViolation> = CLIPPY_DENIED_LINTS
+    let mut violations: Vec<PackageViolation> = REQUIRED_LINT_GROUPS
         .iter()
-        .filter(|_| !may_panic)
-        .filter(|lint| !ClippyLintLevel { lint, lints }.is_denied())
-        .map(
-            |ClippyLint { name, .. }| PackageViolation::ClippyLintNotDenied {
-                lint: (*name).to_owned(),
-                table: table.clone(),
-            },
-        )
+        .chain(PANICKING_LINTS.iter().filter(|_| !may_panic))
+        .filter(|lint| !LintLevel { lint, lints }.is_denied())
+        .map(|lint| PackageViolation::RequiredLintNotDenied {
+            lint: lint.path(),
+            table: table.clone(),
+        })
         .collect();
 
     match configuration {
@@ -51,15 +52,34 @@ fn member_violations(
             });
         }
         ClippyConfigurationFile::Present { file, settings } => {
+            let relative = workspace_path.relative(&file);
+
             violations.extend(
-                CLIPPY_TEST_ALLOWANCES
+                REQUIRED_CLIPPY_SETTINGS
                     .iter()
-                    .filter(|setting| {
-                        !matches!(settings.get(**setting), Some(Value::Boolean(true)))
+                    .filter(|RequiredClippySetting { name, value }| {
+                        settings.get(*name) != Some(&Value::Boolean(*value))
                     })
-                    .map(|setting| PackageViolation::ClippyTestAllowanceMissing {
-                        file: workspace_path.relative(&file),
-                        setting: (*setting).to_owned(),
+                    .map(|RequiredClippySetting { name, value }| {
+                        PackageViolation::RequiredClippySettingMissing {
+                            file: relative.clone(),
+                            setting: (*name).to_owned(),
+                            value: *value,
+                        }
+                    }),
+            );
+            violations.extend(
+                settings
+                    .keys()
+                    .filter(|setting| {
+                        !REQUIRED_CLIPPY_SETTINGS
+                            .iter()
+                            .any(|RequiredClippySetting { name, .. }| name == setting)
+                            && !RESTRICTING_CLIPPY_SETTINGS.contains(&setting.as_str())
+                    })
+                    .map(|setting| PackageViolation::UnvettedClippySetting {
+                        file: relative.clone(),
+                        setting: setting.clone(),
                     }),
             );
         }
@@ -80,6 +100,7 @@ impl ClippyRequirements<'_> {
     /// cannot be read or is not valid TOML.
     pub fn violations(&self) -> Result<Vec<PackageViolation>, ProjectModelError> {
         let workspace_path = self.resolved.workspace_path();
+        let mut found = BTreeMap::new();
 
         self.resolved
             .members()
@@ -87,6 +108,7 @@ impl ClippyRequirements<'_> {
                 ClippyConfigurationFile::discover(
                     &package.metadata.manifest_path,
                     workspace_path.root,
+                    &mut found,
                 )
                 .map(|configuration| {
                     member_violations(package, configuration, self.resolved, self.test_crates)

@@ -19,7 +19,7 @@ fn non_doc_comment_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["NonDocComment: 5 violations\n\
-            Names and structure document the code; only doc comments, which documentation tooling consumes, are allowed. Rename or restructure until the comment is unnecessary, or make it a doc comment if it documents an API.\n\
+            Names and structure document the code; only doc comments, which documentation tooling consumes, are allowed, and only on the items they document. Rename or restructure until the comment is unnecessary, or make it a doc comment if it documents an item; a statement, an expression or an unsafe block has no comment form, and unsafe code exists only where a crate integrates foreign code.\n\
             \n\
             - src/lib.rs:6:1: Comment is not a doc comment\n    \
             // A line comment explains what names should.\n\

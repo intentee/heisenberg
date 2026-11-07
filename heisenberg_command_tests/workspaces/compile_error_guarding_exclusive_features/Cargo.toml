@@ -1,0 +1,47 @@
+[package]
+name = "compile_error_guarding_exclusive_features"
+edition = "2024"
+version = "0.1.0"
+
+[features]
+shared_runtime = []
+static_runtime = []
+
+[workspace]
+
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+expect_used = "deny"
+panic = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu-shared"
+target = "x86_64-unknown-linux-gnu"
+default_features = false
+features = ["shared_runtime"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu-static"
+target = "x86_64-unknown-linux-gnu"
+default_features = false
+features = ["static_runtime"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc-shared"
+target = "x86_64-pc-windows-msvc"
+default_features = false
+features = ["shared_runtime"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc-static"
+target = "x86_64-pc-windows-msvc"
+default_features = false
+features = ["static_runtime"]

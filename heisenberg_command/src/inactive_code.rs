@@ -6,10 +6,10 @@ use heisenberg_module_graph::inactive_focus::InactiveFocus;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::walked_code::WalkedCode;
 
-use crate::target_analysis::TargetAnalysis;
+use crate::configuration_analysis::ConfigurationAnalysis;
 
 pub struct InactiveCode<'code> {
-    pub analyses: &'code [TargetAnalysis],
+    pub analyses: &'code [ConfigurationAnalysis],
 }
 
 impl InactiveCode<'_> {
@@ -18,10 +18,17 @@ impl InactiveCode<'_> {
         let walked: Vec<&WalkedCode> = self
             .analyses
             .iter()
-            .flat_map(|TargetAnalysis { graphs, .. }| graphs)
+            .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
             .map(|CrateModuleGraph { walked_code, .. }| walked_code)
             .collect();
+        let mut walked_files: BTreeMap<&str, Vec<&WalkedCode>> = BTreeMap::new();
         let mut foci: BTreeMap<&SourceLocation, BTreeSet<&SourceLocation>> = BTreeMap::new();
+
+        for code in &walked {
+            for file in &code.files {
+                walked_files.entry(file).or_default().push(code);
+            }
+        }
 
         for InactiveFocus {
             location,
@@ -31,9 +38,10 @@ impl InactiveCode<'_> {
             .iter()
             .flat_map(|WalkedCode { inactive_foci, .. }| inactive_foci)
         {
-            let is_dead_everywhere = walked
-                .iter()
-                .filter(|WalkedCode { files, .. }| files.contains(&location.file))
+            let is_dead_everywhere = walked_files
+                .get(location.file.as_str())
+                .into_iter()
+                .flatten()
                 .all(
                     |WalkedCode {
                          active_tokens,

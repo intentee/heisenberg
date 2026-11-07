@@ -4,10 +4,24 @@ edition = "2024"
 version = "0.1.0"
 
 [lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
 expect_used = "warn"
 unwrap_used = "deny"
 
 [workspace]
 
 [workspace.metadata.heisenberg]
-targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

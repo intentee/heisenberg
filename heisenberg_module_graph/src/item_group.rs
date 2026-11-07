@@ -11,6 +11,7 @@ pub enum ItemGroup {
     PrivateHelper,
     PrivateType,
     PublicItem,
+    Test,
     InlineModule,
 }
 
@@ -24,6 +25,7 @@ impl Display for ItemGroup {
             Self::PrivateHelper => "private helpers",
             Self::PrivateType => "private types",
             Self::PublicItem => "public items",
+            Self::Test => "tests",
             Self::InlineModule => "inline modules",
         })
     }

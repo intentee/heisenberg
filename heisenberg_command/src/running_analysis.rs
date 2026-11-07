@@ -1,11 +1,11 @@
 use std::thread::ScopedJoinHandle;
 
-use heisenberg_project_model::supported_target::SupportedTarget;
+use heisenberg_project_model::configuration::Configuration;
 
+use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::heisenberg_command_error::HeisenbergCommandError;
-use crate::target_analysis::TargetAnalysis;
 
 pub struct RunningAnalysis<'scope> {
-    pub handle: ScopedJoinHandle<'scope, Result<TargetAnalysis, HeisenbergCommandError>>,
-    pub target: SupportedTarget,
+    pub configuration: Configuration,
+    pub handle: ScopedJoinHandle<'scope, Result<ConfigurationAnalysis, HeisenbergCommandError>>,
 }

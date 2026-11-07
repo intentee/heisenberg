@@ -7,6 +7,7 @@ use std::process::Output;
 use std::str;
 
 use heisenberg_command_tests::constants::CARGO_HOME_VARIABLE;
+use heisenberg_command_tests::constants::HOST_SELECTION;
 use heisenberg_command_tests::constants::LLVM_PROFILE_FILE_VARIABLE;
 use heisenberg_command_tests::constants::PATH_VARIABLE;
 use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
@@ -19,6 +20,7 @@ fn heisenberg_check(cargo_home: &Path, sysroot: &Path, workspace: &Path) -> io::
         .env(PATH_VARIABLE, "")
         .envs(env::vars_os().filter(|(name, _)| name == LLVM_PROFILE_FILE_VARIABLE))
         .arg("check")
+        .args(HOST_SELECTION)
         .arg("--cargo-home")
         .arg(cargo_home)
         .arg("--sysroot")

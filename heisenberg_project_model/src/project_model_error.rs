@@ -1,7 +1,9 @@
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use cargo::context::Definition;
 use cargo_platform::ParseError;
@@ -18,19 +20,50 @@ use heisenberg_error_context::contextual_error::ContextualError;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_workspace_build::workspace_build_error::WorkspaceBuildError;
 
+use crate::configuration::Configuration;
+use crate::configuration_list::ConfigurationList;
 use crate::constants::CARGO_ENVIRONMENT_TABLE;
 use crate::constants::CLIPPY_ARGUMENTS_VARIABLE;
 use crate::constants::CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE;
 use crate::constants::NIGHTLY_BOOTSTRAP_VARIABLE;
-use crate::constants::SUPPORTED_TARGETS;
-use crate::supported_target::SupportedTarget;
+use crate::supported_target_list::SupportedTargetList;
 
 #[derive(Debug, Error)]
 pub enum ProjectModelError {
-    #[error("`{manifest_path}` declares the target `{target}` more than once")]
-    DuplicateTarget {
+    #[error(
+        "`{manifest_path}` declares the configurations `{first}` and `{second}` with the same target and features"
+    )]
+    ConfigurationsAnalyseTheSameBuild {
+        first: String,
         manifest_path: AbsPathBuf,
-        target: String,
+        second: String,
+    },
+    #[error("`{manifest_path}` declares the configuration `{configuration}` more than once")]
+    ConfigurationDeclaredTwice {
+        configuration: String,
+        manifest_path: AbsPathBuf,
+    },
+    #[error(
+        "the configuration `{configuration}` of `{manifest_path}` lists the feature `{feature}` more than once"
+    )]
+    ConfigurationFeatureListedTwice {
+        configuration: String,
+        feature: String,
+        manifest_path: AbsPathBuf,
+    },
+    #[error(
+        "`{manifest_path}` uses resolver 1 with a root package and other members, so cargo would apply the feature selection of the configuration `{configuration}` to the root package only"
+    )]
+    ConfigurationFeaturesReachOnlyTheRootPackage {
+        configuration: String,
+        manifest_path: AbsPathBuf,
+    },
+    #[error("`{configuration}` is selected twice with --configuration")]
+    ConfigurationSelectedTwice { configuration: String },
+    #[error("`{manifest_path}` declares the configuration at index {index} without a name")]
+    ConfigurationWithoutName {
+        index: usize,
+        manifest_path: AbsPathBuf,
     },
     #[error("the [workspace.metadata.heisenberg] settings of `{manifest_path}` are invalid")]
     HeisenbergSettingsInvalid {
@@ -40,53 +73,34 @@ pub enum ProjectModelError {
     },
     #[error("`{manifest_path}` declares no [workspace.metadata.heisenberg] settings")]
     HeisenbergSettingsMissing { manifest_path: AbsPathBuf },
-    #[error("`{manifest_path}` declares no targets in [workspace.metadata.heisenberg]")]
-    NoTargets { manifest_path: AbsPathBuf },
+    #[error("`{manifest_path}` declares no configurations in [workspace.metadata.heisenberg]")]
+    NoConfigurations { manifest_path: AbsPathBuf },
     #[error(
-        "`{target}` in `{manifest_path}` is not a supported target; the supported targets are {}",
-        SUPPORTED_TARGETS.map(SupportedTarget::triple).join(", ")
+        "`{configuration}` is selected with --configuration, but `{manifest_path}` does not declare it; the declared configurations are {}",
+        ConfigurationList { configurations: declared }
     )]
-    UnknownTarget {
-        manifest_path: AbsPathBuf,
-        target: String,
-    },
-    #[error(
-        "`{target}` is selected with --target, but `{manifest_path}` does not declare it; the declared targets are {}",
-        declared.join(", ")
-    )]
-    SelectedTargetNotDeclared {
-        declared: Vec<String>,
-        manifest_path: AbsPathBuf,
-        target: String,
-    },
-    #[error(
-        "`{host}` is the host target, but `{manifest_path}` does not declare it; the declared targets are {}, which --target can select",
-        declared.join(", ")
-    )]
-    HostTargetNotDeclared {
-        declared: Vec<String>,
-        host: &'static str,
+    SelectedConfigurationNotDeclared {
+        configuration: String,
+        declared: BTreeSet<Configuration>,
         manifest_path: AbsPathBuf,
     },
-    #[error("`{target}` is selected twice with --target")]
-    TargetSelectedTwice { target: String },
     #[error(
-        "feature `{feature}` is selected with --features, but no member of `{manifest_path}` defines it"
+        "the configuration `{configuration}` of `{manifest_path}` selects the feature `{feature}`, which no workspace member defines"
     )]
-    UnknownSelectedFeature {
+    UnknownConfigurationFeature {
+        configuration: String,
         feature: String,
         manifest_path: AbsPathBuf,
     },
     #[error(
-        "`{feature}` is not the name of a feature; --features takes only the names of features that workspace members define"
+        "the configuration `{configuration}` of `{manifest_path}` targets `{target}`, which is not a supported target; the supported targets are {}",
+        SupportedTargetList
     )]
-    SelectedFeatureNotAName { feature: String },
-    #[error(
-        "`{manifest_path}` uses resolver 1 with a root package and other members, so cargo applies --features and --no-default-features to the root package only"
-    )]
-    SelectedFeaturesReachOnlyTheRootPackage { manifest_path: AbsPathBuf },
-    #[error("cargo rejects the features selected with --features")]
-    SelectedFeaturesRejected(#[source] Box<dyn Error + Send + Sync>),
+    UnknownConfigurationTarget {
+        configuration: String,
+        manifest_path: AbsPathBuf,
+        target: String,
+    },
     #[error("the cargo configuration of `{manifest_path}` cannot be loaded")]
     CargoConfiguration {
         manifest_path: PathBuf,
@@ -218,20 +232,20 @@ pub enum ProjectModelError {
         versions: Vec<String>,
     },
     #[error(
-        "`{manifest_path}` declares an out-dir for `{package}` without the cfgs and env of its build script for {target}"
+        "`{manifest_path}` declares an out-dir for `{package}` without the build script output of the configuration `{configuration}`"
     )]
-    OutDirTargetUndeclared {
+    OutDirConfigurationUndeclared {
+        configuration: String,
         manifest_path: AbsPathBuf,
         package: String,
-        target: String,
     },
     #[error(
-        "`{manifest_path}` declares an out-dir for `{package}` with the build script output of {target}, which is not a declared target"
+        "`{manifest_path}` declares an out-dir for `{package}` with the build script output of `{configuration}`, which is not a declared configuration"
     )]
-    UnknownOutDirTarget {
+    UnknownOutDirConfiguration {
+        configuration: String,
         manifest_path: AbsPathBuf,
         package: String,
-        target: String,
     },
     #[error("`{manifest_path}` declares an out-dir for `{package}`, which has no build script")]
     OutDirPackageWithoutBuildScript {
@@ -239,15 +253,18 @@ pub enum ProjectModelError {
         package: String,
     },
     #[error(
-        "`{manifest_path}` declares the out-dir `{directory}` for `{package}` outside the workspace"
+        "`{manifest_path}` declares the out-dir `{directory}` of `{package}` for the configuration `{configuration}` outside the workspace"
     )]
     OutDirOutsideWorkspace {
+        configuration: String,
         directory: String,
         manifest_path: AbsPathBuf,
         package: String,
     },
-    #[error("the build scripts and procedural macros of the workspace cannot be built for {}", .0.context.triple())]
-    WorkspaceBuild(#[source] ContextualError<SupportedTarget, WorkspaceBuildError>),
+    #[error("the build scripts and procedural macros of the workspace cannot be built for the configuration `{}`", .0.context.name)]
+    WorkspaceBuild(#[source] ContextualError<Configuration, Box<WorkspaceBuildError>>),
+    #[error("cargo cannot prepare the build of the build scripts and procedural macros")]
+    WorkspaceBuildSession(#[source] WorkspaceBuildError),
     #[error("the embedded target specification cannot be read")]
     TargetSpec(#[source] error::Error),
     #[error("the build script output cfg `{}` cannot be parsed", .0.context)]
@@ -256,12 +273,14 @@ pub enum ProjectModelError {
     UnreadableBuildScriptOutput(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the procedural macros of `{}` cannot be loaded", .0.context)]
     ProcMacroLoad(#[source] ContextualError<AbsPathBuf, ProcMacroLoadingError>),
-    #[error("the sysroot has no rustc at `{compiler}`")]
-    SysrootWithoutCompiler { compiler: AbsPathBuf },
+    #[error("the sysroot has no rustc in `{directory}`")]
+    SysrootWithoutCompiler { directory: AbsPathBuf },
     #[error("the sysroot has no procedural macro server")]
     ProcMacroServerMissing(#[source] Box<dyn Error + Send + Sync>),
     #[error("the procedural macro server `{}` cannot be started", .0.context)]
     ProcMacroServerSpawn(#[source] ContextualError<AbsPathBuf, io::Error>),
+    #[error(transparent)]
+    ProcMacroServerUnavailable(Arc<Self>),
     #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
     UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]

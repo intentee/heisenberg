@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use ra_ap_cfg::CfgOptions;
 use ra_ap_hir::Crate;
 use ra_ap_hir::ModuleDef;
@@ -9,17 +7,20 @@ use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
-use ra_ap_vfs::FileId;
 
 use heisenberg_module_graph::item_group::ItemGroup;
 
+use crate::attributed_item::AttributedItem;
 use crate::defined_items::DefinedItems;
 use crate::impl_home::ImplHome;
 use crate::implemented_type::ImplementedType;
 use crate::item_visibility::ItemVisibility;
+use crate::local_macro::LocalMacro;
+use crate::local_macro_import::LocalMacroImport;
 use crate::ordered_entries::OrderedEntries;
 use crate::ordered_entry::OrderedEntry;
 use crate::outside_visibility::OutsideVisibility;
+use crate::token_origin::TokenOrigin;
 use crate::trait_arguments::trait_arguments;
 
 pub struct ItemOrder<'order, 'database> {
@@ -27,7 +28,7 @@ pub struct ItemOrder<'order, 'database> {
     pub krate: Crate,
     pub options: &'order CfgOptions,
     pub semantics: &'order Semantics<'database, RootDatabase>,
-    pub workspace_files: &'order BTreeSet<FileId>,
+    pub token_origin: &'order TokenOrigin<'order, 'database>,
 }
 
 impl ItemOrder<'_, '_> {
@@ -44,10 +45,7 @@ impl ItemOrder<'_, '_> {
     fn crate_group(&self, krate: Crate) -> ItemGroup {
         if krate == self.krate {
             ItemGroup::LocalImport
-        } else if self
-            .workspace_files
-            .contains(&krate.root_file(self.semantics.db))
-        {
+        } else if self.token_origin.is_workspace_crate(krate) {
             ItemGroup::WorkspaceImport
         } else {
             ItemGroup::VendorImport
@@ -94,13 +92,22 @@ impl ItemOrder<'_, '_> {
                     .collect()
             },
             |path| {
-                self.path_crate(&path)
-                    .map(|krate| OrderedEntry {
-                        key: self.crate_group(krate),
-                        node: tree.syntax().clone(),
-                    })
-                    .into_iter()
-                    .collect()
+                LocalMacroImport {
+                    path: &path,
+                    semantics: self.semantics,
+                }
+                .imported_macro()
+                .map(|imported| match imported {
+                    LocalMacro::CrateLocal => ItemGroup::PrivateHelper,
+                    LocalMacro::Exported => ItemGroup::PublicItem,
+                })
+                .or_else(|| self.path_crate(&path).map(|krate| self.crate_group(krate)))
+                .map(|key| OrderedEntry {
+                    key,
+                    node: tree.syntax().clone(),
+                })
+                .into_iter()
+                .collect()
             },
         )
     }
@@ -132,6 +139,15 @@ impl ItemOrder<'_, '_> {
             } else {
                 ItemGroup::ModuleDeclaration
             }),
+            ast::Item::Fn(_)
+                if (AttributedItem {
+                    item,
+                    semantics: self.semantics,
+                })
+                .has_test_attribute() =>
+            {
+                Some(ItemGroup::Test)
+            }
             ast::Item::Const(_)
             | ast::Item::Fn(_)
             | ast::Item::MacroDef(_)

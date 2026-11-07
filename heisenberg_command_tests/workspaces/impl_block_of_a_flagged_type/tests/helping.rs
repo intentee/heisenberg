@@ -1,9 +1,9 @@
-#[test]
-fn helps() {}
-
 impl helpers::Helpers {
     fn help() {}
 }
+
+#[test]
+fn helps() {}
 
 mod helpers {
     #[derive(Debug)]

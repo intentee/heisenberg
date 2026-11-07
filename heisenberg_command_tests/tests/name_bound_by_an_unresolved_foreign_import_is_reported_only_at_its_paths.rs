@@ -20,9 +20,9 @@ fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
         str::from_utf8(&outcome.output),
         Ok([
             "UnresolvedPath: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/lib.rs:1:5: Path into shaped::backend is unresolved\n    \
+            - src/lib.rs:1:5: Path into shaped::backend compiles, but rust-analyzer cannot resolve it\n    \
             use shaped::backend::Generated;\n      \
             also unresolved at src/lib.rs:2:5\n      \
             also unresolved at src/lib.rs:12:13\n      \

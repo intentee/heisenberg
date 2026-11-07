@@ -1,7 +1,7 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
-use heisenberg_command_tests::constants::HOST_TRIPLE;
+use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 
@@ -19,7 +19,7 @@ fn build_script_output_with_an_invalid_cfg_fails_to_load_the_project() {
     assert_eq!(
         str::from_utf8(&outcome.errors),
         Ok(format!(
-            "error: the project cannot be loaded for {HOST_TRIPLE}\n\
+            "error: the project cannot be loaded for the configuration `{HOST_CONFIGURATION}`\n\
              error: the build script output cfg `not a cfg` cannot be parsed\n\
              error: failed to parse `not a cfg` as a cfg expression: unexpected content `a cfg` found after cfg expression\n"
         )

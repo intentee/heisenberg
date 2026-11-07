@@ -1,0 +1,32 @@
+use std::str;
+
+use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::host_footer::host_footer;
+
+#[test]
+fn procedural_macro_entry_points_are_exempt_only_from_the_rules_rust_forces() {
+    let outcome = HeisenbergCheck {
+        workspace: &FixtureWorkspace {
+            name: "identity_marker_macros",
+        }
+        .path(),
+    }
+    .run()
+    .expect("the arguments must parse");
+
+    assert_eq!(
+        str::from_utf8(&outcome.output),
+        Ok(["ItemOutOfOrder: 1 violation\n\
+            Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names.\n\
+            \n\
+            - src/lib.rs:13:4: Item belongs before service: private helpers precede public items\n    \
+            fn passthrough(item: TokenStream) -> TokenStream {\n\
+            \n\
+            ------------------------------\n\
+            1 errors found\n\
+            ------------------------------\n", host_footer(1, 1).as_str()].concat().as_str())
+    );
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
+}

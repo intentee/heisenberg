@@ -18,9 +18,11 @@ fn parameter_used_only_through_its_fields_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["UndestructuredParameter: 4 violations\n\
+        Ok(["UndestructuredParameter: 5 violations\n\
             A parameter used only through its fields reads better as a pattern that names those fields. Destructure the parameter in its pattern.\n\
             \n\
+            - src/guard.rs:1:13: Parameter is used only through the fields of Guard\n    \
+            fn count_of(guard: Guard) -> u8 {\n\
             - src/meters.rs:4:26: Parameter is used only through the fields of Meters\n        \
             pub fn longer(&self, other: &Self) -> bool {\n\
             - src/total.rs:5:15: Parameter is used only through the fields of (usize, &u8)\n            \
@@ -31,8 +33,8 @@ fn parameter_used_only_through_its_fields_is_a_violation() {
             .map(|other| other.end)\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
-            ------------------------------\n", host_footer(1, 4).as_str()].concat().as_str())
+            5 errors found\n\
+            ------------------------------\n", host_footer(1, 5).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

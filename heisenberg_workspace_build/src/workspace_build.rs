@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use std::collections::hash_map::Entry;
 use std::io;
 use std::mem;
-use std::path::Path;
 use std::sync::Arc;
 
 use cargo::GlobalContext;
@@ -11,11 +10,8 @@ use cargo::compiler::BuildConfig;
 use cargo::compiler::BuildContext;
 use cargo::compiler::BuildRunner;
 use cargo::compiler::CompileMode;
-use cargo::compiler::CrateType;
 use cargo::compiler::DefaultExecutor;
 use cargo::compiler::Executor;
-use cargo::compiler::FileFlavor;
-use cargo::compiler::FileType;
 use cargo::compiler::MessageFormat;
 use cargo::compiler::Unit;
 use cargo::compiler::UnitInterner;
@@ -33,12 +29,12 @@ use cargo_metadata::BuildScript;
 use cargo_metadata::Message;
 use cargo_metadata::TargetKind;
 use cargo_metadata::camino::Utf8PathBuf;
-use cargo_util_terminal::Shell;
 
 use crate::build_outputs::BuildOutputs;
 use crate::build_script_output::BuildScriptOutput;
 use crate::captured_output::CapturedOutput;
-use crate::configured_context::ConfiguredContext;
+use crate::cargo_session::CargoSession;
+use crate::proc_macro_library::proc_macro_library;
 use crate::workspace_build_error::WorkspaceBuildError;
 
 const fn build_script(message: &Message) -> Option<&BuildScript> {
@@ -92,12 +88,28 @@ fn proc_macro_artifact(message: &Message) -> Option<&Artifact> {
     }
 }
 
+fn proc_macro_dylibs(
+    host: &[Message],
+) -> Result<BTreeMap<Utf8PathBuf, Utf8PathBuf>, WorkspaceBuildError> {
+    host.iter()
+        .filter_map(proc_macro_artifact)
+        .map(
+            |Artifact {
+                 filenames, target, ..
+             }| {
+                proc_macro_library(&target.name, filenames)
+                    .map(|library| (target.src_path.clone(), library))
+            },
+        )
+        .collect()
+}
+
 pub struct WorkspaceBuild<'build> {
-    pub context: &'build ConfiguredContext<'build>,
     pub features: &'build CliFeatures,
-    pub manifest_path: &'build Path,
+    pub session: &'build CargoSession,
     pub substituted_packages: &'build BTreeSet<String>,
     pub target: &'build str,
+    pub workspace: &'build Workspace<'build>,
 }
 
 impl WorkspaceBuild<'_> {
@@ -107,18 +119,9 @@ impl WorkspaceBuild<'_> {
     /// scripts and procedural macros of the workspace for the target, or when a build
     /// script that runs needs one that the workspace declares instead.
     pub fn outputs(&self) -> Result<BuildOutputs, WorkspaceBuildError> {
-        let captured = CapturedOutput::default();
+        let CargoSession { captured, context } = self.session;
 
-        self.context
-            .with_shell(Shell::from_write(Box::new(captured.clone())))
-            .map_err(Into::into)
-            .map_err(WorkspaceBuildError::CargoConfiguration)
-            .and_then(|context| {
-                Workspace::new(self.manifest_path, &context)
-                    .map_err(Into::into)
-                    .map_err(WorkspaceBuildError::CargoWorkspace)
-                    .and_then(|workspace| self.workspace_outputs(&context, &workspace, &captured))
-            })
+        self.workspace_outputs(context, self.workspace, captured)
     }
 
     fn closure(&self, graph: &UnitGraph, roots: &[Unit]) -> Result<UnitGraph, WorkspaceBuildError> {
@@ -198,7 +201,6 @@ impl WorkspaceBuild<'_> {
 
     fn planned_outputs(
         &self,
-        context: &GlobalContext,
         plan: &mut BuildContext<'_, '_>,
         captured: &CapturedOutput,
     ) -> Result<BuildOutputs, WorkspaceBuildError> {
@@ -208,86 +210,24 @@ impl WorkspaceBuild<'_> {
             .and_then(|host| {
                 self.messages(plan, &graph, is_run_for_the_target, captured)
                     .and_then(|target| {
-                        Self::proc_macro_dylibs(context, plan, &graph, &host).map(
-                            |proc_macro_dylibs| {
-                                let host_scripts = build_script_outputs(&host);
+                        proc_macro_dylibs(&host).map(|proc_macro_dylibs| {
+                            let host_scripts = build_script_outputs(&host);
 
-                                BuildOutputs {
-                                    build_scripts: host_scripts
-                                        .clone()
-                                        .into_iter()
-                                        .chain(build_script_outputs(&target).into_iter().filter(
-                                            |(package, output)| {
-                                                host_scripts.get(package) != Some(output)
-                                            },
-                                        ))
-                                        .collect(),
-                                    proc_macro_dylibs,
-                                }
-                            },
-                        )
+                            BuildOutputs {
+                                build_scripts: host_scripts
+                                    .clone()
+                                    .into_iter()
+                                    .chain(build_script_outputs(&target).into_iter().filter(
+                                        |(package, output)| {
+                                            host_scripts.get(package) != Some(output)
+                                        },
+                                    ))
+                                    .collect(),
+                                proc_macro_dylibs,
+                            }
+                        })
                     })
             })
-    }
-
-    fn proc_macro_dylibs(
-        context: &GlobalContext,
-        BuildContext { target_data, .. }: &BuildContext<'_, '_>,
-        graph: &UnitGraph,
-        host: &[Message],
-    ) -> Result<BTreeMap<Utf8PathBuf, Utf8PathBuf>, WorkspaceBuildError> {
-        let artifacts: BTreeMap<String, &Artifact> = host
-            .iter()
-            .filter_map(proc_macro_artifact)
-            .map(|artifact| (artifact.package_id.repr.clone(), artifact))
-            .collect();
-
-        graph
-            .keys()
-            .filter(|unit| is_proc_macro_dylib(unit))
-            .map(|unit| {
-                target_data
-                    .info(unit.kind)
-                    .rustc_outputs(
-                        unit.mode,
-                        unit.target.kind(),
-                        target_data.short_name(&unit.kind),
-                        context,
-                    )
-                    .map_err(Into::into)
-                    .map_err(WorkspaceBuildError::ProcMacroFileTypes)
-                    .map(|(file_types, _)| {
-                        let artifact = artifacts[&unit.pkg.package_id().to_spec().to_string()];
-
-                        file_types
-                            .iter()
-                            .filter(
-                                |FileType {
-                                     flavor, crate_type, ..
-                                 }| {
-                                    *flavor == FileFlavor::Linkable
-                                        && *crate_type == Some(CrateType::ProcMacro)
-                                },
-                            )
-                            .flat_map(|file_type| {
-                                let (prefix, suffix) = file_type.output_prefix_suffix(&unit.target);
-
-                                artifact
-                                    .filenames
-                                    .iter()
-                                    .filter(move |file| {
-                                        file.file_name().is_some_and(|name| {
-                                            name.starts_with(&prefix) && name.ends_with(&suffix)
-                                        })
-                                    })
-                                    .map(|dylib| (artifact.target.src_path.clone(), dylib.clone()))
-                                    .collect::<BTreeMap<Utf8PathBuf, Utf8PathBuf>>()
-                            })
-                            .collect::<BTreeMap<Utf8PathBuf, Utf8PathBuf>>()
-                    })
-            })
-            .collect::<Result<Vec<BTreeMap<Utf8PathBuf, Utf8PathBuf>>, WorkspaceBuildError>>()
-            .map(|dylibs| dylibs.into_iter().flatten().collect())
     }
 
     fn workspace_outputs(
@@ -335,7 +275,7 @@ impl WorkspaceBuild<'_> {
                         .map(|kind| plan.target_data.info(*kind).sysroot_target_libdir.clone())
                         .find(|directory| !directory.is_dir())
                         .map_or_else(
-                            || self.planned_outputs(context, &mut plan, captured),
+                            || self.planned_outputs(&mut plan, captured),
                             |directory| {
                                 Err(WorkspaceBuildError::TargetLibraryMissing {
                                     directory,

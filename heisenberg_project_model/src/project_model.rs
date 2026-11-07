@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
+use std::sync::OnceLock;
 
 use ra_ap_paths::AbsPathBuf;
 
@@ -10,30 +12,81 @@ use heisenberg_workspace_build::configured_context::ConfiguredContext;
 
 use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
-use crate::constants::RUSTC_VARIABLE;
+use crate::configuration::Configuration;
+use crate::configuration_builds::ConfigurationBuilds;
+use crate::configuration_selection::ConfigurationSelection;
+use crate::declared_configurations::DeclaredConfigurations;
 use crate::declared_out_dirs::DeclaredOutDirs;
-use crate::declared_targets::declared_targets;
 use crate::declared_test_crates::DeclaredTestCrates;
 use crate::feature_graph::FeatureGraph;
-use crate::feature_selection::FeatureSelection;
 use crate::heisenberg_settings::HeisenbergSettings;
 use crate::library_directory::library_directory;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
+use crate::resolved_packages::ResolvedPackages;
 use crate::resolved_project::ResolvedProject;
 use crate::run_scope::RunScope;
-use crate::sysroot_compiler::sysroot_compiler;
-use crate::target_builds::TargetBuilds;
-use crate::target_selection::TargetSelection;
+use crate::supported_target::SupportedTarget;
+use crate::target_model::TargetModel;
 use crate::utf8_environment::utf8_environment;
 use crate::workspace_manifest::workspace_manifest;
+use crate::workspace_packages::WorkspacePackages;
+
+fn validate_crate_roots(
+    ResolvedPackages {
+        member_targets,
+        workspace,
+        ..
+    }: &ResolvedPackages,
+) -> Result<(), ProjectModelError> {
+    let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
+
+    for MemberTarget { crate_target, root } in member_targets {
+        let crate_root = root.normalize();
+
+        if !crate_root.starts_with(&workspace.root) {
+            return Err(ProjectModelError::CrateRootOutsideWorkspace {
+                crate_root: crate_root.into(),
+                workspace_root: workspace.root.clone().into(),
+            });
+        }
+
+        if let Some(owner) = owners.insert(crate_root.clone(), crate_target) {
+            return Err(ProjectModelError::SharedCrateRoot {
+                crate_root: crate_root.into(),
+                first: Box::new(owner.clone()),
+                second: Box::new(crate_target.clone()),
+            });
+        }
+
+        fs::read(root).map_err(error_context(
+            root.clone().into(),
+            ProjectModelError::CrateRootUnreadable,
+        ))?;
+    }
+
+    Ok(())
+}
+
+fn target_models(
+    configurations: &BTreeSet<Configuration>,
+    library: &FeatureGraph,
+    sysroot: &AbsPathBuf,
+) -> Result<BTreeMap<SupportedTarget, TargetModel>, ProjectModelError> {
+    configurations
+        .iter()
+        .map(|Configuration { target, .. }| *target)
+        .collect::<BTreeSet<SupportedTarget>>()
+        .into_iter()
+        .map(|target| TargetModel::new(target, library, sysroot).map(|model| (target, model)))
+        .collect()
+}
 
 pub struct ProjectModel {
     pub cargo_home: AbsPathBuf,
+    pub configurations: ConfigurationSelection,
     pub environment: BTreeMap<OsString, OsString>,
-    pub features: FeatureSelection,
     pub sysroot: AbsPathBuf,
-    pub targets: TargetSelection,
     pub workspace_directory: AbsPathBuf,
 }
 
@@ -54,46 +107,23 @@ impl ProjectModel {
         .resolve()?;
         let manifest_path = workspace_manifest(&self.workspace_directory);
         let HeisenbergSettings {
+            configurations: declared_configurations,
             out_dirs,
-            targets: declared_triples,
             test_crates,
         } = HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
-        let declared = declared_targets(declared_triples, &manifest_path)?;
-        let targets = self.targets.analysed(&declared, &manifest_path)?;
-
-        self.features.validate(&project, &manifest_path)?;
-
-        let substituted = DeclaredOutDirs {
+        let declared = DeclaredConfigurations {
             manifest_path: &manifest_path,
             resolved: &project,
-            targets: &declared,
+        }
+        .validated(declared_configurations)?;
+        let configurations = self.configurations.analysed(&declared, &manifest_path)?;
+        let substituted = DeclaredOutDirs {
+            configurations: &declared,
+            manifest_path: &manifest_path,
+            resolved: &project,
         }
         .validated(out_dirs)?;
-        let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
-
-        for MemberTarget { crate_target, root } in &project.member_targets {
-            let crate_root = root.normalize();
-
-            if !crate_root.starts_with(&project.workspace.root) {
-                return Err(ProjectModelError::CrateRootOutsideWorkspace {
-                    crate_root: crate_root.into(),
-                    workspace_root: project.workspace.root.clone().into(),
-                });
-            }
-
-            if let Some(owner) = owners.insert(crate_root.clone(), crate_target) {
-                return Err(ProjectModelError::SharedCrateRoot {
-                    crate_root: crate_root.into(),
-                    first: Box::new(owner.clone()),
-                    second: Box::new(crate_target.clone()),
-                });
-            }
-
-            fs::read(root).map_err(error_context(
-                root.clone().into(),
-                ProjectModelError::CrateRootUnreadable,
-            ))?;
-        }
+        validate_crate_roots(&project)?;
 
         let library = CargoPackages {
             cargo_home: self.cargo_home.as_ref(),
@@ -111,39 +141,44 @@ impl ProjectModel {
                     .map_err(Box::new)
                     .map_err(ProjectModelError::LibraryPackageGraph)
                     .and_then(|library| {
-                        let compiler = sysroot_compiler(&self.sysroot);
-                        let mut build_environment = environment.clone();
-
-                        build_environment
-                            .insert(RUSTC_VARIABLE.to_owned(), compiler.as_str().to_owned());
-
-                        let build_outputs = TargetBuilds {
-                            compiler: &compiler,
+                        let build_outputs = ConfigurationBuilds {
+                            configurations: &configurations,
                             context: &ConfiguredContext {
                                 cargo_home: self.cargo_home.as_ref(),
-                                environment: &build_environment,
+                                environment: &environment,
                                 nightly_features_allowed: false,
                                 workspace_directory: self.workspace_directory.as_ref(),
                             },
-                            features: &self.features.cli_features(),
                             manifest_path: &manifest_path,
                             resolved: &project.resolved,
                             substituted: &substituted,
-                            targets: &targets,
+                            sysroot: &self.sysroot,
                         }
                         .outputs();
 
-                        build_outputs.map(|build_outputs| ResolvedProject {
-                            build_outputs,
-                            declared_test_crates: DeclaredTestCrates { names: test_crates },
-                            library,
-                            project,
-                            scope: RunScope {
-                                features: self.features.clone(),
-                                left_out_targets: declared.difference(&targets).copied().collect(),
-                            },
-                            sysroot: self.sysroot.clone(),
-                            targets,
+                        build_outputs.and_then(|build_outputs| {
+                            target_models(&configurations, &library, &self.sysroot).map(|targets| {
+                                let declared_test_crates =
+                                    DeclaredTestCrates { names: test_crates };
+
+                                ResolvedProject {
+                                    build_outputs,
+                                    packages: WorkspacePackages::new(
+                                        &project.resolved,
+                                        &declared_test_crates,
+                                    ),
+                                    declared_test_crates,
+                                    project,
+                                    proc_macro_server: OnceLock::new(),
+                                    scope: RunScope {
+                                        left_out_configurations: declared
+                                            .difference(&configurations)
+                                            .cloned()
+                                            .collect(),
+                                    },
+                                    targets,
+                                }
+                            })
                         })
                     })
             })

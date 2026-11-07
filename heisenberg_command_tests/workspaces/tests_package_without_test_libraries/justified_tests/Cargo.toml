@@ -10,7 +10,13 @@ library = { path = "../library" }
 [dev-dependencies]
 extra_harness = { path = "../extra_harness" }
 
+[lints.rust]
+warnings = "deny"
+
 [lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
 expect_used = "deny"
 panic = "deny"
 unwrap_used = "deny"

@@ -7,18 +7,20 @@ use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPath;
 
 use heisenberg_error_context::error_context::error_context;
+use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
+use crate::configuration::Configuration;
+use crate::declared_build_script_output::DeclaredBuildScriptOutput;
 use crate::declared_out_dir::DeclaredOutDir;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
 use crate::substituted_build_script::SubstitutedBuildScript;
-use crate::supported_target::SupportedTarget;
 
 pub struct DeclaredOutDirs<'declaration> {
+    pub configurations: &'declaration BTreeSet<Configuration>,
     pub manifest_path: &'declaration AbsPath,
     pub resolved: &'declaration ResolvedPackages,
-    pub targets: &'declaration BTreeSet<SupportedTarget>,
 }
 
 impl DeclaredOutDirs<'_> {
@@ -28,14 +30,7 @@ impl DeclaredOutDirs<'_> {
     ) -> Result<BTreeMap<String, SubstitutedBuildScript>, ProjectModelError> {
         let mut validated = BTreeMap::new();
 
-        for (
-            package,
-            DeclaredOutDir {
-                directory,
-                mut targets,
-            },
-        ) in out_dirs
-        {
+        for (package, DeclaredOutDir { mut configurations }) in out_dirs {
             let PackageDocument { metadata, .. } = match self
                 .resolved
                 .packages
@@ -74,50 +69,58 @@ impl DeclaredOutDirs<'_> {
                 });
             }
 
-            let base = self.resolved.workspace.root.join(&directory).normalize();
-
-            if !base.starts_with(&self.resolved.workspace.root) {
-                return Err(ProjectModelError::OutDirOutsideWorkspace {
-                    directory,
-                    manifest_path: self.manifest_path.to_path_buf(),
-                    package,
-                });
-            }
-
             let mut declared = BTreeMap::new();
 
-            for target in self.targets {
-                let target_directory = base.join(target.triple());
-
-                fs::read_dir(&target_directory).map_err(error_context(
-                    target_directory.into(),
-                    ProjectModelError::UnreadableOutDir,
-                ))?;
-
-                let Some(output) = targets.remove(target.triple()) else {
-                    return Err(ProjectModelError::OutDirTargetUndeclared {
+            for configuration in self.configurations {
+                let Some(DeclaredBuildScriptOutput {
+                    cfgs,
+                    directory,
+                    env,
+                }) = configurations.remove(&configuration.name)
+                else {
+                    return Err(ProjectModelError::OutDirConfigurationUndeclared {
+                        configuration: configuration.name.clone(),
                         manifest_path: self.manifest_path.to_path_buf(),
                         package,
-                        target: target.triple().to_owned(),
                     });
                 };
+                let out_dir = self.resolved.workspace.root.join(&directory).normalize();
 
-                declared.insert(*target, output);
+                if !out_dir.starts_with(&self.resolved.workspace.root) {
+                    return Err(ProjectModelError::OutDirOutsideWorkspace {
+                        configuration: configuration.name.clone(),
+                        directory,
+                        manifest_path: self.manifest_path.to_path_buf(),
+                        package,
+                    });
+                }
+
+                fs::read_dir(&out_dir).map_err(error_context(
+                    out_dir.clone().into(),
+                    ProjectModelError::UnreadableOutDir,
+                ))?;
+                declared.insert(
+                    configuration.clone(),
+                    BuildScriptOutput {
+                        cfgs,
+                        env,
+                        out_dir: out_dir.into(),
+                    },
+                );
             }
 
-            if let Some(target) = targets.into_keys().next() {
-                return Err(ProjectModelError::UnknownOutDirTarget {
+            if let Some(configuration) = configurations.into_keys().next() {
+                return Err(ProjectModelError::UnknownOutDirConfiguration {
+                    configuration,
                     manifest_path: self.manifest_path.to_path_buf(),
                     package,
-                    target,
                 });
             }
 
             validated.insert(
                 metadata.id.repr.clone(),
                 SubstitutedBuildScript {
-                    directory: base,
-                    targets: declared,
+                    configurations: declared,
                 },
             );
         }

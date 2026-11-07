@@ -26,7 +26,7 @@ fn negated_predicate_of_a_configured_out_module_file_is_reported_at_its_declarat
             \n\
             - src/lib.rs:1:9: Configuration predicate negates a feature, test or debug_assertions\n    \
             pub mod gated;\n      \
-            code active on no declared target at src/lib.rs:1:9\n\
+            code active in no declared configuration at src/lib.rs:1:9\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

@@ -21,10 +21,10 @@ fn library_with_only_inactive_items_is_empty() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["CodeActiveOnNoTarget: 1 violation\n\
-            Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
+        Ok(["CodeActiveInNoConfiguration: 1 violation\n\
+            Code active in no declared configuration is never built or analysed. Remove it, declare a configuration it is active in, or make it active in a declared configuration.\n\
             \n\
-            - library_tests/src/lib.rs:2:8: Code is active on no declared target\n    \
+            - library_tests/src/lib.rs:2:8: Code is active in no declared configuration\n    \
             pub fn never() {}\n\
             \n\
             TestsOnlyPackageWithoutTestLibraries: 1 violation\n\

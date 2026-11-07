@@ -10,7 +10,7 @@ use crate::resolved_packages::ResolvedPackages;
 
 fn production_dependents<'resolved>(
     resolved: &'resolved ResolvedPackages,
-    test_crates: &BTreeSet<&str>,
+    test_crates: &BTreeSet<String>,
     PackageDocument { metadata, .. }: &PackageDocument,
 ) -> Vec<&'resolved PackageDocument> {
     resolved
@@ -44,16 +44,45 @@ pub struct DeclaredTestCrates {
 impl DeclaredTestCrates {
     #[must_use]
     pub fn test_crates(&self, resolved: &ResolvedPackages) -> BTreeSet<String> {
-        self.valid(resolved)
-            .into_iter()
-            .map(str::to_owned)
-            .collect()
+        let mut test_crates: BTreeSet<String> = resolved
+            .members()
+            .filter(|member| {
+                member.is_unpublished()
+                    && self
+                        .names
+                        .iter()
+                        .any(|name| name.as_str() == member.metadata.name.as_str())
+            })
+            .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
+            .collect();
+
+        loop {
+            let used: Vec<String> = resolved
+                .members()
+                .filter(|member| {
+                    test_crates.contains(member.metadata.name.as_str())
+                        && !production_dependents(resolved, &test_crates, member).is_empty()
+                })
+                .map(|PackageDocument { metadata, .. }| metadata.name.to_string())
+                .collect();
+
+            if used.is_empty() {
+                return test_crates;
+            }
+
+            for name in used {
+                test_crates.remove(&name);
+            }
+        }
     }
 
     #[must_use]
-    pub fn violations(&self, resolved: &ResolvedPackages) -> Vec<PackageViolation> {
+    pub fn violations(
+        &self,
+        resolved: &ResolvedPackages,
+        test_crates: &BTreeSet<String>,
+    ) -> Vec<PackageViolation> {
         let workspace_path = resolved.workspace_path();
-        let test_crates = self.valid(resolved);
         let mut declared: BTreeSet<&str> = BTreeSet::new();
         let mut violations: BTreeSet<PackageViolation> = BTreeSet::new();
 
@@ -85,7 +114,7 @@ impl DeclaredTestCrates {
                 }
                 Some(member) => {
                     violations.extend(
-                        production_dependents(resolved, &test_crates, member)
+                        production_dependents(resolved, test_crates, member)
                             .into_iter()
                             .map(|dependent| PackageViolation::TestCrateUsedByProduction {
                                 dependent: dependent.metadata.name.to_string(),
@@ -98,38 +127,5 @@ impl DeclaredTestCrates {
         }
 
         violations.into_iter().collect()
-    }
-
-    fn valid<'resolved>(&self, resolved: &'resolved ResolvedPackages) -> BTreeSet<&'resolved str> {
-        let mut test_crates: BTreeSet<&str> = resolved
-            .members()
-            .filter(|member| {
-                member.is_unpublished()
-                    && self
-                        .names
-                        .iter()
-                        .any(|name| name.as_str() == member.metadata.name.as_str())
-            })
-            .map(|PackageDocument { metadata, .. }| metadata.name.as_str())
-            .collect();
-
-        loop {
-            let used: Vec<&str> = resolved
-                .members()
-                .filter(|member| {
-                    test_crates.contains(member.metadata.name.as_str())
-                        && !production_dependents(resolved, &test_crates, member).is_empty()
-                })
-                .map(|PackageDocument { metadata, .. }| metadata.name.as_str())
-                .collect();
-
-            if used.is_empty() {
-                return test_crates;
-            }
-
-            for name in used {
-                test_crates.remove(name);
-            }
-        }
     }
 }

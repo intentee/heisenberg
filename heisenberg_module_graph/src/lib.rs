@@ -13,6 +13,7 @@ pub mod item_placement;
 pub mod line_position;
 pub mod method_group;
 pub mod method_placement;
+pub mod method_visibility;
 pub mod module_dependency;
 pub mod module_file_analysis;
 pub mod module_path;

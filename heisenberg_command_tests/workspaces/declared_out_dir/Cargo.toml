@@ -3,15 +3,25 @@ members = ["bindings", "bindings_sys"]
 resolver = "3"
 
 [workspace.metadata.heisenberg]
-targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
 
-[workspace.metadata.heisenberg.out_dirs.bindings_sys]
-directory = "bindings_sys/generated"
-
-[workspace.metadata.heisenberg.out_dirs.bindings_sys.targets.x86_64-pc-windows-msvc]
+[workspace.metadata.heisenberg.out_dirs.bindings_sys.configurations.x86_64-pc-windows-msvc]
+directory = "bindings_sys/generated/x86_64-pc-windows-msvc"
 cfgs = ["declared_backend"]
 env = { DECLARED_VALUE = "declared" }
 
-[workspace.metadata.heisenberg.out_dirs.bindings_sys.targets.x86_64-unknown-linux-gnu]
+[workspace.metadata.heisenberg.out_dirs.bindings_sys.configurations.x86_64-unknown-linux-gnu]
+directory = "bindings_sys/generated/x86_64-unknown-linux-gnu"
 cfgs = ["declared_backend"]
 env = { DECLARED_VALUE = "declared" }
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

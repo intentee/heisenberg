@@ -1,10 +1,16 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
-use heisenberg_command_tests::constants::HOST_TRIPLE;
-use heisenberg_command_tests::constants::LEFT_OUT_TRIPLE;
+use heisenberg_command_tests::constants::HOST_CONFIGURATION;
+use heisenberg_command_tests::constants::PARTIAL_RUN_FOOTER_END;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const LEFT_OUT_CONFIGURATIONS: &str = "x86_64-pc-windows-msvc, x86_64-pc-windows-msvc-without-features, x86_64-unknown-linux-gnu-without-features";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const LEFT_OUT_CONFIGURATIONS: &str = "x86_64-pc-windows-msvc-without-features, x86_64-unknown-linux-gnu, x86_64-unknown-linux-gnu-without-features";
 
 #[test]
 fn cycle_behind_a_selected_feature_is_found() {
@@ -14,7 +20,7 @@ fn cycle_behind_a_selected_feature_is_found() {
         }
         .path(),
     }
-    .run_with_arguments(&["--features", "cyclic"])
+    .run_with_arguments(&["--configuration", HOST_CONFIGURATION])
     .expect("the arguments must parse");
 
     assert_eq!(
@@ -34,11 +40,9 @@ fn cycle_behind_a_selected_feature_is_found() {
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
-            Analysed on {HOST_TRIPLE}: 1 crate targets, 3 modules\n\
-            Not analysed: {LEFT_OUT_TRIPLE}\n\
-            Features: default features, cyclic\n\
-            Not evaluated in a partial run: CodeActiveOnNoTarget, the empty-library check of TestsOnlyPackageWithoutTestLibraries\n\
-            Precondition: rustc 1.99.1 compiles the workspace for every analysed target with the selected features\n").as_str())
+            Analysed on {HOST_CONFIGURATION}: 1 crate targets, 3 modules\n\
+            Not analysed: {LEFT_OUT_CONFIGURATIONS}\n\
+            {PARTIAL_RUN_FOOTER_END}").as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

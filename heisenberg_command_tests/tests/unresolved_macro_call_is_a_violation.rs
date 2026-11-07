@@ -20,17 +20,17 @@ fn unresolved_macro_call_is_a_violation() {
         str::from_utf8(&outcome.output),
         Ok([
             "UnresolvedMacroCall: 5 violations\n\
-            Every name must resolve for the analysis to be complete. Define or import the macro.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Define or import the macro so that rust-analyzer resolves it.\n\
             \n\
-            - src/lib.rs:1:1: Macro call is unresolved\n    \
+            - src/lib.rs:1:1: Macro call compiles, but rust-analyzer cannot resolve its macro\n    \
             Marker!();\n\
-            - src/lib.rs:3:8: Macro call is unresolved\n    \
+            - src/lib.rs:3:8: Macro call compiles, but rust-analyzer cannot resolve its macro\n    \
             crate::missing!();\n\
-            - src/lib.rs:4:16: Macro call is unresolved\n    \
+            - src/lib.rs:4:16: Macro call compiles, but rust-analyzer cannot resolve its macro\n    \
             crate::absent::missing!();\n\
-            - src/lib.rs:6:3: Macro call is unresolved\n    \
+            - src/lib.rs:6:3: Macro call compiles, but rust-analyzer cannot resolve its macro\n    \
             #[missing_attribute]\n\
-            - src/lib.rs:9:10: Macro call is unresolved\n    \
+            - src/lib.rs:9:10: Macro call compiles, but rust-analyzer cannot resolve its macro\n    \
             #[derive(MissingDerive)]\n\
             \n\
             ------------------------------\n\

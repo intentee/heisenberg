@@ -15,6 +15,9 @@ pub enum ViolationKind {
     GlobImport,
     InvalidMacroDefinition,
     ImplWithoutLocalType,
+    IncludedSourceFile {
+        file: String,
+    },
     ItemOutOfOrder {
         placement: ItemPlacement,
     },
@@ -50,6 +53,7 @@ pub enum ViolationKind {
     },
     PublicAssociatedConstant,
     PublicConstantOutsideConstantsModule,
+    ReferencedTest,
     Reexport,
     SingleLetterName,
     TestOnlyCodeInProduction,
@@ -66,6 +70,7 @@ pub enum ViolationKind {
     UnresolvedMethodCall,
     UnresolvedModule,
     UnresolvedPath,
+    UnsafeCode,
 }
 
 impl Display for ViolationKind {
@@ -83,6 +88,9 @@ impl Display for ViolationKind {
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
                 .write_str("Impl block belongs to no single type or trait of this crate"),
+            Self::IncludedSourceFile { file } => {
+                write!(formatter, "Included file {file} is not a build script output")
+            }
             Self::ItemOutOfOrder { placement } => placement.fmt(formatter),
             Self::LintSuppression => formatter.write_str("Attribute suppresses lints"),
             Self::MethodOutOfOrder { placement } => placement.fmt(formatter),
@@ -134,6 +142,7 @@ impl Display for ViolationKind {
                 formatter,
                 "Public constant belongs in crate::{CONSTANTS_MODULE_NAME}"
             ),
+            Self::ReferencedTest => formatter.write_str("Test is referenced by other code"),
             Self::Reexport => formatter.write_str("Re-export"),
             Self::SingleLetterName => formatter.write_str("Name is a single character"),
             Self::TestOnlyCodeInProduction => formatter
@@ -153,11 +162,14 @@ impl Display for ViolationKind {
             Self::UnprefixedTypeParameter => {
                 formatter.write_str("Type parameter name is not T followed by a capitalized word")
             }
-            Self::UnresolvedExternCrate => formatter.write_str("Extern crate is unresolved"),
-            Self::UnresolvedMacroCall => formatter.write_str("Macro call is unresolved"),
-            Self::UnresolvedMethodCall => formatter.write_str("Method call is unresolved"),
-            Self::UnresolvedModule => formatter.write_str("Module file is unresolved"),
-            Self::UnresolvedPath => formatter.write_str("Path is unresolved"),
+            Self::UnresolvedExternCrate => formatter.write_str("Extern crate compiles, but rust-analyzer cannot resolve it"),
+            Self::UnresolvedMacroCall => formatter.write_str("Macro call compiles, but rust-analyzer cannot resolve its macro"),
+            Self::UnresolvedMethodCall => formatter.write_str("Method call compiles, but rust-analyzer cannot resolve its method"),
+            Self::UnresolvedModule => formatter.write_str("Module declaration compiles, but rust-analyzer cannot resolve its file"),
+            Self::UnresolvedPath => formatter.write_str("Path compiles, but rust-analyzer cannot resolve it"),
+            Self::UnsafeCode => {
+                formatter.write_str("Unsafe code in a crate that integrates no foreign code")
+            }
         }
     }
 }

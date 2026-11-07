@@ -21,6 +21,22 @@ pub enum ItemExpansion {
 }
 
 impl ItemExpansion {
+    pub fn new(item: &ast::Item, semantics: &Semantics<'_, RootDatabase>) -> Self {
+        semantics
+            .expand_attr_macro(item)
+            .and_then(
+                |ExpandResult {
+                     value: InFile { file_id, value },
+                     ..
+                 }| {
+                    file_id
+                        .macro_file()
+                        .map(|call| Self::expanded(call, &value, semantics))
+                },
+            )
+            .unwrap_or(Self::Unexpanded)
+    }
+
     fn expanded(
         call: MacroCallId,
         root: &SyntaxNode,
@@ -42,21 +58,5 @@ impl ItemExpansion {
         } else {
             Self::Unparsable { call }
         }
-    }
-
-    pub fn new(item: &ast::Item, semantics: &Semantics<'_, RootDatabase>) -> Self {
-        semantics
-            .expand_attr_macro(item)
-            .and_then(
-                |ExpandResult {
-                     value: InFile { file_id, value },
-                     ..
-                 }| {
-                    file_id
-                        .macro_file()
-                        .map(|call| Self::expanded(call, &value, semantics))
-                },
-            )
-            .unwrap_or(Self::Unexpanded)
     }
 }

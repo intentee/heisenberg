@@ -1,7 +1,7 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
-use heisenberg_command_tests::constants::HOST_TRIPLE;
+use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 
@@ -20,7 +20,7 @@ fn build_script_that_fails_to_compile_fails_to_load_the_project() {
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the project cannot be loaded\n\
-             error: the build scripts and procedural macros of the workspace cannot be built for {HOST_TRIPLE}\n\
+             error: the build scripts and procedural macros of the workspace cannot be built for the configuration `{HOST_CONFIGURATION}`\n\
              error: the build scripts and procedural macros cannot be built or run; a package whose build script cannot run on every host can declare its output in [workspace.metadata.heisenberg.out_dirs.<package>] instead:\n\
              error[E0308]: mismatched types\n \
              --> build.rs:2:22\n  \

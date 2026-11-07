@@ -2,7 +2,6 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-use crate::clippy_lint_path::clippy_lint_path;
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
 use crate::lint_table::LintTable;
@@ -16,14 +15,6 @@ pub enum PackageViolation {
     ClippyConfigurationMissing {
         manifest: String,
         package: String,
-    },
-    ClippyLintNotDenied {
-        lint: String,
-        table: LintTable,
-    },
-    ClippyTestAllowanceMissing {
-        file: String,
-        setting: String,
     },
     LintAllowedInManifest {
         lint: String,
@@ -41,6 +32,15 @@ pub enum PackageViolation {
     PublishableTestCrate {
         manifest: String,
         package: String,
+    },
+    RequiredClippySettingMissing {
+        file: String,
+        setting: String,
+        value: bool,
+    },
+    RequiredLintNotDenied {
+        lint: String,
+        table: LintTable,
     },
     TestCrateDeclaredTwice {
         manifest: String,
@@ -60,6 +60,10 @@ pub enum PackageViolation {
         package: String,
         potential_owners: Vec<PotentialOwner>,
     },
+    UnvettedClippySetting {
+        file: String,
+        setting: String,
+    },
 }
 
 impl PackageViolation {
@@ -74,15 +78,16 @@ impl PackageViolation {
                 .collect(),
             Self::ClippyConfigurationAmbiguous { .. }
             | Self::ClippyConfigurationMissing { .. }
-            | Self::ClippyLintNotDenied { .. }
-            | Self::ClippyTestAllowanceMissing { .. }
             | Self::LintAllowedInManifest { .. }
             | Self::PackageDependencyCycle { .. }
             | Self::PackageDependsOnItself { .. }
             | Self::PublishableTestCrate { .. }
+            | Self::RequiredClippySettingMissing { .. }
+            | Self::RequiredLintNotDenied { .. }
             | Self::TestCrateDeclaredTwice { .. }
             | Self::TestCrateNotAMember { .. }
-            | Self::TestCrateUsedByProduction { .. } => Vec::new(),
+            | Self::TestCrateUsedByProduction { .. }
+            | Self::UnvettedClippySetting { .. } => Vec::new(),
         }
     }
 
@@ -90,7 +95,8 @@ impl PackageViolation {
     pub fn file(&self) -> &str {
         match self {
             Self::ClippyConfigurationAmbiguous { file }
-            | Self::ClippyTestAllowanceMissing { file, .. }
+            | Self::RequiredClippySettingMissing { file, .. }
+            | Self::UnvettedClippySetting { file, .. }
             | Self::ClippyConfigurationMissing { manifest: file, .. }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
@@ -99,9 +105,8 @@ impl PackageViolation {
             | Self::TestCrateNotAMember { manifest: file, .. }
             | Self::TestCrateUsedByProduction { manifest: file, .. }
             | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. } => file,
-            Self::ClippyLintNotDenied { table, .. } | Self::LintAllowedInManifest { table, .. } => {
-                table.manifest()
-            }
+            Self::LintAllowedInManifest { table, .. }
+            | Self::RequiredLintNotDenied { table, .. } => table.manifest(),
         }
     }
 }
@@ -117,19 +122,6 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {package} has no {CLIPPY_CONFIGURATION_FILE} or {CLIPPY_HIDDEN_CONFIGURATION_FILE} within the workspace"
             ),
-            Self::ClippyLintNotDenied { lint, table } => {
-                write!(
-                    formatter,
-                    "{table} does not deny {}",
-                    clippy_lint_path(lint)
-                )
-            }
-            Self::ClippyTestAllowanceMissing { setting, .. } => {
-                write!(
-                    formatter,
-                    "Clippy configuration does not set {setting} = true"
-                )
-            }
             Self::LintAllowedInManifest { lint, table, tool } => {
                 write!(formatter, "{table} allows {lint} in its {tool} lints")
             }
@@ -146,6 +138,15 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {package} is declared a test crate but can be published"
             ),
+            Self::RequiredClippySettingMissing { setting, value, .. } => {
+                write!(
+                    formatter,
+                    "Clippy configuration does not set {setting} = {value}"
+                )
+            }
+            Self::RequiredLintNotDenied { lint, table } => {
+                write!(formatter, "{table} does not deny {lint}")
+            }
             Self::TestCrateDeclaredTwice { package, .. } => write!(
                 formatter,
                 "Package {package} is declared a test crate more than once"
@@ -163,6 +164,10 @@ impl Display for PackageViolation {
             Self::TestsOnlyPackageWithoutTestLibraries { package, .. } => write!(
                 formatter,
                 "Package {package} holds only tests and no test library of its own, so the package its tests verify must own them"
+            ),
+            Self::UnvettedClippySetting { setting, .. } => write!(
+                formatter,
+                "Clippy configuration sets {setting}, which Heisenberg has not vetted"
             ),
         }
     }

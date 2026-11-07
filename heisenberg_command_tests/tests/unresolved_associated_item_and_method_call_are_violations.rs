@@ -19,19 +19,19 @@ fn unresolved_associated_item_and_method_call_are_violations() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["UnresolvedMethodCall: 2 violations\n\
-            Every name must resolve for the analysis to be complete. Fix the call so its method resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the call so that rust-analyzer resolves its method, such as by naming the type of its receiver.\n\
             \n\
-            - src/run.rs:5:10: Method call is unresolved\n        \
+            - src/run.rs:5:10: Method call compiles, but rust-analyzer cannot resolve its method\n        \
             Item.absent();\n\
-            - src/run.rs:7:10: Method call is unresolved\n        \
+            - src/run.rs:7:10: Method call compiles, but rust-analyzer cannot resolve its method\n        \
             Item.absent().unknown();\n\
             \n\
             UnresolvedPath: 2 violations\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/run.rs:4:5: Path is unresolved\n        \
+            - src/run.rs:4:5: Path compiles, but rust-analyzer cannot resolve it\n        \
             Item::missing();\n\
-            - src/run.rs:6:5: Path is unresolved\n        \
+            - src/run.rs:6:5: Path compiles, but rust-analyzer cannot resolve it\n        \
             missing_function().unknown();\n\
             \n\
             ------------------------------\n\

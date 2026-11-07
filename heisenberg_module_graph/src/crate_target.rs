@@ -14,6 +14,21 @@ pub struct CrateTarget {
     pub test_harness: TestHarness,
 }
 
+impl CrateTarget {
+    #[must_use]
+    pub fn enters_through_main(&self) -> bool {
+        match self.kind {
+            CrateTargetKind::Binary | CrateTargetKind::BuildScript | CrateTargetKind::Example => {
+                true
+            }
+            CrateTargetKind::Benchmark | CrateTargetKind::IntegrationTest => {
+                self.test_harness == TestHarness::Absent
+            }
+            CrateTargetKind::Library => false,
+        }
+    }
+}
+
 impl Display for CrateTarget {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         let Self {

@@ -13,6 +13,7 @@ HEISENBERG_CRATES := \
 	heisenberg_module_graph \
 	heisenberg_project_model \
 	heisenberg_workspace_build
+HOST_TUPLE := $(shell rustc --print host-tuple)
 RUST_SYSROOT := $(shell rustc --print sysroot)
 SUPPORTED_TARGETS := \
 	aarch64-apple-darwin \
@@ -29,7 +30,7 @@ HEISENBERG_SOURCES := \
 	Cargo.toml \
 	Cargo.lock
 
-HEISENBERG_CHECK := target/release/heisenberg check --cargo-home $(subst \,/,$(CARGO_HOME)) --sysroot $(subst \,/,$(RUST_SYSROOT)) --workspace
+HEISENBERG_CHECK := target/release/heisenberg check --cargo-home "$(CARGO_HOME)" --sysroot "$(RUST_SYSROOT)" --configuration $(HOST_TUPLE) --workspace
 
 export HEISENBERG_CARGO_HOME := $(CARGO_HOME)
 export HEISENBERG_SYSROOT := $(RUST_SYSROOT)
@@ -54,9 +55,9 @@ target/release/heisenberg: $(HEISENBERG_SOURCES)
 .PHONY: benchmark
 benchmark: fetch target/release/heisenberg
 	hyperfine --shell=none --warmup 1 --ignore-failure=1 --export-markdown target/benchmark.md \
-		--command-name acyclic_modules "$(HEISENBERG_CHECK) $(CURDIR)/heisenberg_command_tests/workspaces/acyclic_modules" \
-		--command-name cycles_in_a_dependency_diamond "$(HEISENBERG_CHECK) $(CURDIR)/heisenberg_command_tests/workspaces/cycles_in_a_dependency_diamond" \
-		--command-name heisenberg "$(HEISENBERG_CHECK) $(CURDIR)"
+		--command-name acyclic_modules "$(subst ",\",$(HEISENBERG_CHECK)) \"$(CURDIR)/heisenberg_command_tests/workspaces/acyclic_modules\"" \
+		--command-name cycles_in_a_dependency_diamond "$(subst ",\",$(HEISENBERG_CHECK)) \"$(CURDIR)/heisenberg_command_tests/workspaces/cycles_in_a_dependency_diamond\"" \
+		--command-name heisenberg "$(subst ",\",$(HEISENBERG_CHECK)) \"$(CURDIR)\""
 
 .PHONY: clean
 clean:
@@ -76,7 +77,7 @@ fmt:
 
 .PHONY: heisenberg.check
 heisenberg.check: fetch target/release/heisenberg
-	$(HEISENBERG_CHECK) $(CURDIR)
+	$(HEISENBERG_CHECK) "$(CURDIR)"
 
 .PHONY: test
 test: fetch $(TARGET_CFG_TABLES)
@@ -89,7 +90,7 @@ test.coverage: fetch node_modules/.package-lock.json $(TARGET_CFG_TABLES)
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report
 	npx rust-coverage-check target/llvm-cov.json \
-		--workspace-root $(CURDIR) \
+		--workspace-root "$(CURDIR)" \
 		--gated heisenberg=100 \
 		--gated heisenberg_absolute_path=100 \
 		--gated heisenberg_analysis_threads=100 \

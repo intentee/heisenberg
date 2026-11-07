@@ -17,9 +17,6 @@ impl CapturedOutput {
 }
 
 impl Write for CapturedOutput {
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
     fn write(&mut self, written: &[u8]) -> io::Result<usize> {
         self.bytes
             .lock()
@@ -27,5 +24,9 @@ impl Write for CapturedOutput {
             .extend_from_slice(written);
 
         Ok(written.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }

@@ -5,13 +5,15 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
-use crate::defined_items::DefinedItems;
+use crate::expanded_items::ExpandedItems;
 use crate::item_visibility::ItemVisibility;
+use crate::token_origin::TokenOrigin;
 
 pub struct PublicItems<'items, 'database> {
     pub container: &'items SyntaxNode,
     pub options: &'items CfgOptions,
     pub semantics: &'items Semantics<'database, RootDatabase>,
+    pub token_origin: &'items TokenOrigin<'items, 'database>,
 }
 
 impl PublicItems<'_, '_> {
@@ -29,17 +31,25 @@ impl PublicItems<'_, '_> {
     }
 
     fn defined_in(&self, container: &SyntaxNode) -> Vec<ast::Item> {
-        DefinedItems {
+        ExpandedItems {
             container,
             options: self.options,
             semantics: self.semantics,
+            token_origin: self.token_origin,
         }
         .items()
+    }
+
+    fn is_proc_macro(&self, function: &ast::Fn) -> bool {
+        self.semantics
+            .to_def(function)
+            .is_some_and(|definition| definition.as_proc_macro(self.semantics.db).is_some())
     }
 
     fn is_public_non_constant(&self, item: &ast::Item) -> bool {
         match item {
             ast::Item::Const(_) | ast::Item::Module(_) => false,
+            ast::Item::Fn(function) if self.is_proc_macro(function) => false,
             _ => ItemVisibility {
                 item,
                 semantics: self.semantics,

@@ -4,25 +4,26 @@ use clap::ValueEnum;
 use clap::builder::PossibleValue;
 
 use heisenberg_module_graph::violation_kind::ViolationKind;
-use heisenberg_project_model::clippy_lint_path::clippy_lint_path;
 use heisenberg_project_model::constants::CLIPPY_CONFIGURATION_FILE;
-use heisenberg_project_model::constants::CLIPPY_DENIED_LINTS;
 use heisenberg_project_model::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
-use heisenberg_project_model::constants::CLIPPY_TEST_ALLOWANCES;
+use heisenberg_project_model::constants::PANICKING_LINTS;
+use heisenberg_project_model::constants::REQUIRED_CLIPPY_SETTINGS;
+use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
+use heisenberg_project_model::constants::RESTRICTING_CLIPPY_SETTINGS;
 use heisenberg_project_model::package_violation::PackageViolation;
+use heisenberg_project_model::required_clippy_setting::RequiredClippySetting;
 
 use crate::constants::ADDITIONAL_PUBLIC_ITEM;
 use crate::constants::CLIPPY_CONFIGURATION_AMBIGUOUS;
 use crate::constants::CLIPPY_CONFIGURATION_MISSING;
-use crate::constants::CLIPPY_LINT_NOT_DENIED;
-use crate::constants::CLIPPY_TEST_ALLOWANCE_MISSING;
-use crate::constants::CODE_ACTIVE_ON_NO_TARGET;
+use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
 use crate::constants::CONFIGURATION_SELECTION_MACRO;
 use crate::constants::DUPLICATED_FUNCTION_BODY;
 use crate::constants::FAILED_MACRO_EXPANSION;
 use crate::constants::FUNCTION_USED_ONLY_BY_TESTS;
 use crate::constants::GLOB_IMPORT;
 use crate::constants::IMPL_WITHOUT_LOCAL_TYPE;
+use crate::constants::INCLUDED_SOURCE_FILE;
 use crate::constants::INVALID_MACRO_DEFINITION;
 use crate::constants::ITEM_OUT_OF_ORDER;
 use crate::constants::LINT_ALLOWED_IN_MANIFEST;
@@ -46,6 +47,9 @@ use crate::constants::PUBLIC_ASSOCIATED_CONSTANT;
 use crate::constants::PUBLIC_CONSTANT_OUTSIDE_CONSTANTS_MODULE;
 use crate::constants::PUBLISHABLE_TEST_CRATE;
 use crate::constants::REEXPORT;
+use crate::constants::REFERENCED_TEST;
+use crate::constants::REQUIRED_CLIPPY_SETTING_MISSING;
+use crate::constants::REQUIRED_LINT_NOT_DENIED;
 use crate::constants::SHARED_MODULE_FILE;
 use crate::constants::SINGLE_LETTER_NAME;
 use crate::constants::TEST_CRATE_DECLARED_TWICE;
@@ -64,6 +68,8 @@ use crate::constants::UNRESOLVED_MACRO_CALL;
 use crate::constants::UNRESOLVED_METHOD_CALL;
 use crate::constants::UNRESOLVED_MODULE;
 use crate::constants::UNRESOLVED_PATH;
+use crate::constants::UNSAFE_CODE;
+use crate::constants::UNVETTED_CLIPPY_SETTING;
 use crate::issue_text::IssueText;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -71,15 +77,14 @@ pub enum IssueType {
     AdditionalPublicItem,
     ClippyConfigurationAmbiguous,
     ClippyConfigurationMissing,
-    ClippyLintNotDenied,
-    ClippyTestAllowanceMissing,
-    CodeActiveOnNoTarget,
+    CodeActiveInNoConfiguration,
     ConfigurationSelectionMacro,
     DuplicatedFunctionBody,
     FailedMacroExpansion,
     FunctionUsedOnlyByTests,
     GlobImport,
     ImplWithoutLocalType,
+    IncludedSourceFile,
     InvalidMacroDefinition,
     ItemOutOfOrder,
     LintAllowedInManifest,
@@ -103,6 +108,9 @@ pub enum IssueType {
     PublicConstantOutsideConstantsModule,
     PublishableTestCrate,
     Reexport,
+    ReferencedTest,
+    RequiredClippySettingMissing,
+    RequiredLintNotDenied,
     SharedModuleFile,
     SingleLetterName,
     TestCrateDeclaredTwice,
@@ -121,6 +129,8 @@ pub enum IssueType {
     UnresolvedMethodCall,
     UnresolvedModule,
     UnresolvedPath,
+    UnsafeCode,
+    UnvettedClippySetting,
 }
 
 impl IssueType {
@@ -153,15 +163,14 @@ impl IssueType {
             Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
             Self::ClippyConfigurationAmbiguous => CLIPPY_CONFIGURATION_AMBIGUOUS,
             Self::ClippyConfigurationMissing => CLIPPY_CONFIGURATION_MISSING,
-            Self::ClippyLintNotDenied => CLIPPY_LINT_NOT_DENIED,
-            Self::ClippyTestAllowanceMissing => CLIPPY_TEST_ALLOWANCE_MISSING,
-            Self::CodeActiveOnNoTarget => CODE_ACTIVE_ON_NO_TARGET,
+            Self::CodeActiveInNoConfiguration => CODE_ACTIVE_IN_NO_CONFIGURATION,
             Self::ConfigurationSelectionMacro => CONFIGURATION_SELECTION_MACRO,
             Self::DuplicatedFunctionBody => DUPLICATED_FUNCTION_BODY,
             Self::FailedMacroExpansion => FAILED_MACRO_EXPANSION,
             Self::FunctionUsedOnlyByTests => FUNCTION_USED_ONLY_BY_TESTS,
             Self::GlobImport => GLOB_IMPORT,
             Self::ImplWithoutLocalType => IMPL_WITHOUT_LOCAL_TYPE,
+            Self::IncludedSourceFile => INCLUDED_SOURCE_FILE,
             Self::InvalidMacroDefinition => INVALID_MACRO_DEFINITION,
             Self::ItemOutOfOrder => ITEM_OUT_OF_ORDER,
             Self::LintAllowedInManifest => LINT_ALLOWED_IN_MANIFEST,
@@ -185,6 +194,9 @@ impl IssueType {
             Self::PublicConstantOutsideConstantsModule => PUBLIC_CONSTANT_OUTSIDE_CONSTANTS_MODULE,
             Self::PublishableTestCrate => PUBLISHABLE_TEST_CRATE,
             Self::Reexport => REEXPORT,
+            Self::ReferencedTest => REFERENCED_TEST,
+            Self::RequiredClippySettingMissing => REQUIRED_CLIPPY_SETTING_MISSING,
+            Self::RequiredLintNotDenied => REQUIRED_LINT_NOT_DENIED,
             Self::SharedModuleFile => SHARED_MODULE_FILE,
             Self::SingleLetterName => SINGLE_LETTER_NAME,
             Self::TestCrateDeclaredTwice => TEST_CRATE_DECLARED_TWICE,
@@ -203,25 +215,37 @@ impl IssueType {
             Self::UnresolvedMethodCall => UNRESOLVED_METHOD_CALL,
             Self::UnresolvedModule => UNRESOLVED_MODULE,
             Self::UnresolvedPath => UNRESOLVED_PATH,
+            Self::UnsafeCode => UNSAFE_CODE,
+            Self::UnvettedClippySetting => UNVETTED_CLIPPY_SETTING,
         }
     }
 
-    fn values(self) -> Option<String> {
+    fn values(self) -> Vec<String> {
         match self {
-            Self::ClippyConfigurationAmbiguous | Self::ClippyConfigurationMissing => Some(format!(
+            Self::ClippyConfigurationAmbiguous | Self::ClippyConfigurationMissing => vec![format!(
                 "Clippy configuration files: {CLIPPY_CONFIGURATION_FILE}, {CLIPPY_HIDDEN_CONFIGURATION_FILE}"
-            )),
-            Self::ClippyLintNotDenied | Self::LintSuppression => Some(format!(
-                "Required lints: {}",
-                CLIPPY_DENIED_LINTS
-                    .map(|lint| clippy_lint_path(lint.name))
+            )],
+            Self::LintSuppression | Self::RequiredLintNotDenied => vec![
+                format!(
+                    "Required lint groups: {}",
+                    REQUIRED_LINT_GROUPS.map(|lint| lint.path()).join(", ")
+                ),
+                format!(
+                    "Panicking lints: {}",
+                    PANICKING_LINTS.map(|lint| lint.path()).join(", ")
+                ),
+            ],
+            Self::RequiredClippySettingMissing => vec![format!(
+                "Required settings: {}",
+                REQUIRED_CLIPPY_SETTINGS
+                    .map(|RequiredClippySetting { name, value }| format!("{name} = {value}"))
                     .join(", ")
-            )),
-            Self::ClippyTestAllowanceMissing => Some(format!(
-                "Test allowances: {}",
-                CLIPPY_TEST_ALLOWANCES.join(", ")
-            )),
-            _ => None,
+            )],
+            Self::UnvettedClippySetting => vec![format!(
+                "Settings that only add restrictions: {}",
+                RESTRICTING_CLIPPY_SETTINGS.join(", ")
+            )],
+            _ => Vec::new(),
         }
     }
 }
@@ -268,6 +292,9 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::UnresolvedMethodCall => Self::UnresolvedMethodCall,
             ViolationKind::UnresolvedModule => Self::UnresolvedModule,
             ViolationKind::UnresolvedPath => Self::UnresolvedPath,
+            ViolationKind::IncludedSourceFile { .. } => Self::IncludedSourceFile,
+            ViolationKind::UnsafeCode => Self::UnsafeCode,
+            ViolationKind::ReferencedTest => Self::ReferencedTest,
         }
     }
 }
@@ -279,8 +306,6 @@ impl From<&PackageViolation> for IssueType {
                 Self::ClippyConfigurationAmbiguous
             }
             PackageViolation::ClippyConfigurationMissing { .. } => Self::ClippyConfigurationMissing,
-            PackageViolation::ClippyLintNotDenied { .. } => Self::ClippyLintNotDenied,
-            PackageViolation::ClippyTestAllowanceMissing { .. } => Self::ClippyTestAllowanceMissing,
             PackageViolation::LintAllowedInManifest { .. } => Self::LintAllowedInManifest,
             PackageViolation::PackageDependencyCycle { .. } => Self::PackageDependencyCycle,
             PackageViolation::PackageDependsOnItself { .. } => Self::PackageDependsOnItself,
@@ -291,29 +316,29 @@ impl From<&PackageViolation> for IssueType {
             PackageViolation::TestsOnlyPackageWithoutTestLibraries { .. } => {
                 Self::TestsOnlyPackageWithoutTestLibraries
             }
+            PackageViolation::RequiredLintNotDenied { .. } => Self::RequiredLintNotDenied,
+            PackageViolation::RequiredClippySettingMissing { .. } => {
+                Self::RequiredClippySettingMissing
+            }
+            PackageViolation::UnvettedClippySetting { .. } => Self::UnvettedClippySetting,
         }
     }
 }
 
 impl ValueEnum for IssueType {
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        Some(PossibleValue::new(self.text().name))
-    }
-
     fn value_variants<'variants>() -> &'variants [Self] {
         &[
             Self::AdditionalPublicItem,
             Self::ClippyConfigurationAmbiguous,
             Self::ClippyConfigurationMissing,
-            Self::ClippyLintNotDenied,
-            Self::ClippyTestAllowanceMissing,
-            Self::CodeActiveOnNoTarget,
+            Self::CodeActiveInNoConfiguration,
             Self::ConfigurationSelectionMacro,
             Self::DuplicatedFunctionBody,
             Self::FailedMacroExpansion,
             Self::FunctionUsedOnlyByTests,
             Self::GlobImport,
             Self::ImplWithoutLocalType,
+            Self::IncludedSourceFile,
             Self::InvalidMacroDefinition,
             Self::ItemOutOfOrder,
             Self::LintAllowedInManifest,
@@ -337,6 +362,9 @@ impl ValueEnum for IssueType {
             Self::PublicConstantOutsideConstantsModule,
             Self::PublishableTestCrate,
             Self::Reexport,
+            Self::ReferencedTest,
+            Self::RequiredClippySettingMissing,
+            Self::RequiredLintNotDenied,
             Self::SharedModuleFile,
             Self::SingleLetterName,
             Self::TestCrateDeclaredTwice,
@@ -355,6 +383,12 @@ impl ValueEnum for IssueType {
             Self::UnresolvedMethodCall,
             Self::UnresolvedModule,
             Self::UnresolvedPath,
+            Self::UnsafeCode,
+            Self::UnvettedClippySetting,
         ]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(PossibleValue::new(self.text().name))
     }
 }

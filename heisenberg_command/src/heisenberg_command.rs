@@ -11,9 +11,10 @@ use crate::explain_command::ExplainCommand;
 use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::heisenberg_subcommand::HeisenbergSubcommand;
+use crate::rendered_report::RenderedReport;
 
-fn written<TOutput: Write>(
-    output: &mut TOutput,
+fn written(
+    output: &mut dyn Write,
     text: &str,
     status: HeisenbergExitStatus,
     failure: fn(io::Error) -> HeisenbergCommandError,
@@ -36,20 +37,17 @@ pub struct HeisenbergCommand {
 }
 
 impl HeisenbergCommand {
-    pub fn run<TOutput: Write, TErrors: Write>(
+    pub fn run(
         &self,
         environment: &BTreeMap<OsString, OsString>,
-        output: &mut TOutput,
-        errors: &mut TErrors,
+        output: &mut dyn Write,
+        errors: &mut dyn Write,
     ) -> HeisenbergExitStatus {
         let outcome = match &self.subcommand {
             HeisenbergSubcommand::Check(check) => check.execute(environment).and_then(|report| {
-                written(
-                    output,
-                    &report.render(),
-                    report.status(),
-                    HeisenbergCommandError::WriteReport,
-                )
+                let RenderedReport { status, text } = report.render();
+
+                written(output, &text, status, HeisenbergCommandError::WriteReport)
             }),
             HeisenbergSubcommand::Explain(ExplainCommand { issue_type }) => written(
                 output,

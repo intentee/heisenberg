@@ -20,13 +20,13 @@ fn name_bound_by_an_unresolved_import_belongs_to_the_import_issue() {
         str::from_utf8(&outcome.output),
         Ok([
             "UnresolvedPath: 3 violations\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/lib.rs:1:5: Path is unresolved\n    \
+            - src/lib.rs:1:5: Path compiles, but rust-analyzer cannot resolve it\n    \
             use crate::missing::helper;\n\
-            - src/lib.rs:2:5: Path is unresolved\n    \
+            - src/lib.rs:2:5: Path compiles, but rust-analyzer cannot resolve it\n    \
             use crate::missing::helper_rules;\n\
-            - src/lib.rs:6:20: Path is unresolved\n    \
+            - src/lib.rs:6:20: Path compiles, but rust-analyzer cannot resolve it\n    \
             fn unknown(_value: Unknown) {}\n\
             \n\
             ------------------------------\n\

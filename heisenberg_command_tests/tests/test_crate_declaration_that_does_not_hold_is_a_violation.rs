@@ -18,8 +18,13 @@ fn test_crate_declaration_that_does_not_hold_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["ClippyLintNotDenied: 6 violations\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave it undenied, in its own lints table.\n\
+        Ok(["PublishableTestCrate: 1 violation\n\
+            A test crate holds only what tests use, so it is never published. Set publish = false in its manifest, or remove it from test_crates.\n\
+            \n\
+            - published/Cargo.toml: Package published is declared a test crate but can be published\n\
+            \n\
+            RequiredLintNotDenied: 6 violations\n\
+            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
             \n\
             - published/Cargo.toml: Package published does not deny clippy::expect_used\n\
             - published/Cargo.toml: Package published does not deny clippy::panic\n\
@@ -27,11 +32,6 @@ fn test_crate_declaration_that_does_not_hold_is_a_violation() {
             - used/Cargo.toml: Package used does not deny clippy::expect_used\n\
             - used/Cargo.toml: Package used does not deny clippy::panic\n\
             - used/Cargo.toml: Package used does not deny clippy::unwrap_used\n\
-            \n\
-            PublishableTestCrate: 1 violation\n\
-            A test crate holds only what tests use, so it is never published. Set publish = false in its manifest, or remove it from test_crates.\n\
-            \n\
-            - published/Cargo.toml: Package published is declared a test crate but can be published\n\
             \n\
             TestCrateDeclaredTwice: 1 violation\n\
             Each test crate is declared once. Remove the repeated entry from test_crates.\n\

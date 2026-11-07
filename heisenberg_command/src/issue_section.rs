@@ -6,9 +6,10 @@ use heisenberg_module_cycles::non_empty::NonEmpty;
 
 use crate::analysis_context::AnalysisContext;
 use crate::issue::Issue;
+use crate::issue_type::IssueType;
 
 pub struct IssueSection<'section> {
-    pub issue_type: &'section str,
+    pub issue_type: IssueType,
     pub issues: &'section NonEmpty<&'section Issue>,
 }
 
@@ -26,11 +27,8 @@ impl IssueSection<'_> {
             "violations"
         };
 
-        iter::once(format!("{issue_type}: {count} {noun}"))
-            .chain([
-                issues.first.issue_type().text().purpose.to_owned(),
-                String::new(),
-            ])
+        iter::once(format!("{}: {count} {noun}", issue_type.text().name))
+            .chain([issue_type.text().purpose.to_owned(), String::new()])
             .chain(
                 issues
                     .iter()

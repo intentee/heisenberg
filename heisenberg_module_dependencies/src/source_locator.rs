@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use ra_ap_hir::FileRangeWrapper;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::SourceDatabase;
@@ -8,24 +11,31 @@ use ra_ap_paths::Utf8Path;
 use ra_ap_syntax::TextRange;
 use ra_ap_syntax::TextSize;
 use ra_ap_vfs::FileId;
-use ra_ap_vfs::Vfs;
 
 use heisenberg_module_graph::line_position::LinePosition;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_project_model::source_files::SourceFiles;
 use heisenberg_project_model::workspace_path::WorkspacePath;
 
 pub struct SourceLocator<'project> {
     pub database: &'project RootDatabase,
-    pub vfs: &'project Vfs,
+    pub files: &'project SourceFiles,
+    pub relative_paths: &'project RefCell<HashMap<FileId, String>>,
     pub workspace_root: &'project AbsPathBuf,
 }
 
 impl SourceLocator<'_> {
     pub fn file(&self, file_id: FileId) -> String {
-        WorkspacePath {
-            root: AsRef::<Utf8Path>::as_ref(self.workspace_root),
-        }
-        .relative(Utf8Path::new(&self.vfs.file_path(file_id).to_string()))
+        self.relative_paths
+            .borrow_mut()
+            .entry(file_id)
+            .or_insert_with(|| {
+                WorkspacePath {
+                    root: AsRef::<Utf8Path>::as_ref(self.workspace_root),
+                }
+                .relative(self.files.path(file_id).as_ref())
+            })
+            .clone()
     }
 
     pub fn locate(

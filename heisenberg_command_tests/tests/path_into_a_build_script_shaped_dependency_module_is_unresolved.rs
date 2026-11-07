@@ -20,9 +20,9 @@ fn path_into_a_build_script_shaped_dependency_module_is_unresolved() {
         str::from_utf8(&outcome.output),
         Ok([
             "UnresolvedPath: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/lib.rs:1:23: Path into shaped::backend is unresolved\n    \
+            - src/lib.rs:1:23: Path into shaped::backend compiles, but rust-analyzer cannot resolve it\n    \
             pub fn generated() -> shaped::backend::Generated {\n      \
             also unresolved at src/lib.rs:2:5\n\
             \n\

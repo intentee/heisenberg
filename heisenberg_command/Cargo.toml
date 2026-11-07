@@ -12,7 +12,6 @@ heisenberg_module_cycles = { workspace = true }
 heisenberg_module_dependencies = { workspace = true }
 heisenberg_module_graph = { workspace = true }
 heisenberg_project_model = { workspace = true }
-itertools = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

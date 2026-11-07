@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::env::consts::EXE_EXTENSION;
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
@@ -30,12 +29,8 @@ fn build_with_a_sysroot_without_rustc_fails_to_load_the_project() {
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the project cannot be loaded\n\
-             error: the sysroot has no rustc at `{}`\n",
-            sysroot
-                .join("bin")
-                .join("rustc")
-                .with_extension(EXE_EXTENSION)
-                .display()
+             error: the sysroot has no rustc in `{}`\n",
+            sysroot.join("bin").display()
         )
         .as_str())
     );

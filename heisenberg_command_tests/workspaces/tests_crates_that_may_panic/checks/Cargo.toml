@@ -8,5 +8,11 @@ publish = false
 library = { path = "../library" }
 shared_tests = { path = "../shared_tests" }
 
+[lints.rust]
+warnings = "deny"
+
 [lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
 dbg_macro = "deny"

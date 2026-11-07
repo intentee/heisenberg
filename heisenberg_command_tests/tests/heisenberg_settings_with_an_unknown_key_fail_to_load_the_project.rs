@@ -21,7 +21,7 @@ fn heisenberg_settings_with_an_unknown_key_fail_to_load_the_project() {
         Ok(format!(
             "error: the project cannot be loaded\n\
              error: the [workspace.metadata.heisenberg] settings of `{}` are invalid\n\
-             error: unknown field `ignore`, expected one of `out_dirs`, `targets`, `test_crates`\n",
+             error: unknown field `ignore`, expected one of `configurations`, `out_dirs`, `test_crates`\n",
             workspace.join("Cargo.toml").display()
         )
         .as_str())

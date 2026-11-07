@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 use ra_ap_ide_db::ChangeWithProcMacros;
 use ra_ap_ide_db::FxHashMap;
@@ -23,6 +25,7 @@ use crate::project_model_error::ProjectModelError;
 
 pub struct LoadedProcMacros<'project> {
     pub dylibs: &'project BTreeMap<Utf8PathBuf, Utf8PathBuf>,
+    pub server: &'project OnceLock<Result<Vec<ProcMacroClient>, Arc<ProjectModelError>>>,
     pub vfs: &'project Vfs,
     pub workspace: &'project ProjectWorkspace,
 }
@@ -95,12 +98,25 @@ impl LoadedProcMacros<'_> {
         &self,
         proc_macro_crates: &BTreeSet<CrateBuilderId>,
     ) -> Result<Vec<ProcMacroClient>, ProjectModelError> {
+        proc_macro_crates
+            .iter()
+            .take(1)
+            .map(|_| {
+                self.server
+                    .get_or_init(|| self.spawned_servers())
+                    .clone()
+                    .map_err(ProjectModelError::ProcMacroServerUnavailable)
+            })
+            .collect::<Result<Vec<Vec<ProcMacroClient>>, ProjectModelError>>()
+            .map(|servers| servers.into_iter().flatten().collect())
+    }
+
+    fn spawned_servers(&self) -> Result<Vec<ProcMacroClient>, Arc<ProjectModelError>> {
         let no_environment: FxHashMap<String, Option<String>> = FxHashMap::default();
 
         self.workspace
             .find_sysroot_proc_macro_srv()
             .into_iter()
-            .take(usize::from(!proc_macro_crates.is_empty()))
             .collect::<Result<Vec<AbsPathBuf>, _>>()
             .map_err(Into::into)
             .map_err(ProjectModelError::ProcMacroServerMissing)
@@ -114,5 +130,6 @@ impl LoadedProcMacros<'_> {
                     })
                     .collect()
             })
+            .map_err(Arc::new)
     }
 }

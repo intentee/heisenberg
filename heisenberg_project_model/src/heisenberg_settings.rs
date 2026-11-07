@@ -5,15 +5,16 @@ use serde::Deserialize;
 use toml::Value;
 
 use crate::constants::HEISENBERG_SETTINGS_KEY;
+use crate::declared_configuration::DeclaredConfiguration;
 use crate::declared_out_dir::DeclaredOutDir;
 use crate::project_model_error::ProjectModelError;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeisenbergSettings {
+    pub configurations: Vec<DeclaredConfiguration>,
     #[serde(default)]
     pub out_dirs: BTreeMap<String, DeclaredOutDir>,
-    pub targets: Vec<String>,
     #[serde(default)]
     pub test_crates: Vec<String>,
 }

@@ -7,6 +7,5 @@ use crate::declared_build_script_output::DeclaredBuildScriptOutput;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeclaredOutDir {
-    pub directory: String,
-    pub targets: BTreeMap<String, DeclaredBuildScriptOutput>,
+    pub configurations: BTreeMap<String, DeclaredBuildScriptOutput>,
 }

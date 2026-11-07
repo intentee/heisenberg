@@ -1,17 +1,15 @@
 use std::collections::BTreeSet;
 
-use crate::feature_selection::FeatureSelection;
-use crate::supported_target::SupportedTarget;
+use crate::configuration::Configuration;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct RunScope {
-    pub features: FeatureSelection,
-    pub left_out_targets: BTreeSet<SupportedTarget>,
+    pub left_out_configurations: BTreeSet<Configuration>,
 }
 
 impl RunScope {
     #[must_use]
     pub fn is_partial(&self) -> bool {
-        !self.left_out_targets.is_empty() || self.features != FeatureSelection::All
+        !self.left_out_configurations.is_empty()
     }
 }

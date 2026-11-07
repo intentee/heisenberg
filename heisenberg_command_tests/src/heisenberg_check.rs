@@ -9,6 +9,7 @@ use heisenberg_command::heisenberg_command::HeisenbergCommand;
 
 use crate::check_outcome::CheckOutcome;
 use crate::constants::CARGO_HOME_VARIABLE;
+use crate::constants::HOST_SELECTION;
 use crate::constants::SYSROOT_VARIABLE;
 use crate::heisenberg_check_error::HeisenbergCheckError;
 
@@ -22,7 +23,7 @@ impl HeisenbergCheck<'_> {
     /// Returns [`HeisenbergCheckError::CargoHome`] when `HEISENBERG_CARGO_HOME` cannot be read,
     /// and [`HeisenbergCheckError::Arguments`] when the arguments are rejected.
     pub fn command(&self, sysroot: &Path) -> Result<HeisenbergCommand, HeisenbergCheckError> {
-        self.command_with(sysroot, &[])
+        self.command_with(sysroot, &HOST_SELECTION)
     }
 
     /// # Errors
@@ -60,7 +61,7 @@ impl HeisenbergCheck<'_> {
     /// Returns [`HeisenbergCheckError::Sysroot`] when `HEISENBERG_SYSROOT` cannot be read, and
     /// the errors of [`Self::command`].
     pub fn toolchain_command(&self) -> Result<HeisenbergCommand, HeisenbergCheckError> {
-        self.toolchain_command_with(&[])
+        self.toolchain_command_with(&HOST_SELECTION)
     }
 
     fn command_with(

@@ -5,7 +5,6 @@ use std::ffi::OsString;
 use std::thread::scope;
 
 use clap::Args;
-use itertools::Itertools;
 
 use heisenberg_absolute_path::absolute_path::AbsolutePath;
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
@@ -18,21 +17,20 @@ use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
+use heisenberg_project_model::configuration::Configuration;
+use heisenberg_project_model::configuration_selection::ConfigurationSelection;
 use heisenberg_project_model::constants::CARGO_MANIFEST_FILE;
-use heisenberg_project_model::feature_selection::FeatureSelection;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::project_model_error::ProjectModelError;
 use heisenberg_project_model::resolved_project::ResolvedProject;
-use heisenberg_project_model::supported_target::SupportedTarget;
-use heisenberg_project_model::target_selection::TargetSelection;
 
 use crate::check_report::CheckReport;
+use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::constants::SUPPORTED_RUST_VERSION;
 use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::running_analysis::RunningAnalysis;
-use crate::target_analysis::TargetAnalysis;
 
 fn project_model_failure(error: ProjectModelError) -> Vec<HeisenbergCommandError> {
     vec![HeisenbergCommandError::ProjectModel(error)]
@@ -40,14 +38,14 @@ fn project_model_failure(error: ProjectModelError) -> Vec<HeisenbergCommandError
 
 fn analysed(
     project: &ResolvedProject,
-    target: SupportedTarget,
-) -> Result<TargetAnalysis, HeisenbergCommandError> {
+    configuration: &Configuration,
+) -> Result<ConfigurationAnalysis, HeisenbergCommandError> {
     project
-        .load(target)
+        .load(configuration)
         .map_err(Box::new)
         .map_err(error_context(
-            target,
-            HeisenbergCommandError::TargetProjectModel,
+            configuration.clone(),
+            HeisenbergCommandError::ConfigurationProjectModel,
         ))
         .and_then(|mut loaded| {
             ModuleDependencies {
@@ -55,21 +53,21 @@ fn analysed(
             }
             .extract()
             .map_err(error_context(
-                target,
+                configuration.clone(),
                 HeisenbergCommandError::ModuleDependencies,
             ))
         })
-        .map(|graphs| TargetAnalysis {
+        .map(|graphs| ConfigurationAnalysis {
+            configuration: configuration.clone(),
             cycles: graphs
                 .iter()
                 .flat_map(|graph| ModuleCycles { graph }.find())
                 .collect(),
             graphs,
-            target,
         })
 }
 
-fn empty_libraries(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
+fn empty_libraries(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
     let mut libraries: BTreeMap<&str, bool> = BTreeMap::new();
 
     for CrateModuleGraph {
@@ -78,7 +76,7 @@ fn empty_libraries(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
         ..
     } in analyses
         .iter()
-        .flat_map(|TargetAnalysis { graphs, .. }| graphs)
+        .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
         .filter(|CrateModuleGraph { crate_target, .. }| {
             crate_target.kind == CrateTargetKind::Library
         })
@@ -95,30 +93,45 @@ fn empty_libraries(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
         .collect()
 }
 
+fn every_analysis(
+    outcomes: Vec<Result<ConfigurationAnalysis, HeisenbergCommandError>>,
+) -> Result<Vec<ConfigurationAnalysis>, Vec<HeisenbergCommandError>> {
+    if outcomes.iter().all(Result::is_ok) {
+        Ok(outcomes.into_iter().flatten().collect())
+    } else {
+        Err(outcomes.into_iter().filter_map(Result::err).collect())
+    }
+}
+
 fn joined(
     running: Vec<Result<RunningAnalysis<'_>, HeisenbergCommandError>>,
-) -> Vec<Result<TargetAnalysis, HeisenbergCommandError>> {
+) -> Vec<Result<ConfigurationAnalysis, HeisenbergCommandError>> {
     running
         .into_iter()
         .map(|analysis| {
-            analysis.and_then(|RunningAnalysis { handle, target }| {
-                handle
-                    .join()
-                    .map_err(PanicPayload)
-                    .map_err(error_context(
-                        target,
-                        HeisenbergCommandError::AnalysisPanicked,
-                    ))
-                    .and_then(identity)
-            })
+            analysis.and_then(
+                |RunningAnalysis {
+                     configuration,
+                     handle,
+                 }| {
+                    handle
+                        .join()
+                        .map_err(PanicPayload)
+                        .map_err(error_context(
+                            configuration,
+                            HeisenbergCommandError::AnalysisPanicked,
+                        ))
+                        .and_then(identity)
+                },
+            )
         })
         .collect()
 }
 
-fn test_library_packages(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
+fn test_library_packages(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
     analyses
         .iter()
-        .flat_map(|TargetAnalysis { graphs, .. }| graphs)
+        .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
         .filter(
             |CrateModuleGraph {
                  crate_target,
@@ -139,11 +152,6 @@ fn test_library_packages(analyses: &[TargetAnalysis]) -> BTreeSet<String> {
 pub struct CheckCommand {
     #[arg(
         long,
-        help = "Analyse every feature of every workspace member, which is the default"
-    )]
-    pub all_features: bool,
-    #[arg(
-        long,
         env = "CARGO_HOME",
         hide_env_values = true,
         value_parser = AbsolutePath::parse,
@@ -151,29 +159,18 @@ pub struct CheckCommand {
     )]
     pub cargo_home: AbsolutePath,
     #[arg(
-        long,
-        conflicts_with = "all_features",
-        help = "Analyse these features, separated by commas or spaces, on top of the default ones, each enabled on every workspace member that defines it"
+        long = "configuration",
+        value_name = "NAME",
+        required = true,
+        help = "Analyse this declared configuration; repeat it to select several"
     )]
-    pub features: Vec<String>,
-    #[arg(
-        long,
-        conflicts_with = "all_features",
-        help = "Leave out the default features of every workspace member"
-    )]
-    pub no_default_features: bool,
+    pub configurations: Vec<String>,
     #[arg(
         long,
         value_parser = AbsolutePath::parse,
         help = format!("Absolute path of the Rust {SUPPORTED_RUST_VERSION} sysroot that contains the rust-src component")
     )]
     pub sysroot: AbsolutePath,
-    #[arg(
-        long = "target",
-        value_name = "TRIPLE",
-        help = "Analyse this declared target instead of the host's; repeat it to select several"
-    )]
-    pub targets: Vec<String>,
     #[arg(
         long,
         value_parser = AbsolutePath::parse,
@@ -186,114 +183,85 @@ impl CheckCommand {
     /// # Errors
     ///
     /// Returns every [`HeisenbergCommandError`] that kept the project from loading or a
-    /// supported target from being analysed.
+    /// declared configuration from being analysed.
     pub fn execute(
         &self,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<CheckReport, Vec<HeisenbergCommandError>> {
-        let project = self
-            .feature_selection()
-            .and_then(|features| {
-                ProjectModel {
-                    cargo_home: self.cargo_home.path.clone(),
-                    environment: environment.clone(),
-                    features,
-                    sysroot: self.sysroot.path.clone(),
-                    targets: self.target_selection(),
-                    workspace_directory: self.workspace.path.clone(),
-                }
-                .resolve()
-            })
-            .map_err(project_model_failure)?;
-        let test_crates = project
-            .declared_test_crates
-            .test_crates(&project.project.resolved);
+        let project = ProjectModel {
+            cargo_home: self.cargo_home.path.clone(),
+            configurations: ConfigurationSelection {
+                names: self.configurations.clone(),
+            },
+            environment: environment.clone(),
+            sysroot: self.sysroot.path.clone(),
+            workspace_directory: self.workspace.path.clone(),
+        }
+        .resolve()
+        .map_err(project_model_failure)?;
         let clippy_violations = ClippyRequirements {
             resolved: &project.project.resolved,
-            test_crates: &test_crates,
+            test_crates: &project.packages.test_crates,
         }
         .violations()
         .map_err(project_model_failure)?;
         let project = &project;
-        let (analyses, failures): (Vec<TargetAnalysis>, Vec<HeisenbergCommandError>) =
-            scope(|scope| {
-                let threads = AnalysisThreads { scope };
 
-                joined(
+        every_analysis(scope(|scope| {
+            let threads = AnalysisThreads { scope };
+
+            joined(
+                project
+                    .build_outputs
+                    .keys()
+                    .map(|configuration| {
+                        threads
+                            .spawn(move || analysed(project, configuration))
+                            .map_err(error_context(
+                                configuration.clone(),
+                                HeisenbergCommandError::AnalysisThread,
+                            ))
+                            .map(|handle| RunningAnalysis {
+                                configuration: configuration.clone(),
+                                handle,
+                            })
+                    })
+                    .collect(),
+            )
+        }))
+        .map(|analyses| {
+            let package_violations = clippy_violations
+                .into_iter()
+                .chain(
                     project
-                        .targets
-                        .iter()
-                        .copied()
-                        .map(|target| {
-                            threads
-                                .spawn(move || analysed(project, target))
-                                .map_err(error_context(
-                                    target,
-                                    HeisenbergCommandError::AnalysisThread,
-                                ))
-                                .map(|handle| RunningAnalysis { handle, target })
-                        })
-                        .collect(),
+                        .declared_test_crates
+                        .violations(&project.project.resolved, &project.packages.test_crates),
                 )
-            })
-            .into_iter()
-            .partition_result();
+                .chain(
+                    ManifestLintAllowances {
+                        resolved: &project.project.resolved,
+                    }
+                    .violations(),
+                )
+                .chain(
+                    PackageRules {
+                        empty_libraries: &if project.scope.is_partial() {
+                            BTreeSet::new()
+                        } else {
+                            empty_libraries(&analyses)
+                        },
+                        resolved: &project.project.resolved,
+                        test_library_packages: &test_library_packages(&analyses),
+                    }
+                    .violations(),
+                )
+                .collect();
 
-        failures
-            .is_empty()
-            .then_some(analyses)
-            .ok_or(failures)
-            .map(|analyses| {
-                let package_violations = clippy_violations
-                    .into_iter()
-                    .chain(
-                        project
-                            .declared_test_crates
-                            .violations(&project.project.resolved),
-                    )
-                    .chain(
-                        ManifestLintAllowances {
-                            resolved: &project.project.resolved,
-                        }
-                        .violations(),
-                    )
-                    .chain(
-                        PackageRules {
-                            empty_libraries: &if project.scope.is_partial() {
-                                BTreeSet::new()
-                            } else {
-                                empty_libraries(&analyses)
-                            },
-                            resolved: &project.project.resolved,
-                            test_library_packages: &test_library_packages(&analyses),
-                        }
-                        .violations(),
-                    )
-                    .collect();
-
-                CheckReport {
-                    analyses,
-                    package_violations,
-                    scope: project.scope.clone(),
-                }
-            })
-    }
-
-    fn feature_selection(&self) -> Result<FeatureSelection, ProjectModelError> {
-        if self.features.is_empty() && !self.no_default_features {
-            Ok(FeatureSelection::All)
-        } else {
-            FeatureSelection::listed(!self.no_default_features, &self.features)
-        }
-    }
-
-    fn target_selection(&self) -> TargetSelection {
-        if self.targets.is_empty() {
-            TargetSelection::Host
-        } else {
-            TargetSelection::Selected {
-                triples: self.targets.clone(),
+            CheckReport {
+                analyses,
+                package_violations,
+                scope: project.scope.clone(),
             }
-        }
+        })
     }
 }

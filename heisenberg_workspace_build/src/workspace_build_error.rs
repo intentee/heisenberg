@@ -2,6 +2,9 @@ use std::error::Error;
 use std::io;
 use std::path::PathBuf;
 
+use cargo_metadata::camino::Utf8Path;
+use cargo_metadata::camino::Utf8PathBuf;
+
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceBuildError {
     #[error("cargo cannot plan the build of the build scripts and procedural macros")]
@@ -22,8 +25,24 @@ pub enum WorkspaceBuildError {
     CargoConfiguration(#[source] Box<dyn Error + Send + Sync>),
     #[error("the cargo workspace of the build cannot be loaded")]
     CargoWorkspace(#[source] Box<dyn Error + Send + Sync>),
-    #[error("cargo cannot name the files of the procedural macros")]
-    ProcMacroFileTypes(#[source] Box<dyn Error + Send + Sync>),
+    #[error(
+        "the files that cargo lists for the procedural macro `{proc_macro}` hold {} dynamic libraries instead of one: [{}]",
+        libraries.len(),
+        libraries.iter().map(Utf8PathBuf::as_path).map(Utf8Path::as_str).collect::<Vec<&str>>().join(", ")
+    )]
+    ProcMacroLibraryNotUnique {
+        libraries: Vec<Utf8PathBuf>,
+        proc_macro: String,
+    },
+    #[error(
+        "the file `{file}` that cargo lists for the procedural macro `{proc_macro}` cannot be read"
+    )]
+    ProcMacroLibraryRead {
+        file: Utf8PathBuf,
+        proc_macro: String,
+        #[source]
+        source: io::Error,
+    },
     #[error("the standard library of {target} is not installed at `{}`", directory.display())]
     TargetLibraryMissing { directory: PathBuf, target: String },
     #[error(

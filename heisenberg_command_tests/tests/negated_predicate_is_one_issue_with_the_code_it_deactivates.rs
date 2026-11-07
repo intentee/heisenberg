@@ -26,7 +26,7 @@ fn negated_predicate_is_one_issue_with_the_code_it_deactivates() {
             \n\
             - src/lib.rs:6:1: Configuration predicate negates a feature, test or debug_assertions\n    \
             #[cfg(not(feature = \"web_admin_panel\"))]\n      \
-            code active on no declared target at src/lib.rs:7:8\n\
+            code active in no declared configuration at src/lib.rs:7:8\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

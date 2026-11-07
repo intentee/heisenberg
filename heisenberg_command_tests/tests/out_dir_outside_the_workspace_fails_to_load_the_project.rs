@@ -20,7 +20,7 @@ fn out_dir_outside_the_workspace_fails_to_load_the_project() {
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the project cannot be loaded\n\
-             error: `{}` declares the out-dir `../elsewhere` for `bindings_sys` outside the workspace\n",
+             error: `{}` declares the out-dir `../elsewhere` of `bindings_sys` for the configuration `x86_64-pc-windows-msvc` outside the workspace\n",
             workspace.join("Cargo.toml").display()
         )
         .as_str())

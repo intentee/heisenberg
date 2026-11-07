@@ -4,18 +4,21 @@ use std::ops::ControlFlow;
 use ra_ap_cfg::CfgOptions;
 use ra_ap_hir::PathResolution;
 use ra_ap_hir::Semantics;
+use ra_ap_hir_expand::attrs::Attr;
+use ra_ap_hir_expand::attrs::AttrInput;
+use ra_ap_hir_expand::mod_path::ModPath;
+use ra_ap_hir_expand::mod_path::PathKind;
 use ra_ap_ide_db::RootDatabase;
+use ra_ap_intern::Interned;
 use ra_ap_intern::Symbol;
 use ra_ap_syntax::AstNode;
-use ra_ap_syntax::SyntaxElement;
 use ra_ap_syntax::SyntaxNode;
-use ra_ap_syntax::SyntaxToken;
-use ra_ap_syntax::T;
 use ra_ap_syntax::ast;
+use ra_ap_syntax_bridge::DocCommentDesugarMode;
+use ra_ap_syntax_bridge::syntax_node_to_token_tree;
 
-use heisenberg_project_model::clippy_lint_selector::ClippyLintSelector;
-use heisenberg_project_model::constants::CLIPPY_DENIED_LINTS;
-use heisenberg_project_model::constants::CLIPPY_TOOL;
+use heisenberg_project_model::constants::PANICKING_LINTS;
+use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 
 use crate::visit_active_metas::visit_active_metas;
 
@@ -23,29 +26,11 @@ const LOWERING_ATTRIBUTES: [&str; 1] = ["warn"];
 
 const SUPPRESSING_ATTRIBUTES: [&str; 2] = ["allow", "expect"];
 
-fn lint_paths(tree: &ast::TokenTree) -> Vec<Vec<String>> {
-    let tokens: Vec<SyntaxToken> = tree
-        .syntax()
-        .children_with_tokens()
-        .filter_map(SyntaxElement::into_token)
-        .collect();
-
-    tokens
-        .split(|token| token.kind() == T![,])
-        .map(|lint| {
-            lint.iter()
-                .filter(|token| token.kind().is_any_identifier())
-                .map(|segment| segment.text().to_owned())
-                .collect()
-        })
-        .collect()
-}
-
 fn is_required_lint(path: &[String]) -> bool {
-    matches!(path, [tool, name] if tool == CLIPPY_TOOL
-        && CLIPPY_DENIED_LINTS
-            .iter()
-            .any(|lint| ClippyLintSelector { name }.selects(lint)))
+    REQUIRED_LINT_GROUPS
+        .iter()
+        .chain(PANICKING_LINTS.iter())
+        .any(|lint| lint.is_named_by(path))
 }
 
 pub struct LintSuppressions<'suppressions, 'database> {
@@ -71,13 +56,63 @@ impl LintSuppressions<'_, '_> {
         suppressions
     }
 
+    fn lint_paths(&self, lowering: &ast::TokenTreeMeta) -> Vec<Vec<String>> {
+        let database = self.semantics.db;
+        let spans = self
+            .semantics
+            .hir_file_for(lowering.syntax())
+            .span_map(database);
+        let attribute = lowering.path().and_then(|path| {
+            let span = spans.span_for_range(path.syntax().text_range());
+
+            ModPath::from_tt(
+                database,
+                syntax_node_to_token_tree(
+                    path.syntax(),
+                    spans,
+                    span,
+                    DocCommentDesugarMode::ProcMacro,
+                )
+                .token_trees(),
+            )
+            .map(|attribute_path| Attr {
+                path: Interned::new(attribute_path),
+                input: lowering.token_tree().map(|tree| {
+                    Box::new(AttrInput::TokenTree(syntax_node_to_token_tree(
+                        tree.syntax(),
+                        spans,
+                        span,
+                        DocCommentDesugarMode::ProcMacro,
+                    )))
+                }),
+                ctxt: span.ctx,
+            })
+        });
+
+        attribute
+            .iter()
+            .filter_map(|attribute| attribute.parse_path_comma_token_tree(database))
+            .flatten()
+            .filter(|(path, ..)| path.kind == PathKind::Plain)
+            .map(|(path, ..)| {
+                path.segments()
+                    .iter()
+                    .map(|segment| segment.as_str().to_owned())
+                    .collect()
+            })
+            .collect()
+    }
+
     fn lowers_a_required_lint(&self, meta: &ast::Meta) -> bool {
+        let ast::Meta::TokenTreeMeta(lowering) = meta else {
+            return false;
+        };
+
         self.names_builtin_attribute(meta, &LOWERING_ATTRIBUTES)
-            && meta
-                .syntax()
-                .children()
-                .find_map(ast::TokenTree::cast)
-                .is_some_and(|tree| lint_paths(&tree).iter().any(|path| is_required_lint(path)))
+            && self
+                .lint_paths(lowering)
+                .iter()
+                .any(|path| is_required_lint(path))
     }
 
     fn names_builtin_attribute(&self, meta: &ast::Meta, names: &[&str]) -> bool {

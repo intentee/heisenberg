@@ -20,9 +20,9 @@ fn unresolved_import_is_a_violation() {
         str::from_utf8(&outcome.output),
         Ok([
             "UnresolvedPath: 1 violation\n\
-            Every name must resolve for the analysis to be complete. Fix the path so it resolves.\n\
+            The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
-            - src/lib.rs:3:5: Path is unresolved\n    \
+            - src/lib.rs:3:5: Path compiles, but rust-analyzer cannot resolve it\n    \
             use crate::present::Absent;\n\
             \n\
             ------------------------------\n\

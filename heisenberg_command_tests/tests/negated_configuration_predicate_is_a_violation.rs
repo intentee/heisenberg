@@ -7,26 +7,28 @@ use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_command_tests::host_only_fixture::HostOnlyFixture;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
-const NOT_WINDOWS_ACTIVE_ON_NO_TARGET: &str = "";
+const NOT_WINDOWS_ACTIVE_IN_NO_CONFIGURATION: &str = "";
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
-const DEBUG_ASSERTIONS_FOLD: &str = "      code active on no declared target at src/lib.rs:15:12\n";
+const DEBUG_ASSERTIONS_FOLD: &str =
+    "      code active in no declared configuration at src/lib.rs:15:12\n";
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const FEATURE_OFF_WINDOWS_FOLD: &str =
-    "      code active on no declared target at src/lib.rs:18:12\n";
+    "      code active in no declared configuration at src/lib.rs:18:12\n";
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
-const FEATURE_ON_UNIX_FOLD: &str = "      code active on no declared target at src/lib.rs:21:12\n";
+const FEATURE_ON_UNIX_FOLD: &str =
+    "      code active in no declared configuration at src/lib.rs:21:12\n";
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const ERRORS: usize = 6;
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
-const NOT_WINDOWS_ACTIVE_ON_NO_TARGET: &str = "CodeActiveOnNoTarget: 1 violation\n\
-    Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.\n\
+const NOT_WINDOWS_ACTIVE_IN_NO_CONFIGURATION: &str = "CodeActiveInNoConfiguration: 1 violation\n\
+    Code active in no declared configuration is never built or analysed. Remove it, declare a configuration it is active in, or make it active in a declared configuration.\n\
     \n\
-    - src/lib.rs:32:12: Code is active on no declared target\n        \
+    - src/lib.rs:32:12: Code is active in no declared configuration\n        \
     pub fn not_windows() {}\n\
     \n";
 
@@ -58,7 +60,7 @@ fn negated_configuration_predicate_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(format!(
-            "{NOT_WINDOWS_ACTIVE_ON_NO_TARGET}\
+            "{NOT_WINDOWS_ACTIVE_IN_NO_CONFIGURATION}\
              NegatedConfiguration: 6 violations\n\
              Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.\n\
              \n\
@@ -77,7 +79,7 @@ fn negated_configuration_predicate_is_a_violation() {
              {FEATURE_ON_UNIX_FOLD}\
              - src/lib.rs:27:9: Configuration predicate negates a feature, test or debug_assertions\n            \
              #[cfg(not(feature = \"optional\"))]\n      \
-             code active on no declared target at src/lib.rs:28:9\n\
+             code active in no declared configuration at src/lib.rs:28:9\n\
              \n\
              ------------------------------\n\
              {ERRORS} errors found\n\

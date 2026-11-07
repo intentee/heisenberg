@@ -3,14 +3,14 @@ use crate::issue_text::IssueText;
 macro_rules! resolution_purpose {
     ($instruction:literal) => {
         concat!(
-            "Every name must resolve for the analysis to be complete. ",
+            "The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. ",
             $instruction
         )
     };
 }
 
 pub const ADDITIONAL_PUBLIC_ITEM: IssueText = IssueText {
-    definition: "A second public item in a module, constants and modules aside, among the items written in module files. An item is public when its visibility reaches beyond its own module, so a `pub(self)` item is not public while a `pub` item of a private module is, and a `macro_rules!` macro is public when exported.",
+    definition: "A public item of a module beyond the one that the module's name spells, or beyond its first public item when the name spells none, among the items of module files, including those that a macro_rules! macro of the crate writes, constants, modules and the functions that Rust requires for procedural macros at the crate root aside. An item is public when its visibility reaches beyond its own module, so a `pub(self)` item is not public while a `pub` item of a private module is, and a `macro_rules!` macro is public when exported.",
     name: "AdditionalPublicItem",
     purpose: "Each module exposes a single public item, so every file has one responsibility. Move each additional public item into its own module.",
     summary: "A module with more than one public item",
@@ -30,25 +30,11 @@ pub const CLIPPY_CONFIGURATION_MISSING: IssueText = IssueText {
     summary: "A workspace member without a clippy configuration",
 };
 
-pub const CLIPPY_LINT_NOT_DENIED: IssueText = IssueText {
-    definition: "A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint below deny, under either spelling of its name or a name clippy renamed to it, unless it is a test crate, which may panic and then declares its own [lints] table, since cargo cannot override single lints of an inherited table. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].",
-    name: "ClippyLintNotDenied",
-    purpose: "Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave it undenied, in its own lints table.",
-    summary: "A workspace member that leaves a required clippy lint below deny",
-};
-
-pub const CLIPPY_TEST_ALLOWANCE_MISSING: IssueText = IssueText {
-    definition: "A clippy configuration that does not set each test allowance to true, which is the only way tests may use them.",
-    name: "ClippyTestAllowanceMissing",
-    purpose: "Tests may fail fast with expect, unwrap and panic. Set the allowance to true in the clippy configuration.",
-    summary: "A clippy configuration that does not allow tests to fail fast",
-};
-
-pub const CODE_ACTIVE_ON_NO_TARGET: IssueText = IssueText {
-    definition: "Code active on no declared target. A module file that its own attributes configure out is inactive code at its declaration. Code that a negated predicate leaves active on no declared target is listed within the predicate's NegatedConfiguration issue instead.",
-    name: "CodeActiveOnNoTarget",
-    purpose: "Code active on no declared target is never built or analysed. Remove it, declare a supported target it is active on, or make it active on a declared target.",
-    summary: "Code that no declared target builds",
+pub const CODE_ACTIVE_IN_NO_CONFIGURATION: IssueText = IssueText {
+    definition: "Code active in no declared configuration, a configuration being a supported target with a selection of features. A module file that its own attributes configure out is inactive code at its declaration. Code that a negated predicate leaves active in no declared configuration is listed within the predicate's NegatedConfiguration issue instead, and a compile_error! call, which exists only to fail the builds no configuration declares, is not inactive code.",
+    name: "CodeActiveInNoConfiguration",
+    purpose: "Code active in no declared configuration is never built or analysed. Remove it, declare a configuration it is active in, or make it active in a declared configuration.",
+    summary: "Code that no declared configuration builds",
 };
 
 pub const CONFIGURATION_SELECTION_MACRO: IssueText = IssueText {
@@ -59,7 +45,7 @@ pub const CONFIGURATION_SELECTION_MACRO: IssueText = IssueText {
 };
 
 pub const DUPLICATED_FUNCTION_BODY: IssueText = IssueText {
-    definition: "Functions written in the module files of workspace members whose signatures and bodies are identical once every name is replaced by the definition it resolves to, with names a function declares itself compared by declaration order and names that resolve to nothing never equal, functions with an empty body aside.",
+    definition: "Functions written in the module files of workspace members whose signatures and bodies are identical once every name is replaced by the definition it resolves to, with names a function declares itself compared by declaration order and names that resolve to nothing never equal. Functions with an empty body are not compared, and neither are the entry points that Rust requires one of per target or per macro: the main function of a binary, a build script, an example, or a test or benchmark target without libtest's harness, and the functions of procedural macros.",
     name: "DuplicatedFunctionBody",
     purpose: "Duplicated code drifts apart when one copy changes. Keep one function and call it from every place that needs it.",
     summary: "Functions whose signatures and bodies are identical",
@@ -93,6 +79,13 @@ pub const IMPL_WITHOUT_LOCAL_TYPE: IssueText = IssueText {
     summary: "An impl of another crate's trait with no home in this crate",
 };
 
+pub const INCLUDED_SOURCE_FILE: IssueText = IssueText {
+    definition: "An include! of a file that no build script provides: one outside the OUT_DIR of its crate, which a build script writes or an out_dirs declaration stands in for. Included files are trusted as generated text and not analysed.",
+    name: "IncludedSourceFile",
+    purpose: "An included file is trusted as generated text, so code written by hand escapes every rule once it is included. Make the file a module, or have a build script generate it into OUT_DIR.",
+    summary: "An include! of a file that is not a build script output",
+};
+
 pub const INVALID_MACRO_DEFINITION: IssueText = IssueText {
     definition: "A macro definition that rust-analyzer reports as invalid.",
     name: "InvalidMacroDefinition",
@@ -101,7 +94,7 @@ pub const INVALID_MACRO_DEFINITION: IssueText = IssueText {
 };
 
 pub const ITEM_OUT_OF_ORDER: IssueText = IssueText {
-    definition: "An item of a module file or inline module, among the items written in module files, that follows an item of a later group. The groups, in order: module declarations; imports from vendor crates, which are std, core, alloc and every crate outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics, macro_rules! macros and macro calls; private structs, enums, unions, type aliases and traits with their impl blocks; public items with their impl blocks; inline modules. An import takes the group of the crate that the first segment of each of its paths resolves to, an impl block the group of the item of its file it belongs to, and an item is public when its visibility reaches beyond its own module. The item is reported at its name, with the first earlier item of a later group.",
+    definition: "An item of a module file or inline module, among the items written in module files, that follows an item of a later group. The groups, in order: module declarations; imports from vendor crates, which are std, core, alloc and every crate outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics, macro_rules! macros and macro calls; private structs, enums, unions, type aliases and traits with their impl blocks; public items with their impl blocks; tests, the functions under the built-in test, bench or test_case attribute; inline modules. An import takes the group of the crate that the first segment of each of its paths resolves to, except that an import of a macro_rules! macro of its own module, which Rust allows only after the macro, takes the group of the macro; an impl block takes the group of the item of its file it belongs to, and an item is public when its visibility reaches beyond its own module. The item is reported at its name, with the first earlier item of a later group.",
     name: "ItemOutOfOrder",
     purpose: "Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names.",
     summary: "An item that follows an item of a later group",
@@ -115,17 +108,17 @@ pub const LINT_ALLOWED_IN_MANIFEST: IssueText = IssueText {
 };
 
 pub const LINT_SUPPRESSION: IssueText = IssueText {
-    definition: "An allow or expect attribute of any lint, or a warn attribute that lowers a required lint or its group, including one that a cfg_attr applies or a workspace member's macro writes.",
+    definition: "An allow or expect attribute of any lint, or a warn attribute that lowers a required lint or lint group, that the workspace writes, in module files, through a cfg_attr, through a macro of a workspace member or as output of a procedural macro of a workspace member, over code that holds text written in the module files of workspace members once its macros are expanded. A suppression that a vendored macro writes, or one over code that only a generator wrote, such as bindings that a build script writes and include! brings in, is not one.",
     name: "LintSuppression",
     purpose: "Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports.",
-    summary: "An attribute that allows or expects a lint, or lowers a required one",
+    summary: "An attribute that suppresses or lowers lints over code written in the workspace",
 };
 
 pub const METHOD_OUT_OF_ORDER: IssueText = IssueText {
-    definition: "A function of an impl block, among the items written in module files, that follows a function of a later group, or of its own group with a later name. The groups, in order: constructors, which return Self, Option<Self> or Result<Self, _>, an async function by the output of its future, with or without a self receiver; then, by visibility, pub, pub(crate), pub(super) or pub(in path), and private functions. The functions of a trait impl other than its constructors form one group. Names compare as Rust strings. The function is reported at its name, with the first earlier function it belongs before.",
+    definition: "A function of an impl block or of a trait definition, among the items written in module files, that follows a function it belongs before. The functions of an inherent impl and of a trait definition form groups, in order: constructors, which return Self, Option<Self> or Result<Self, _>, an async function by the output of its future, without a receiver or with a self receiver taken by value, by visibility, pub, pub(crate), pub(super) or pub(in path), and private; then the other functions, by the same visibilities. The functions of a trait definition are public. Within a group, names compare as Rust strings. The functions of a trait impl follow the order in which their trait declares them. The function is reported at its name, with the first earlier function it belongs before.",
     name: "MethodOutOfOrder",
-    purpose: "Constructors come first and wider visibility before narrower, so the interface of a type reads from the top and each function is found by its name. Move the function before the function the message names.",
-    summary: "An impl function that follows one it belongs before",
+    purpose: "Constructors come first and wider visibility before narrower, so the interface of a type reads from the top and each function is found by its name, and a trait impl reads in the order of its trait. Move the function before the function the message names.",
+    summary: "A function of an impl block or trait that follows one it belongs before",
 };
 
 pub const MISPLACED_BLANKET_IMPL: IssueText = IssueText {
@@ -171,14 +164,14 @@ pub const MODULE_FILE_INSIDE_BLOCK: IssueText = IssueText {
 };
 
 pub const MODULE_NOT_NAMED_AFTER_ITS_ITEM: IssueText = IssueText {
-    definition: "A module other than a crate root whose file, or whose name for an inline module or the directory of a mod.rs, does not spell the words of its public item in order and in lowercase, each joined to the next by an underscore or by nothing. The words of a name are split at its underscores, before an uppercase letter that follows a lowercase letter or a digit, and before the last letter of an uppercase run that a lowercase letter follows, with digits kept in the word before them, so that pub struct OpenAIApiPath lives in open_ai_api_path.rs, openai_api_path.rs or openaiapipath.rs, while Ministral3ClusterParams does not live in ministral_3_cluster_params.rs.",
+    definition: "A module other than a crate root whose file, or whose name for an inline module or the directory of a mod.rs, spells the words of none of its public items, reported at its first public item. A module spells the words of an item in order and in lowercase, each joined to the next by an underscore or by nothing. The words of a name are split at its underscores, before an uppercase letter that follows a lowercase letter or a digit, and before the last letter of an uppercase run that a lowercase letter follows, with digits kept in the word before them, so that pub struct OpenAIApiPath lives in open_ai_api_path.rs, openai_api_path.rs or openaiapipath.rs, while Ministral3ClusterParams does not live in ministral_3_cluster_params.rs.",
     name: "ModuleNotNamedAfterItsItem",
     purpose: "A module is named after the one item it exposes, so the file that defines an item is found from the item's name alone. Rename the module to the words of its public item, keeping each word whole and joining it to the next by an underscore or by nothing, or rename the item.",
     summary: "A module that is not named after its public item",
 };
 
 pub const NEGATED_CONFIGURATION: IssueText = IssueText {
-    definition: "A cfg or cfg_attr predicate that negates a feature, test or debug_assertions. Code that the predicate leaves active on no declared target is listed within its issue, and the predicate of a module file that its own attributes configure out is reported at the declaration unless an analysis of that same declaration reports it where it is written.",
+    definition: "A cfg or cfg_attr predicate that negates a feature, test or debug_assertions. Code that the predicate leaves active in no declared configuration is listed within its issue, and the predicate of a module file that its own attributes configure out is reported at the declaration unless an analysis of that same declaration reports it where it is written.",
     name: "NegatedConfiguration",
     purpose: "Code that exists only without a feature, outside tests or outside debug builds escapes testing and makes features non-additive. Express the condition positively.",
     summary: "A cfg predicate that negates a feature, test or debug_assertions",
@@ -192,14 +185,14 @@ pub const NON_CONSTANT_IN_CONSTANTS_MODULE: IssueText = IssueText {
 };
 
 pub const NON_DOC_COMMENT: IssueText = IssueText {
-    definition: "A comment other than a doc comment, in a module file or in a file it includes.",
+    definition: "A comment other than a doc comment, in a module file.",
     name: "NonDocComment",
-    purpose: "Names and structure document the code; only doc comments, which documentation tooling consumes, are allowed. Rename or restructure until the comment is unnecessary, or make it a doc comment if it documents an API.",
+    purpose: "Names and structure document the code; only doc comments, which documentation tooling consumes, are allowed, and only on the items they document. Rename or restructure until the comment is unnecessary, or make it a doc comment if it documents an item; a statement, an expression or an unsafe block has no comment form, and unsafe code exists only where a crate integrates foreign code.",
     summary: "A comment that is not a doc comment",
 };
 
 pub const NON_TEST_ITEM_IN_TEST_TARGET: IssueText = IssueText {
-    definition: "An item of an integration test target other than a test, a constant, an import, a module or a private item that only the file defining it uses, among the items written in module files. A test is a function under the built-in test, bench or test_case attribute, and a target with harness = false enters through the main function of its crate root. The impl blocks of a flagged type are listed within the type's issue.",
+    definition: "An item of an integration test target other than a test, a constant, an import, a module or a private item that only the file defining it uses, among the items of module files, including those that a macro_rules! macro of the crate writes: a macro call is judged by the items it expands to, and the items that procedural macros and the macros of other crates generate are trusted. A test is a function under the built-in test, bench or test_case attribute, and a target with harness = false enters through the main function of its crate root. The impl blocks of a flagged type are listed within the type's issue.",
     name: "NonTestItemInTestTarget",
     purpose: "A helper used beyond its own test file is a test library, and test libraries never live in a tests directory. Move it into a library crate; when that crate depends on the package under test, move the tests that use it there too, so package dependencies never form a cycle.",
     summary: "An integration test item that is neither a test nor a file-local helper",
@@ -220,7 +213,7 @@ pub const PACKAGE_DEPENDS_ON_ITSELF: IssueText = IssueText {
 };
 
 pub const PROCEDURAL_FUNCTION: IssueText = IssueText {
-    definition: "A function without a self receiver, free or associated, that takes a struct, enum or union of its own crate by value or by reference, unless it belongs to a trait impl, constructs the self type of its impl, directly, as the success of a Result or as the value of an Option, an async function by the output of its future, or is a private helper used only in the file that defines it.",
+    definition: "A function that takes a struct, enum or union of its own crate, by value, by reference or behind a type that dereferences to it, such as Box, Rc or Arc, without belonging to it: it has no self receiver that its body reads, is neither declared by a trait nor part of a trait impl, does not construct the self type of its impl, directly, as the success of a Result or as the value of an Option, an async function by the output of its future, and is not a private helper used only in the file that defines it.",
     name: "ProceduralFunction",
     purpose: "Behavior belongs with the data it works on. Make the function a method of the type it takes, a constructor of its own type, or a private helper used in a single file.",
     summary: "A function that takes a type of its crate without belonging to it",
@@ -247,11 +240,32 @@ pub const PUBLISHABLE_TEST_CRATE: IssueText = IssueText {
     summary: "A declared test crate that can be published",
 };
 
+pub const REFERENCED_TEST: IssueText = IssueText {
+    definition: "A function under the built-in test, bench or test_case attribute that other code references.",
+    name: "ReferencedTest",
+    purpose: "The test harness calls every test, and a test that other code calls ties tests to each other. Move the code they share into a helper that each test calls.",
+    summary: "A test that other code references",
+};
+
 pub const REEXPORT: IssueText = IssueText {
-    definition: "A re-export.",
+    definition: "A re-export, apart from the import that gives a macro_rules! macro of its own module that is not exported its only path.",
     name: "Reexport",
     purpose: "Every item is reachable through exactly one path. Import the item from where it is defined instead of re-exporting it.",
     summary: "A re-export",
+};
+
+pub const REQUIRED_CLIPPY_SETTING_MISSING: IssueText = IssueText {
+    definition: "A clippy configuration that does not give each required setting the value it requires: true for the test allowances, which are the only way tests may use expect, unwrap and panic, and false for avoid-breaking-exported-api, which clippy otherwise sets to true and so leaves the lints that would change a public signature silent on public items.",
+    name: "RequiredClippySettingMissing",
+    purpose: "Tests may fail fast with expect, unwrap and panic, and the lints that clippy relaxes for public items by default must hold for them too. Set each required setting to the value it names.",
+    summary: "A clippy configuration without a required setting",
+};
+
+pub const REQUIRED_LINT_NOT_DENIED: IssueText = IssueText {
+    definition: "A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint or lint group below deny, under either spelling of its name or a name clippy renamed to it, a warn level counting as deny while the warnings group is denied. Every member denies the warnings group and the clippy all, nursery and pedantic groups; every member but a test crate also denies the panicking lints, while a test crate, which may panic, declares its own [lints] table, since cargo cannot override single lints of an inherited table. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].",
+    name: "RequiredLintNotDenied",
+    purpose: "Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.",
+    summary: "A workspace member that leaves a required lint or lint group below deny",
 };
 
 pub const SHARED_MODULE_FILE: IssueText = IssueText {
@@ -297,7 +311,7 @@ pub const TEST_ONLY_CODE_IN_PRODUCTION: IssueText = IssueText {
 };
 
 pub const TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES: IssueText = IssueText {
-    definition: "A tests package, whose targets are integration tests beside an absent or empty library, a library being empty when it defines nothing on any declared target, and whose integration test targets hold nothing but tests, constants, imports, modules and file-local private items, so that it holds no test library of its own. Integration tests belong to the package whose behaviour they verify, in its tests directory, and may use any dev-dependency; a helper used beyond its own test file is a test library, which belongs in a library crate; a separate tests package exists only to hold test libraries of its own, such as helpers that need the package under test, which that package cannot dev-depend on without a package cycle. The issue lists every workspace member the package depends on, either as a package that could take its tests or with the dependency cycle that moving them there would close, as guidance, not as the owner.",
+    definition: "A tests package, whose targets are integration tests beside an absent or empty library, a library being empty when it defines nothing in any declared configuration, and whose integration test targets hold nothing but tests, constants, imports, modules and file-local private items, so that it holds no test library of its own. Integration tests belong to the package whose behaviour they verify, in its tests directory, and may use any dev-dependency; a helper used beyond its own test file is a test library, which belongs in a library crate; a separate tests package exists only to hold test libraries of its own, such as helpers that need the package under test, which that package cannot dev-depend on without a package cycle. The issue lists every workspace member the package depends on, either as a package that could take its tests or with the dependency cycle that moving them there would close, as guidance, not as the owner.",
     name: "TestsOnlyPackageWithoutTestLibraries",
     purpose: "Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so it lists every workspace member the tests use, either as a package that could take them or with the dependency cycle that moving them there would close; the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.",
     summary: "A package of tests that holds no test library of its own",
@@ -311,7 +325,7 @@ pub const TUPLE_IN_SIGNATURE: IssueText = IssueText {
 };
 
 pub const UNDESTRUCTURED_PARAMETER: IssueText = IssueText {
-    definition: "A function or closure parameter bound by an identifier, other than self, whose every use, at least one, accesses a field of the struct or tuple the parameter holds, directly or behind references, with the field name written in a module file. Fields reached through Box or another Deref implementation, and fields of unions, do not count.",
+    definition: "A function or closure parameter bound by an identifier, other than self, whose every use, at least one, accesses a field of the struct or tuple the parameter holds, directly or behind references, with the field name written in a module file. Fields reached through Box or another Deref implementation, and fields of unions, do not count, and neither does a parameter that holds by value a type implementing Drop and reads a field that is not Copy, which a pattern cannot move out of.",
     name: "UndestructuredParameter",
     purpose: "A parameter used only through its fields reads better as a pattern that names those fields. Destructure the parameter in its pattern.",
     summary: "A parameter used only through its fields",
@@ -346,38 +360,56 @@ pub const UNPREFIXED_TYPE_PARAMETER: IssueText = IssueText {
 };
 
 pub const UNRESOLVED_EXTERN_CRATE: IssueText = IssueText {
-    definition: "An extern crate declaration that does not resolve.",
+    definition: "An extern crate declaration that rust-analyzer cannot resolve.",
     name: "UnresolvedExternCrate",
     purpose: resolution_purpose!("Declare the crate as a dependency or remove the declaration."),
-    summary: "An extern crate that does not resolve",
+    summary: "An extern crate that rust-analyzer cannot resolve",
 };
 
 pub const UNRESOLVED_MACRO_CALL: IssueText = IssueText {
-    definition: "A macro call, attribute or derive whose macro does not resolve. A macro call whose name an unresolved import binds belongs to that import's issue.",
+    definition: "A macro call, attribute or derive whose macro rust-analyzer cannot resolve. A macro call whose name an unresolved import binds belongs to that import's issue.",
     name: "UnresolvedMacroCall",
-    purpose: resolution_purpose!("Define or import the macro."),
-    summary: "A macro call, attribute or derive whose macro does not resolve",
+    purpose: resolution_purpose!("Define or import the macro so that rust-analyzer resolves it."),
+    summary: "A macro call, attribute or derive whose macro rust-analyzer cannot resolve",
 };
 
 pub const UNRESOLVED_METHOD_CALL: IssueText = IssueText {
-    definition: "A method call that does not resolve, unless its receiver holds a name that does not resolve, which is that name's issue.",
+    definition: "A method call whose method rust-analyzer cannot resolve, unless its receiver holds a name that rust-analyzer cannot resolve, which is that name's issue.",
     name: "UnresolvedMethodCall",
-    purpose: resolution_purpose!("Fix the call so its method resolves."),
-    summary: "A method call that does not resolve",
+    purpose: resolution_purpose!(
+        "Write the call so that rust-analyzer resolves its method, such as by naming the type of its receiver."
+    ),
+    summary: "A method call that rust-analyzer cannot resolve",
 };
 
 pub const UNRESOLVED_MODULE: IssueText = IssueText {
-    definition: "A module declaration whose file does not resolve.",
+    definition: "A module declaration whose file rust-analyzer cannot resolve.",
     name: "UnresolvedModule",
     purpose: resolution_purpose!("Create the module file or remove the declaration."),
-    summary: "A module declaration whose file does not exist",
+    summary: "A module declaration whose file rust-analyzer cannot resolve",
 };
 
 pub const UNRESOLVED_PATH: IssueText = IssueText {
-    definition: "A path that does not resolve, imports included. A name bound by an unresolved import, whether a path or a macro call, belongs to that import's issue, and paths into a module of another crate that do not resolve are one issue per module, listed under a failed macro expansion that a workspace member reports in that module's file when there is one.",
+    definition: "A path that rust-analyzer cannot resolve, imports included. A name bound by an unresolved import, whether a path or a macro call, belongs to that import's issue, and paths into a module of another crate that do not resolve are one issue per module, listed under a failed macro expansion that a workspace member reports in that module's file when there is one.",
     name: "UnresolvedPath",
-    purpose: resolution_purpose!("Fix the path so it resolves."),
-    summary: "A path that does not resolve",
+    purpose: resolution_purpose!(
+        "Write the path so that rust-analyzer resolves it, such as by importing the item it names."
+    ),
+    summary: "A path that rust-analyzer cannot resolve",
+};
+
+pub const UNSAFE_CODE: IssueText = IssueText {
+    definition: "An unsafe block, function, trait, impl, extern block or attribute, written in the module files of a crate whose own code neither declares foreign functions or statics in an extern block, nor uses one, nor defines a function with a foreign ABI.",
+    name: "UnsafeCode",
+    purpose: "Unsafe code escapes the guarantees that make a project statically analyzable, and only code that meets a foreign library cannot avoid it. Write the code without unsafe; only a crate that integrates foreign code, by declaring or using foreign functions or statics, or by defining functions with a foreign ABI, may use it.",
+    summary: "Unsafe code in a crate that integrates no foreign code",
+};
+
+pub const UNVETTED_CLIPPY_SETTING: IssueText = IssueText {
+    definition: "A clippy configuration setting other than a required one and those that only add restrictions, which can silence or relax the lints that Heisenberg requires.",
+    name: "UnvettedClippySetting",
+    purpose: "A clippy setting can silence or relax the lints that Heisenberg requires, so a clippy configuration holds only the required settings and settings that only add restrictions. Remove the setting.",
+    summary: "A clippy configuration setting that Heisenberg has not vetted",
 };
 
 pub const SUPPORTED_RUST_VERSION: &str = "1.99.1";

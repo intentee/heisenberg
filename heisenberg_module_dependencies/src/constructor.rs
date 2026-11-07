@@ -1,3 +1,4 @@
+use ra_ap_hir::Access;
 use ra_ap_hir::Adt;
 use ra_ap_hir::Crate;
 use ra_ap_hir::Function;
@@ -17,26 +18,29 @@ impl Constructor<'_, '_> {
         let database = self.semantics.db;
         let famous_definitions = FamousDefs(self.semantics, self.krate);
 
-        if self.function.is_async(database) {
-            self.function.async_ret_type(database)
-        } else {
-            Some(self.function.ret_type(database))
-        }
-        .is_some_and(|returned| {
-            returned == *constructed
-                || [
-                    famous_definitions.core_option_Option(),
-                    famous_definitions.core_result_Result(),
-                ]
-                .into_iter()
-                .flatten()
-                .any(|wrapper| {
-                    returned.as_adt() == Some(Adt::Enum(wrapper))
-                        && returned
-                            .type_arguments()
-                            .next()
-                            .is_some_and(|wrapped| wrapped == *constructed)
-                })
-        })
+        self.function
+            .self_param(database)
+            .is_none_or(|receiver| receiver.access(database) == Access::Owned)
+            && if self.function.is_async(database) {
+                self.function.async_ret_type(database)
+            } else {
+                Some(self.function.ret_type(database))
+            }
+            .is_some_and(|returned| {
+                returned == *constructed
+                    || [
+                        famous_definitions.core_option_Option(),
+                        famous_definitions.core_result_Result(),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .any(|wrapper| {
+                        returned.as_adt() == Some(Adt::Enum(wrapper))
+                            && returned
+                                .type_arguments()
+                                .next()
+                                .is_some_and(|wrapped| wrapped == *constructed)
+                    })
+            })
     }
 }

@@ -18,14 +18,15 @@ fn clippy_lint_not_denied_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["ClippyLintNotDenied: 2 violations\n\
-            Production code reports failures as typed errors instead of panicking. Deny the lint in the [lints.clippy] or [workspace.lints.clippy] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave it undenied, in its own lints table.\n\
+        Ok(["RequiredLintNotDenied: 3 violations\n\
+            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
             \n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::expect_used\n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::panic\n\
+            - Cargo.toml: Package clippy_lint_not_denied does not deny warnings\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            3 errors found\n\
             ------------------------------\n", host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

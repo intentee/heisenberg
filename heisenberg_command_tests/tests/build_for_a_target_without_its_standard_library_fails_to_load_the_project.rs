@@ -16,14 +16,14 @@ fn build_for_a_target_without_its_standard_library_fails_to_load_the_project() {
         }
         .path(),
     }
-    .run_with_arguments(&["--target", "aarch64-apple-darwin"])
+    .run_with_arguments(&["--configuration", "aarch64-apple-darwin"])
     .expect("the arguments must parse");
 
     assert_eq!(
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the project cannot be loaded\n\
-             error: the build scripts and procedural macros of the workspace cannot be built for aarch64-apple-darwin\n\
+             error: the build scripts and procedural macros of the workspace cannot be built for the configuration `aarch64-apple-darwin`\n\
              error: the standard library of aarch64-apple-darwin is not installed at `{}`\n",
             Path::new(&sysroot)
                 .join("lib")

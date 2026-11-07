@@ -23,7 +23,7 @@ fn impl_block_of_a_flagged_type_is_part_of_its_issue() {
             \n\
             - tests/helping.rs:10:16: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
             pub struct Helpers;\n      \
-            impl block at tests/helping.rs:4:6\n\
+            impl block at tests/helping.rs:1:6\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

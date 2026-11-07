@@ -66,7 +66,7 @@ impl OutDirFiles<'_> {
         &self,
         database: &mut RootDatabase,
         vfs: &mut Vfs,
-    ) -> Result<(), ProjectModelError> {
+    ) -> Result<BTreeSet<FileId>, ProjectModelError> {
         let mut source_roots: BTreeMap<SourceRootId, BTreeSet<String>> = BTreeMap::new();
 
         for krate in all_crates(database).iter() {
@@ -90,7 +90,7 @@ impl OutDirFiles<'_> {
 
         source_roots
             .into_iter()
-            .try_for_each(|(source_root, packages)| {
+            .map(|(source_root, packages)| {
                 packages
                     .iter()
                     .map(|package| directory_files(self.outputs[package].out_dir.as_std_path()))
@@ -114,9 +114,11 @@ impl OutDirFiles<'_> {
                             .collect::<Result<Vec<Option<OutDirFile>>, ProjectModelError>>()
                     })
                     .map(|contents| {
-                        Self::extend(database, vfs, source_root, contents.into_iter().flatten());
+                        Self::extend(database, vfs, source_root, contents.into_iter().flatten())
                     })
             })
+            .collect::<Result<Vec<Vec<FileId>>, ProjectModelError>>()
+            .map(|files| files.into_iter().flatten().collect())
     }
 
     fn extend(
@@ -124,7 +126,7 @@ impl OutDirFiles<'_> {
         vfs: &mut Vfs,
         source_root: SourceRootId,
         contents: impl Iterator<Item = OutDirFile>,
-    ) {
+    ) -> Vec<FileId> {
         let existing = database.source_root(source_root).source_root(database);
         let mut file_set = FileSet::default();
 
@@ -156,8 +158,14 @@ impl OutDirFiles<'_> {
             Durability::MEDIUM,
         );
 
-        for file_id in added {
-            database.set_file_source_root_with_durability(file_id, source_root, Durability::MEDIUM);
+        for file_id in &added {
+            database.set_file_source_root_with_durability(
+                *file_id,
+                source_root,
+                Durability::MEDIUM,
+            );
         }
+
+        added
     }
 }
