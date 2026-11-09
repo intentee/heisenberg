@@ -9,9 +9,11 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::ast;
 
 use crate::local_macro::LocalMacro;
+use crate::path_resolutions::PathResolutions;
 
 pub struct LocalMacroImport<'import, 'database> {
     pub path: &'import ast::Path,
+    pub paths: &'import PathResolutions<'import, 'database>,
     pub semantics: &'import Semantics<'database, RootDatabase>,
 }
 
@@ -29,7 +31,7 @@ impl LocalMacroImport<'_, '_> {
     fn macro_definition(&self) -> Option<Macro> {
         let database = self.semantics.db;
 
-        match self.semantics.resolve_path(self.path) {
+        match self.paths.resolve(self.path) {
             Some(PathResolution::Def(ModuleDef::Macro(definition)))
                 if definition.kind(database) == MacroKind::Declarative
                     && self

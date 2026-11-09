@@ -11,14 +11,16 @@ use ra_ap_syntax::ast;
 
 use crate::module_paths::ModulePaths;
 use crate::path_reference_outcome::PathReferenceOutcome;
+use crate::path_resolutions::PathResolutions;
 use crate::referenced_modules::ReferencedModules;
 use crate::token_origin::TokenOrigin;
 use crate::unresolved_import_binding::UnresolvedImportBinding;
 
 pub struct PathReference<'reference, 'database> {
     pub krate: Crate,
-    pub module_paths: &'reference ModulePaths<'database>,
+    pub module_paths: &'reference ModulePaths,
     pub path: &'reference ast::Path,
+    pub paths: &'reference PathResolutions<'reference, 'database>,
     pub scope: &'reference SyntaxNode,
     pub semantics: &'reference Semantics<'database, RootDatabase>,
     pub token_origin: &'reference TokenOrigin<'reference, 'database>,
@@ -26,7 +28,7 @@ pub struct PathReference<'reference, 'database> {
 
 impl PathReference<'_, '_> {
     pub fn outcome(&self) -> PathReferenceOutcome {
-        match self.semantics.resolve_path(self.path) {
+        match self.paths.resolve(self.path) {
             Some(PathResolution::Def(definition)) => self
                 .semantics
                 .scope(self.path.syntax())
@@ -55,11 +57,11 @@ impl PathReference<'_, '_> {
             other => other.module(database),
         };
 
-        let from = self.module_paths.path(from);
+        let from = self.module_paths.path(database, from);
 
         target
             .filter(|to| to.krate(database) == self.krate)
-            .map(|to| self.module_paths.path(to))
+            .map(|to| self.module_paths.path(database, to))
             .filter(|to| *to != from)
             .map_or(PathReferenceOutcome::Irrelevant, |to| {
                 PathReferenceOutcome::Dependency(ReferencedModules { from, to })
@@ -83,7 +85,7 @@ impl PathReference<'_, '_> {
     }
 
     fn qualified(&self, qualifier: &ast::Path) -> PathReferenceOutcome {
-        match self.semantics.resolve_path(qualifier) {
+        match self.paths.resolve(qualifier) {
             None => PathReferenceOutcome::Irrelevant,
             Some(PathResolution::Def(ModuleDef::Module(module)))
                 if module.krate(self.semantics.db) != self.krate =>

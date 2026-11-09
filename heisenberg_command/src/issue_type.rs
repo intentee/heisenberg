@@ -2,14 +2,20 @@ use std::iter;
 
 use clap::ValueEnum;
 use clap::builder::PossibleValue;
+use humantime::format_duration;
 
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::constants::CLIPPY_CONFIGURATION_FILE;
 use heisenberg_project_model::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
+use heisenberg_project_model::constants::MAXIMUM_SLOW_TEST_PERIOD;
+use heisenberg_project_model::constants::MAXIMUM_TEST_DURATION;
 use heisenberg_project_model::constants::PANICKING_LINTS;
 use heisenberg_project_model::constants::REQUIRED_CLIPPY_SETTINGS;
 use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 use heisenberg_project_model::constants::RESTRICTING_CLIPPY_SETTINGS;
+use heisenberg_project_model::constants::VETTED_NEXTEST_PROFILE_SETTINGS;
+use heisenberg_project_model::constants::VETTED_NEXTEST_SETTINGS;
+use heisenberg_project_model::constants::VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::required_clippy_setting::RequiredClippySetting;
 
@@ -37,6 +43,9 @@ use crate::constants::MODULE_CYCLE;
 use crate::constants::MODULE_FILE_INSIDE_BLOCK;
 use crate::constants::MODULE_NOT_NAMED_AFTER_ITS_ITEM;
 use crate::constants::NEGATED_CONFIGURATION;
+use crate::constants::NEXTEST_CONFIGURATION_MISSING;
+use crate::constants::NEXTEST_OVERRIDE;
+use crate::constants::NEXTEST_TIMEOUT_NOT_ENFORCED;
 use crate::constants::NON_CONSTANT_IN_CONSTANTS_MODULE;
 use crate::constants::NON_DOC_COMMENT;
 use crate::constants::NON_TEST_ITEM_IN_TEST_TARGET;
@@ -70,6 +79,7 @@ use crate::constants::UNRESOLVED_MODULE;
 use crate::constants::UNRESOLVED_PATH;
 use crate::constants::UNSAFE_CODE;
 use crate::constants::UNVETTED_CLIPPY_SETTING;
+use crate::constants::UNVETTED_NEXTEST_SETTING;
 use crate::issue_text::IssueText;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -98,6 +108,9 @@ pub enum IssueType {
     ModuleFileInsideBlock,
     ModuleNotNamedAfterItsItem,
     NegatedConfiguration,
+    NextestConfigurationMissing,
+    NextestOverride,
+    NextestTimeoutNotEnforced,
     NonConstantInConstantsModule,
     NonDocComment,
     NonTestItemInTestTarget,
@@ -131,6 +144,7 @@ pub enum IssueType {
     UnresolvedPath,
     UnsafeCode,
     UnvettedClippySetting,
+    UnvettedNextestSetting,
 }
 
 impl IssueType {
@@ -184,6 +198,9 @@ impl IssueType {
             Self::ModuleFileInsideBlock => MODULE_FILE_INSIDE_BLOCK,
             Self::ModuleNotNamedAfterItsItem => MODULE_NOT_NAMED_AFTER_ITS_ITEM,
             Self::NegatedConfiguration => NEGATED_CONFIGURATION,
+            Self::NextestConfigurationMissing => NEXTEST_CONFIGURATION_MISSING,
+            Self::NextestOverride => NEXTEST_OVERRIDE,
+            Self::NextestTimeoutNotEnforced => NEXTEST_TIMEOUT_NOT_ENFORCED,
             Self::NonConstantInConstantsModule => NON_CONSTANT_IN_CONSTANTS_MODULE,
             Self::NonDocComment => NON_DOC_COMMENT,
             Self::NonTestItemInTestTarget => NON_TEST_ITEM_IN_TEST_TARGET,
@@ -217,6 +234,7 @@ impl IssueType {
             Self::UnresolvedPath => UNRESOLVED_PATH,
             Self::UnsafeCode => UNSAFE_CODE,
             Self::UnvettedClippySetting => UNVETTED_CLIPPY_SETTING,
+            Self::UnvettedNextestSetting => UNVETTED_NEXTEST_SETTING,
         }
     }
 
@@ -241,9 +259,20 @@ impl IssueType {
                     .map(|RequiredClippySetting { name, value }| format!("{name} = {value}"))
                     .join(", ")
             )],
+            Self::NextestTimeoutNotEnforced => vec![format!(
+                "Limits: slow after at most {}, terminated after at most {}",
+                format_duration(MAXIMUM_SLOW_TEST_PERIOD),
+                format_duration(MAXIMUM_TEST_DURATION)
+            )],
             Self::UnvettedClippySetting => vec![format!(
                 "Settings that only add restrictions: {}",
                 RESTRICTING_CLIPPY_SETTINGS.join(", ")
+            )],
+            Self::UnvettedNextestSetting => vec![format!(
+                "Vetted settings: {}; in a profile: {}; in a slow-timeout: {}",
+                VETTED_NEXTEST_SETTINGS.join(", "),
+                VETTED_NEXTEST_PROFILE_SETTINGS.join(", "),
+                VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS.join(", ")
             )],
             _ => Vec::new(),
         }
@@ -307,6 +336,15 @@ impl From<&PackageViolation> for IssueType {
             }
             PackageViolation::ClippyConfigurationMissing { .. } => Self::ClippyConfigurationMissing,
             PackageViolation::LintAllowedInManifest { .. } => Self::LintAllowedInManifest,
+            PackageViolation::NextestConfigurationMissing { .. } => {
+                Self::NextestConfigurationMissing
+            }
+            PackageViolation::NextestOverride { .. } => Self::NextestOverride,
+            PackageViolation::NextestSlowPeriodTooLong { .. }
+            | PackageViolation::NextestSlowTimeoutUnset { .. }
+            | PackageViolation::NextestTestNeverTerminated { .. }
+            | PackageViolation::NextestTestTerminatedTooLate { .. }
+            | PackageViolation::NextestTimeoutPasses { .. } => Self::NextestTimeoutNotEnforced,
             PackageViolation::PackageDependencyCycle { .. } => Self::PackageDependencyCycle,
             PackageViolation::PackageDependsOnItself { .. } => Self::PackageDependsOnItself,
             PackageViolation::PublishableTestCrate { .. } => Self::PublishableTestCrate,
@@ -321,6 +359,7 @@ impl From<&PackageViolation> for IssueType {
                 Self::RequiredClippySettingMissing
             }
             PackageViolation::UnvettedClippySetting { .. } => Self::UnvettedClippySetting,
+            PackageViolation::UnvettedNextestSetting { .. } => Self::UnvettedNextestSetting,
         }
     }
 }
@@ -352,6 +391,9 @@ impl ValueEnum for IssueType {
             Self::ModuleFileInsideBlock,
             Self::ModuleNotNamedAfterItsItem,
             Self::NegatedConfiguration,
+            Self::NextestConfigurationMissing,
+            Self::NextestOverride,
+            Self::NextestTimeoutNotEnforced,
             Self::NonConstantInConstantsModule,
             Self::NonDocComment,
             Self::NonTestItemInTestTarget,
@@ -385,6 +427,7 @@ impl ValueEnum for IssueType {
             Self::UnresolvedPath,
             Self::UnsafeCode,
             Self::UnvettedClippySetting,
+            Self::UnvettedNextestSetting,
         ]
     }
 

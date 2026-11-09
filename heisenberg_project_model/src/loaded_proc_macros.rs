@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::num::NonZeroU16;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -25,6 +26,7 @@ use crate::project_model_error::ProjectModelError;
 
 pub struct LoadedProcMacros<'project> {
     pub dylibs: &'project BTreeMap<Utf8PathBuf, Utf8PathBuf>,
+    pub processes: NonZeroU16,
     pub server: &'project OnceLock<Result<Vec<ProcMacroClient>, Arc<ProjectModelError>>>,
     pub vfs: &'project Vfs,
     pub workspace: &'project ProjectWorkspace,
@@ -64,15 +66,19 @@ impl LoadedProcMacros<'_> {
                     .iter()
                     .flat_map(|server| {
                         proc_macro_crates.iter().map(|krate| {
-                            let dylib =
-                                &dylibs[self.vfs.file_path(crate_graph[*krate].basic.root_file_id)];
+                            let root = self.vfs.file_path(crate_graph[*krate].basic.root_file_id);
 
-                            load_proc_macro(server, dylib, &[])
-                                .map_err(error_context(
-                                    dylib.clone(),
-                                    ProjectModelError::ProcMacroLoad,
-                                ))
-                                .map(|macros| (*krate, Ok(macros)))
+                            dylibs
+                                .get(root)
+                                .ok_or(ProjectModelError::ProcMacroLibraryMissing(root.clone()))
+                                .and_then(|dylib| {
+                                    load_proc_macro(server, dylib, &[])
+                                        .map_err(error_context(
+                                            dylib.clone(),
+                                            ProjectModelError::ProcMacroLoad,
+                                        ))
+                                        .map(|macros| (*krate, Ok(macros)))
+                                })
                         })
                     })
                     .collect::<Result<Vec<_>, ProjectModelError>>()
@@ -124,9 +130,16 @@ impl LoadedProcMacros<'_> {
                 servers
                     .into_iter()
                     .map(|server| {
-                        ProcMacroClient::spawn(&server, no_environment.iter(), None, 1).map_err(
-                            error_context(server, ProjectModelError::ProcMacroServerSpawn),
+                        ProcMacroClient::spawn(
+                            &server,
+                            no_environment.iter(),
+                            None,
+                            usize::from(self.processes.get()),
                         )
+                        .map_err(error_context(
+                            server,
+                            ProjectModelError::ProcMacroServerSpawn,
+                        ))
                     })
                     .collect()
             })

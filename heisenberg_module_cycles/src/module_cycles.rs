@@ -22,7 +22,7 @@ impl ModuleCycles<'_> {
             BTreeMap<SiblingEdge, NonEmpty<ModuleDependency>>,
         > = BTreeMap::new();
 
-        for dependency in &self.graph.dependencies {
+        for dependency in &self.graph.findings.dependencies {
             let LiftedDependency { container, edge } = LiftedDependency::of(dependency);
 
             NonEmpty::push_into(

@@ -11,3 +11,4 @@ paths:
 - Keep real targets, phony targets grouped together. Keep targets alphabetically sorted within each group.
 - Keep all the real targets above phony targets.
 - Make sure each Makefile target has enough dependencies to be able to run from a clean state.
+- Make sure there are no scripts or logic like loops in Makefile.

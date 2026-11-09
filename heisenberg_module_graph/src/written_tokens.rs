@@ -17,4 +17,10 @@ impl WrittenTokens {
     pub fn insert(&mut self, file: String, start: u32) {
         self.starts.entry(file).or_default().insert(start);
     }
+
+    pub fn merge(&mut self, Self { starts }: Self) {
+        for (file, file_starts) in starts {
+            self.starts.entry(file).or_default().extend(file_starts);
+        }
+    }
 }

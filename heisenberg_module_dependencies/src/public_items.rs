@@ -10,7 +10,7 @@ use crate::item_visibility::ItemVisibility;
 use crate::token_origin::TokenOrigin;
 
 pub struct PublicItems<'items, 'database> {
-    pub container: &'items SyntaxNode,
+    pub items: &'items [ast::Item],
     pub options: &'items CfgOptions,
     pub semantics: &'items Semantics<'database, RootDatabase>,
     pub token_origin: &'items TokenOrigin<'items, 'database>,
@@ -18,8 +18,9 @@ pub struct PublicItems<'items, 'database> {
 
 impl PublicItems<'_, '_> {
     pub fn non_constant(&self) -> Vec<ast::Item> {
-        self.defined_in(self.container)
-            .into_iter()
+        self.items
+            .iter()
+            .cloned()
             .flat_map(|item| match &item {
                 ast::Item::ExternBlock(block) => block
                     .extern_item_list()
@@ -32,12 +33,11 @@ impl PublicItems<'_, '_> {
 
     fn defined_in(&self, container: &SyntaxNode) -> Vec<ast::Item> {
         ExpandedItems {
-            container,
             options: self.options,
             semantics: self.semantics,
             token_origin: self.token_origin,
         }
-        .items()
+        .defined_in(container)
     }
 
     fn is_proc_macro(&self, function: &ast::Fn) -> bool {

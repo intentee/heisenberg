@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use ra_ap_ide_db::RootDatabase;
-use ra_ap_paths::AbsPathBuf;
 use ra_ap_vfs::FileId;
 
 use crate::source_files::SourceFiles;
@@ -12,5 +11,4 @@ pub struct LoadedProject<'resolved> {
     pub database: RootDatabase,
     pub files: SourceFiles,
     pub packages: &'resolved WorkspacePackages,
-    pub workspace_root: &'resolved AbsPathBuf,
 }

@@ -7,7 +7,14 @@ version = "0.1.0"
 all = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
+arithmetic_side_effects = "deny"
 expect_used = "warn"
+indexing_slicing = "deny"
+panic_in_result_fn = "deny"
+string_slice = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
 unwrap_used = "deny"
 
 [workspace]

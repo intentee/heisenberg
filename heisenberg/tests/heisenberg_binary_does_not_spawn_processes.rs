@@ -1,48 +1,31 @@
 use std::env;
 use std::fs;
-use std::io;
 use std::path::Path;
-use std::process::Command;
-use std::process::Output;
+use std::process::Child;
 use std::str;
 
+use heisenberg_command_tests::binary_check::BinaryCheck;
 use heisenberg_command_tests::constants::CARGO_HOME_VARIABLE;
-use heisenberg_command_tests::constants::HOST_SELECTION;
-use heisenberg_command_tests::constants::LLVM_PROFILE_FILE_VARIABLE;
-use heisenberg_command_tests::constants::PATH_VARIABLE;
 use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::host_footer::host_footer;
-
-fn heisenberg_check(cargo_home: &Path, sysroot: &Path, workspace: &Path) -> io::Result<Output> {
-    Command::new(env!("CARGO_BIN_EXE_heisenberg"))
-        .env_clear()
-        .env(PATH_VARIABLE, "")
-        .envs(env::vars_os().filter(|(name, _)| name == LLVM_PROFILE_FILE_VARIABLE))
-        .arg("check")
-        .args(HOST_SELECTION)
-        .arg("--cargo-home")
-        .arg(cargo_home)
-        .arg("--sysroot")
-        .arg(sysroot)
-        .arg("--workspace")
-        .arg(workspace)
-        .output()
-}
 
 #[test]
 fn heisenberg_binary_analyses_the_real_sysroot_without_spawning_processes() {
     let cargo_home =
         env::var_os(CARGO_HOME_VARIABLE).expect("HEISENBERG_CARGO_HOME must be exported");
     let sysroot = env::var_os(SYSROOT_VARIABLE).expect("HEISENBERG_SYSROOT must be exported");
-    let output = heisenberg_check(
-        Path::new(&cargo_home),
-        Path::new(&sysroot),
-        &FixtureWorkspace {
+    let output = BinaryCheck {
+        binary: Path::new(env!("CARGO_BIN_EXE_heisenberg")),
+        cargo_home: Path::new(&cargo_home),
+        sysroot: Path::new(&sysroot),
+        workspace: &FixtureWorkspace {
             name: "acyclic_modules",
         }
         .path(),
-    )
+    }
+    .spawn(&[])
+    .and_then(Child::wait_with_output)
     .expect("the heisenberg binary must start");
 
     assert_eq!(str::from_utf8(&output.stderr), Ok(""));
@@ -70,11 +53,14 @@ fn heisenberg_binary_runs_without_spawning_processes() {
 
     fs::create_dir_all(&cargo_home).expect("the cargo home must be created");
 
-    let output = heisenberg_check(
-        &cargo_home,
-        &fixture.join("sysroot"),
-        &fixture.join("workspace"),
-    )
+    let output = BinaryCheck {
+        binary: Path::new(env!("CARGO_BIN_EXE_heisenberg")),
+        cargo_home: &cargo_home,
+        sysroot: &fixture.join("sysroot"),
+        workspace: &fixture.join("workspace"),
+    }
+    .spawn(&[])
+    .and_then(Child::wait_with_output)
     .expect("the heisenberg binary must start");
 
     assert_eq!(str::from_utf8(&output.stderr), Ok(""));

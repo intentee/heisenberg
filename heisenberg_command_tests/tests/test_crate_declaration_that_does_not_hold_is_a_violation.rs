@@ -23,16 +23,6 @@ fn test_crate_declaration_that_does_not_hold_is_a_violation() {
             \n\
             - published/Cargo.toml: Package published is declared a test crate but can be published\n\
             \n\
-            RequiredLintNotDenied: 6 violations\n\
-            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
-            \n\
-            - published/Cargo.toml: Package published does not deny clippy::expect_used\n\
-            - published/Cargo.toml: Package published does not deny clippy::panic\n\
-            - published/Cargo.toml: Package published does not deny clippy::unwrap_used\n\
-            - used/Cargo.toml: Package used does not deny clippy::expect_used\n\
-            - used/Cargo.toml: Package used does not deny clippy::panic\n\
-            - used/Cargo.toml: Package used does not deny clippy::unwrap_used\n\
-            \n\
             TestCrateDeclaredTwice: 1 violation\n\
             Each test crate is declared once. Remove the repeated entry from test_crates.\n\
             \n\
@@ -48,9 +38,17 @@ fn test_crate_declaration_that_does_not_hold_is_a_violation() {
             \n\
             - library/Cargo.toml: Package library depends on test crate used through a normal or build dependency\n\
             \n\
+            TestOnlyCodeInProduction: 2 violations\n\
+            Production code holds only what production runs. Keep test-only code in a #[cfg(test)] module, such as the inline mod tests of the file it tests, and move test libraries shared by several packages into a test crate.\n\
+            \n\
+            - published/src/lib.rs:2:10: Code exists only under cfg(test) outside a test module\n    \
+            const fn sample() -> u8 {\n\
+            - used/src/lib.rs:2:10: Code exists only under cfg(test) outside a test module\n    \
+            const fn sample() -> u8 {\n\
+            \n\
             ------------------------------\n\
-            10 errors found\n\
-            ------------------------------\n", host_footer(3, 3).as_str()].concat().as_str())
+            6 errors found\n\
+            ------------------------------\n", host_footer(3, 5).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

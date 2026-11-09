@@ -4,8 +4,8 @@ use std::fmt::Formatter;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct LinePosition {
-    pub line: u32,
-    pub column: u32,
+    pub line: u64,
+    pub column: u64,
     pub source_line: String,
 }
 

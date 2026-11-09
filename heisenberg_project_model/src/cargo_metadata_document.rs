@@ -54,31 +54,35 @@ impl CargoMetadataDocument<'_, '_> {
                             self.workspace.unstable_features(),
                         ))
                         .and_then(from_value)
+                        .and_then(|metadata| {
+                            to_value(&metadata).map(|metadata_json| PackageDocument {
+                                dependencies,
+                                is_member: self.workspace.is_member(package),
+                                lints: package
+                                    .manifest()
+                                    .normalized_toml()
+                                    .lints
+                                    .as_ref()
+                                    .map(|InheritableLints { lints, .. }| lints.clone())
+                                    .unwrap_or_default(),
+                                lints_source: if package
+                                    .manifest()
+                                    .original_toml()
+                                    .and_then(|TomlManifest { lints, .. }| lints.as_ref())
+                                    .is_some_and(|InheritableLints { workspace, .. }| *workspace)
+                                {
+                                    LintsSource::Workspace
+                                } else {
+                                    LintsSource::Package
+                                },
+                                metadata,
+                                metadata_json,
+                            })
+                        })
                         .map_err(error_context(
                             package_id.to_string(),
                             ProjectModelError::PackageMetadata,
                         ))
-                        .map(|metadata| PackageDocument {
-                            dependencies,
-                            lints: package
-                                .manifest()
-                                .normalized_toml()
-                                .lints
-                                .as_ref()
-                                .map(|InheritableLints { lints, .. }| lints.clone())
-                                .unwrap_or_default(),
-                            lints_source: if package
-                                .manifest()
-                                .original_toml()
-                                .and_then(|TomlManifest { lints, .. }| lints.as_ref())
-                                .is_some_and(|InheritableLints { workspace, .. }| *workspace)
-                            {
-                                LintsSource::Workspace
-                            } else {
-                                LintsSource::Package
-                            },
-                            metadata,
-                        })
                     })
             })
             .collect()

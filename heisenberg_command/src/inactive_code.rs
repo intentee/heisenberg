@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::inactive_focus::InactiveFocus;
+use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::walked_code::WalkedCode;
 
@@ -19,7 +20,12 @@ impl InactiveCode<'_> {
             .analyses
             .iter()
             .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
-            .map(|CrateModuleGraph { walked_code, .. }| walked_code)
+            .map(
+                |CrateModuleGraph {
+                     findings: ModuleFindings { walked_code, .. },
+                     ..
+                 }| walked_code,
+            )
             .collect();
         let mut walked_files: BTreeMap<&str, Vec<&WalkedCode>> = BTreeMap::new();
         let mut foci: BTreeMap<&SourceLocation, BTreeSet<&SourceLocation>> = BTreeMap::new();
@@ -30,13 +36,16 @@ impl InactiveCode<'_> {
             }
         }
 
+        let distinct_foci: BTreeSet<&InactiveFocus> = walked
+            .iter()
+            .flat_map(|WalkedCode { inactive_foci, .. }| inactive_foci)
+            .collect();
+
         for InactiveFocus {
             location,
             negations,
             token_starts,
-        } in walked
-            .iter()
-            .flat_map(|WalkedCode { inactive_foci, .. }| inactive_foci)
+        } in distinct_foci
         {
             let is_dead_everywhere = walked_files
                 .get(location.file.as_str())

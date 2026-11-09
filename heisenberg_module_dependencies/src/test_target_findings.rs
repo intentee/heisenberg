@@ -1,8 +1,8 @@
 use ra_ap_hir::Adt;
 
-use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
 use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
+use heisenberg_module_graph::module_findings::ModuleFindings;
 
 use crate::adt_violation::AdtViolation;
 
@@ -14,7 +14,7 @@ pub struct TestTargetFindings {
 }
 
 impl TestTargetFindings {
-    pub fn fold(self, CrateModuleGraph { violations, .. }: &mut CrateModuleGraph) {
+    pub fn fold(self, ModuleFindings { violations, .. }: &mut ModuleFindings) {
         let Self {
             accepted,
             impl_blocks,
@@ -42,5 +42,18 @@ impl TestTargetFindings {
                 }
             }
         }
+    }
+
+    pub fn merge(
+        &mut self,
+        Self {
+            accepted,
+            impl_blocks,
+            types,
+        }: Self,
+    ) {
+        self.accepted.extend(accepted);
+        self.impl_blocks.extend(impl_blocks);
+        self.types.extend(types);
     }
 }

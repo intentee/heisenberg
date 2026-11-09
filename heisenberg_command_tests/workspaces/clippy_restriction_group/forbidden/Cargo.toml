@@ -10,7 +10,14 @@ warnings = "deny"
 all = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
+arithmetic_side_effects = "forbid"
 expect_used = "forbid"
+indexing_slicing = "forbid"
 panic = "forbid"
+panic_in_result_fn = "forbid"
 restriction = { level = "allow", priority = 1 }
+string_slice = "forbid"
+todo = "forbid"
+unimplemented = "forbid"
+unreachable = "forbid"
 unwrap_used = "forbid"

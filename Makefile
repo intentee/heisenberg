@@ -12,6 +12,7 @@ HEISENBERG_CRATES := \
 	heisenberg_module_dependencies \
 	heisenberg_module_graph \
 	heisenberg_project_model \
+	heisenberg_task_graph \
 	heisenberg_workspace_build
 HOST_TUPLE := $(shell rustc --print host-tuple)
 RUST_SYSROOT := $(shell rustc --print sysroot)
@@ -51,13 +52,6 @@ node_modules/.package-lock.json: package.json package-lock.json
 
 target/release/heisenberg: $(HEISENBERG_SOURCES)
 	cargo build --release -p heisenberg
-
-.PHONY: benchmark
-benchmark: fetch target/release/heisenberg
-	hyperfine --shell=none --warmup 1 --ignore-failure=1 --export-markdown target/benchmark.md \
-		--command-name acyclic_modules "$(subst ",\",$(HEISENBERG_CHECK)) \"$(CURDIR)/heisenberg_command_tests/workspaces/acyclic_modules\"" \
-		--command-name cycles_in_a_dependency_diamond "$(subst ",\",$(HEISENBERG_CHECK)) \"$(CURDIR)/heisenberg_command_tests/workspaces/cycles_in_a_dependency_diamond\"" \
-		--command-name heisenberg "$(subst ",\",$(HEISENBERG_CHECK)) \"$(CURDIR)\""
 
 .PHONY: clean
 clean:
@@ -102,4 +96,5 @@ test.coverage: fetch node_modules/.package-lock.json $(TARGET_CFG_TABLES)
 		--gated heisenberg_module_dependencies=100 \
 		--gated heisenberg_module_graph=100 \
 		--gated heisenberg_project_model=100 \
+		--gated heisenberg_task_graph=100 \
 		--gated heisenberg_workspace_build=100

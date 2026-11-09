@@ -1,0 +1,11 @@
+[package]
+name = "heisenberg_task_graph"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+rayon = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

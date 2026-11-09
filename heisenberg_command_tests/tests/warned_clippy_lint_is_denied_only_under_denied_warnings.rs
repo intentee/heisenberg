@@ -39,7 +39,7 @@ fn warned_clippy_lint_is_denied_only_under_denied_warnings() {
     assert_eq!(
         str::from_utf8(&warned.output),
         Ok(["RequiredLintNotDenied: 2 violations\n\
-            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
+            Every warning and every lint of the clippy groups fails the build, and code reports failures as typed errors instead of panicking, wherever it is written; tests, in every crate alike, fail fast only with expect and unwrap, which the required clippy settings allow in #[test] functions and #[cfg(test)] items. Deny the lint in the [lints] or [workspace.lints] table the package uses.\n\
             \n\
             - Cargo.toml: Package clippy_lint_warned_under_warned_warnings does not deny clippy::expect_used\n\
             - Cargo.toml: Package clippy_lint_warned_under_warned_warnings does not deny warnings\n\

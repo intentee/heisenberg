@@ -23,11 +23,11 @@ fn explain_names_the_required_clippy_settings() {
         Ok(
             "RequiredClippySettingMissing: A clippy configuration without a required setting\n\
         \n\
-        A clippy configuration that does not give each required setting the value it requires: true for the test allowances, which are the only way tests may use expect, unwrap and panic, and false for avoid-breaking-exported-api, which clippy otherwise sets to true and so leaves the lints that would change a public signature silent on public items.\n\
+        A clippy configuration that does not give each required setting the value it requires: true for the test allowances, which are the only way tests may use expect and unwrap, and false for avoid-breaking-exported-api, which clippy otherwise sets to true and so leaves the lints that would change a public signature silent on public items.\n\
         \n\
-        Required settings: allow-expect-in-tests = true, allow-panic-in-tests = true, allow-unwrap-in-tests = true, avoid-breaking-exported-api = false\n\
+        Required settings: allow-expect-in-tests = true, allow-unwrap-in-tests = true, avoid-breaking-exported-api = false\n\
         \n\
-        Tests may fail fast with expect, unwrap and panic, and the lints that clippy relaxes for public items by default must hold for them too. Set each required setting to the value it names.\n\
+        Tests may fail fast with expect and unwrap, and the lints that clippy relaxes for public items by default must hold for them too. Set each required setting to the value it names.\n\
         "
         )
     );

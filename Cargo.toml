@@ -12,6 +12,7 @@ members = [
     "heisenberg_module_dependencies",
     "heisenberg_module_graph",
     "heisenberg_project_model",
+    "heisenberg_task_graph",
     "heisenberg_workspace_build",
 ]
 resolver = "3"
@@ -163,7 +164,9 @@ heisenberg_module_cycles = { version = "0.1", path = "heisenberg_module_cycles" 
 heisenberg_module_dependencies = { version = "0.1", path = "heisenberg_module_dependencies" }
 heisenberg_module_graph = { version = "0.1", path = "heisenberg_module_graph" }
 heisenberg_project_model = { version = "0.1", path = "heisenberg_project_model" }
+heisenberg_task_graph = { version = "0.1", path = "heisenberg_task_graph" }
 heisenberg_workspace_build = { version = "0.1", path = "heisenberg_workspace_build" }
+humantime = "2.3"
 object = { version = "0.40", default-features = false, features = ["elf", "macho", "pe", "read_core"] }
 petgraph = "0.8"
 ra_ap_cfg = "0.0.358"
@@ -173,6 +176,7 @@ ra_ap_hir_expand = "0.0.358"
 ra_ap_ide_db = "0.0.358"
 ra_ap_intern = "0.0.358"
 ra_ap_load-cargo = "0.0.358"
+ra_ap_parser = "0.0.358"
 ra_ap_paths = "0.0.358"
 ra_ap_proc_macro_api = "0.0.358"
 ra_ap_project_model = "0.0.358"
@@ -181,6 +185,8 @@ ra_ap_syntax = "0.0.358"
 ra_ap_syntax-bridge = "0.0.358"
 ra_ap_toolchain = "0.0.358"
 ra_ap_vfs = "0.0.358"
+rayon = "1.12"
+salsa = { version = "0.28", default-features = false, features = ["inventory", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
@@ -202,16 +208,21 @@ pedantic = { level = "deny", priority = -1 }
 
 absolute_paths = "deny"
 allow_attributes = "deny"
+arithmetic_side_effects = "deny"
 dbg_macro = "deny"
 expect_used = "deny"
+indexing_slicing = "deny"
 infinite_loop = "deny"
 panic = "deny"
+panic_in_result_fn = "deny"
 print_stderr = "deny"
 print_stdout = "deny"
 rc_mutex = "deny"
 rest_pat_in_fully_bound_structs = "deny"
 self_named_module_files = "deny"
 str_to_string = "deny"
+string_slice = "deny"
 todo = "deny"
 unimplemented = "deny"
+unreachable = "deny"
 unwrap_used = "deny"

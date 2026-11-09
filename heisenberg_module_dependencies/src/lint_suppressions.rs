@@ -20,6 +20,7 @@ use ra_ap_syntax_bridge::syntax_node_to_token_tree;
 use heisenberg_project_model::constants::PANICKING_LINTS;
 use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 
+use crate::path_resolutions::PathResolutions;
 use crate::visit_active_metas::visit_active_metas;
 
 const LOWERING_ATTRIBUTES: [&str; 1] = ["warn"];
@@ -36,6 +37,7 @@ fn is_required_lint(path: &[String]) -> bool {
 pub struct LintSuppressions<'suppressions, 'database> {
     pub node: &'suppressions SyntaxNode,
     pub options: &'suppressions CfgOptions,
+    pub paths: &'suppressions PathResolutions<'suppressions, 'database>,
     pub semantics: &'suppressions Semantics<'database, RootDatabase>,
 }
 
@@ -121,7 +123,7 @@ impl LintSuppressions<'_, '_> {
             .find_map(ast::Path::cast)
             .is_some_and(|path| {
                 matches!(
-                    self.semantics.resolve_path(&path),
+                    self.paths.resolve(&path),
                     Some(PathResolution::BuiltinAttr(attribute))
                         if names
                             .iter()

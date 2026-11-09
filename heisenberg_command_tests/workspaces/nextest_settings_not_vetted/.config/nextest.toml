@@ -1,0 +1,11 @@
+nextest-version = "0.9.151"
+
+[store]
+dir = "target/nextest"
+
+[profile.default]
+default-filter = "all()"
+fail-fast = false
+retries = 2
+slow-timeout = { period = "5s", terminate-after = 2, grace-period = "30s" }
+test-threads = 2

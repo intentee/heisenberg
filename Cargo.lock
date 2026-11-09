@@ -2419,6 +2419,7 @@ name = "heisenberg_analysis_threads"
 version = "0.1.0"
 dependencies = [
  "ra_ap_stdx",
+ "rayon",
  "thiserror",
 ]
 
@@ -2434,6 +2435,9 @@ dependencies = [
  "heisenberg_module_dependencies",
  "heisenberg_module_graph",
  "heisenberg_project_model",
+ "heisenberg_workspace_build",
+ "humantime",
+ "rayon",
  "thiserror",
 ]
 
@@ -2444,6 +2448,7 @@ dependencies = [
  "clap",
  "heisenberg_command",
  "heisenberg_error_context",
+ "rayon",
  "thiserror",
  "toml",
 ]
@@ -2471,20 +2476,22 @@ dependencies = [
 name = "heisenberg_module_dependencies"
 version = "0.1.0"
 dependencies = [
- "heisenberg_analysis_threads",
- "heisenberg_error_context",
  "heisenberg_module_graph",
  "heisenberg_project_model",
+ "heisenberg_task_graph",
  "ra_ap_cfg",
  "ra_ap_hir",
  "ra_ap_hir_def",
  "ra_ap_hir_expand",
  "ra_ap_ide_db",
  "ra_ap_intern",
+ "ra_ap_parser",
  "ra_ap_paths",
  "ra_ap_syntax",
  "ra_ap_syntax-bridge",
  "ra_ap_vfs",
+ "rayon",
+ "salsa",
  "thiserror",
 ]
 
@@ -2502,10 +2509,13 @@ dependencies = [
  "cargo-util-terminal",
  "cargo_metadata",
  "guppy",
+ "heisenberg_analysis_threads",
  "heisenberg_error_context",
  "heisenberg_graph_cycles",
  "heisenberg_module_graph",
+ "heisenberg_task_graph",
  "heisenberg_workspace_build",
+ "humantime",
  "ra_ap_cfg",
  "ra_ap_ide_db",
  "ra_ap_intern",
@@ -2520,6 +2530,14 @@ dependencies = [
  "thiserror",
  "toml",
  "triomphe",
+]
+
+[[package]]
+name = "heisenberg_task_graph"
+version = "0.1.0"
+dependencies = [
+ "rayon",
+ "thiserror",
 ]
 
 [[package]]
@@ -2593,6 +2611,12 @@ checksum = "150fa4a9462ef926824cf4519c84ed652ca8f4fbae34cb8af045b5cbcaf98822"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "humantime"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
 name = "hybrid-array"
@@ -3002,9 +3026,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.30"
+version = "1.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f710a23e6dbf193214fd46ca56a9d6864e550abe86202184532ae7275e46de19"
+checksum = "69965d2409bff8c8cea3829009fff66a86f05a0570656552ef70f616e8e4bd85"
 dependencies = [
  "cc",
  "libc",
@@ -3507,10 +3531,11 @@ dependencies = [
 
 [[package]]
 name = "orion"
-version = "0.17.15"
+version = "0.17.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e6758747fd1ce1efaf2bd43219ac4aa9e28263b236b2b6a1e486bcd06820707"
+checksum = "be0ab36a035b13899701dd991f918616c31694c9219908807ee56d6562c60568"
 dependencies = [
+ "cmov",
  "fiat-crypto",
  "subtle",
 ]

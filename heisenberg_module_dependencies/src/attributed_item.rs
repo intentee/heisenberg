@@ -9,8 +9,11 @@ use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::ast;
 use ra_ap_syntax::ast::HasAttrs;
 
+use crate::path_resolutions::PathResolutions;
+
 pub struct AttributedItem<'item, 'database> {
     pub item: &'item ast::Item,
+    pub paths: &'item PathResolutions<'item, 'database>,
     pub semantics: &'item Semantics<'database, RootDatabase>,
 }
 
@@ -33,7 +36,7 @@ impl AttributedItem<'_, '_> {
         self.item
             .attrs()
             .filter_map(|attribute| attribute.path())
-            .filter_map(|path| match self.semantics.resolve_path(&path) {
+            .filter_map(|path| match self.paths.resolve(&path) {
                 Some(PathResolution::Def(ModuleDef::Macro(definition))) => Some(definition),
                 _ => None,
             })

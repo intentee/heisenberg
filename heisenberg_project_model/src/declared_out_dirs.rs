@@ -15,7 +15,6 @@ use crate::declared_out_dir::DeclaredOutDir;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
-use crate::substituted_build_script::SubstitutedBuildScript;
 
 pub struct DeclaredOutDirs<'declaration> {
     pub configurations: &'declaration BTreeSet<Configuration>,
@@ -27,8 +26,13 @@ impl DeclaredOutDirs<'_> {
     pub fn validated(
         &self,
         out_dirs: BTreeMap<String, DeclaredOutDir>,
-    ) -> Result<BTreeMap<String, SubstitutedBuildScript>, ProjectModelError> {
-        let mut validated = BTreeMap::new();
+    ) -> Result<BTreeMap<Configuration, BTreeMap<String, BuildScriptOutput>>, ProjectModelError>
+    {
+        let mut validated: BTreeMap<Configuration, BTreeMap<String, BuildScriptOutput>> = self
+            .configurations
+            .iter()
+            .map(|configuration| (configuration.clone(), BTreeMap::new()))
+            .collect();
 
         for (package, DeclaredOutDir { mut configurations }) in out_dirs {
             let PackageDocument { metadata, .. } = match self
@@ -117,12 +121,12 @@ impl DeclaredOutDirs<'_> {
                 });
             }
 
-            validated.insert(
-                metadata.id.repr.clone(),
-                SubstitutedBuildScript {
-                    configurations: declared,
-                },
-            );
+            for (configuration, output) in declared {
+                validated
+                    .entry(configuration)
+                    .or_default()
+                    .insert(metadata.id.repr.clone(), output);
+            }
         }
 
         Ok(validated)

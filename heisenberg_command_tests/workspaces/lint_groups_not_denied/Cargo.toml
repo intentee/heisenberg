@@ -4,8 +4,15 @@ edition = "2024"
 version = "0.1.0"
 
 [lints.clippy]
+arithmetic_side_effects = "deny"
 expect_used = "deny"
+indexing_slicing = "deny"
 panic = "deny"
+panic_in_result_fn = "deny"
+string_slice = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
 unwrap_used = "deny"
 
 [workspace]

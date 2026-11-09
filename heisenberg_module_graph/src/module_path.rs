@@ -37,18 +37,14 @@ impl ModulePath {
             segments: other_segments,
         }: &Self,
     ) -> Self {
-        let mut shared_length = 0;
-
-        while self
-            .segments
-            .get(shared_length)
-            .is_some_and(|segment| other_segments.get(shared_length) == Some(segment))
-        {
-            shared_length += 1;
-        }
-
         Self {
-            segments: self.segments.iter().take(shared_length).cloned().collect(),
+            segments: self
+                .segments
+                .iter()
+                .zip(other_segments)
+                .take_while(|(segment, other_segment)| segment == other_segment)
+                .map(|(segment, _)| segment.clone())
+                .collect(),
         }
     }
 

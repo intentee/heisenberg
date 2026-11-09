@@ -1,7 +1,3 @@
 [profile.default]
-slow-timeout = { period = "10s", terminate-after = 3 }
+slow-timeout = { period = "10s", terminate-after = 2 }
 test-threads = 4
-
-[[profile.default.overrides]]
-filter = "test(=heisenberg_workspace_is_compliant)"
-threads-required = "num-test-threads"

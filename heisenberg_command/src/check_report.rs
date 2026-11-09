@@ -8,6 +8,7 @@ use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
 use heisenberg_module_graph::foreign_module::ForeignModule;
 use heisenberg_module_graph::function_body::FunctionBody;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
+use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::violation::Violation;
@@ -30,6 +31,7 @@ use crate::inactive_code::InactiveCode;
 use crate::issue::Issue;
 use crate::issue_section::IssueSection;
 use crate::issue_type::IssueType;
+use crate::located_issue::LocatedIssue;
 use crate::module_inclusion::ModuleInclusion;
 use crate::rendered_report::RenderedReport;
 use crate::shared_file::SharedFile;
@@ -37,6 +39,24 @@ use crate::shared_file_tree::SharedFileTree;
 use crate::violation_occurrences::ViolationOccurrences;
 
 const SEPARATOR: &str = "------------------------------";
+
+fn sorted_issues(issues: Vec<Issue>) -> Vec<Issue> {
+    let mut located: Vec<LocatedIssue> = issues
+        .into_iter()
+        .map(|issue| LocatedIssue {
+            location: issue.location(),
+            issue,
+        })
+        .collect();
+
+    located.sort();
+    located.dedup();
+
+    located
+        .into_iter()
+        .map(|LocatedIssue { issue, .. }| issue)
+        .collect()
+}
 
 fn shared_module_file_issues(
     shared_files: &BTreeMap<
@@ -140,7 +160,7 @@ impl CheckReport {
 
         for analysis in &self.analyses {
             for graph in &analysis.graphs {
-                for file in &graph.walked_code.files {
+                for file in &graph.findings.walked_code.files {
                     contexts_by_file
                         .entry(file.clone())
                         .or_default()
@@ -275,7 +295,11 @@ impl CheckReport {
             .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
             .flat_map(
                 |CrateModuleGraph {
-                     configured_out_negations,
+                     findings:
+                         ModuleFindings {
+                             configured_out_negations,
+                             ..
+                         },
                      ..
                  }| &configured_out_negations.declarations,
             )
@@ -288,16 +312,22 @@ impl CheckReport {
                     crate_target: graph.crate_target.clone(),
                 };
 
-                for (violation, folded_findings) in &graph.violations {
+                for (violation, folded_findings) in &graph.findings.violations {
                     let occurrences = violations.entry(violation).or_default();
 
                     occurrences.reported.insert(context.clone());
                     occurrences.folded.extend(folded_findings.iter().cloned());
                 }
 
-                for negation in graph.configured_out_negations.negations.iter().filter(
-                    |Violation { location, .. }| !declarations_of_negated_files.contains(location),
-                ) {
+                for negation in graph
+                    .findings
+                    .configured_out_negations
+                    .negations
+                    .iter()
+                    .filter(|Violation { location, .. }| {
+                        !declarations_of_negated_files.contains(location)
+                    })
+                {
                     violations
                         .entry(negation)
                         .or_default()
@@ -305,7 +335,7 @@ impl CheckReport {
                         .insert(context.clone());
                 }
 
-                for shared in &graph.shared_module_files {
+                for shared in &graph.findings.shared_module_files {
                     shared_files
                         .entry(shared.file.as_str())
                         .or_default()
@@ -357,14 +387,7 @@ impl CheckReport {
             issues.push(Issue::new_package(violation));
         }
 
-        issues.sort_by(|left, right| {
-            left.location()
-                .cmp(&right.location())
-                .then_with(|| left.cmp(right))
-        });
-        issues.dedup();
-
-        issues
+        sorted_issues(issues)
     }
 
     fn partial_run_lines(&self) -> Vec<String> {
@@ -400,38 +423,21 @@ impl CheckReport {
             .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
             .flat_map(
                 |CrateModuleGraph {
-                     unresolved_foreign_references,
+                     findings:
+                         ModuleFindings {
+                             unresolved_foreign_references,
+                             ..
+                         },
                      ..
                  }| unresolved_foreign_references,
             )
             .collect();
 
         let mut sites: BTreeMap<&ForeignModule, NonEmpty<&SourceLocation>> = BTreeMap::new();
-        let mut referencing: BTreeMap<&ForeignModule, BTreeSet<Configuration>> = BTreeMap::new();
         let mut failed_in: BTreeMap<&str, Vec<&'report Violation>> = BTreeMap::new();
 
         for UnresolvedForeignReference { location, module } in references {
             NonEmpty::push_into(&mut sites, module, location);
-        }
-
-        for ConfigurationAnalysis {
-            configuration,
-            graphs,
-            ..
-        } in &self.analyses
-        {
-            for CrateModuleGraph {
-                unresolved_foreign_references,
-                ..
-            } in graphs
-            {
-                for UnresolvedForeignReference { module, .. } in unresolved_foreign_references {
-                    referencing
-                        .entry(module)
-                        .or_default()
-                        .insert(configuration.clone());
-                }
-            }
         }
 
         for violation in violations
@@ -453,7 +459,31 @@ impl CheckReport {
                 issues.push(Issue::new_unresolved_foreign_references(
                     module,
                     &group,
-                    referencing[module].iter().cloned().collect(),
+                    self.analyses
+                        .iter()
+                        .filter(|ConfigurationAnalysis { graphs, .. }| {
+                            graphs
+                                .iter()
+                                .flat_map(
+                                    |CrateModuleGraph {
+                                         findings:
+                                             ModuleFindings {
+                                                 unresolved_foreign_references,
+                                                 ..
+                                             },
+                                         ..
+                                     }| {
+                                        unresolved_foreign_references
+                                    },
+                                )
+                                .any(
+                                    |UnresolvedForeignReference {
+                                         module: referenced, ..
+                                     }| referenced == module,
+                                )
+                        })
+                        .map(|ConfigurationAnalysis { configuration, .. }| configuration.clone())
+                        .collect(),
                 ));
             }
 
@@ -462,7 +492,7 @@ impl CheckReport {
                     |ViolationOccurrences { folded, .. }| {
                         folded.insert(FoldedFinding {
                             kind: FoldedFindingKind::UnresolvedForeignReferences {
-                                count: group.others.len() + 1,
+                                count: group.iter().count(),
                                 module: module.name.clone(),
                             },
                             location: group.first.clone(),

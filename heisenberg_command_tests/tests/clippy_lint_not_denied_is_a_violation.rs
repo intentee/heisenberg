@@ -19,7 +19,7 @@ fn clippy_lint_not_denied_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["RequiredLintNotDenied: 3 violations\n\
-            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
+            Every warning and every lint of the clippy groups fails the build, and code reports failures as typed errors instead of panicking, wherever it is written; tests, in every crate alike, fail fast only with expect and unwrap, which the required clippy settings allow in #[test] functions and #[cfg(test)] items. Deny the lint in the [lints] or [workspace.lints] table the package uses.\n\
             \n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::expect_used\n\
             - Cargo.toml: Package clippy_lint_not_denied does not deny clippy::panic\n\

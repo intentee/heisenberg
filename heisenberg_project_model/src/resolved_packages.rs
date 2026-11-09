@@ -27,9 +27,7 @@ impl ResolvedPackages {
     pub fn members(&self) -> impl Iterator<Item = &PackageDocument> {
         self.packages
             .iter()
-            .filter(|PackageDocument { metadata, .. }| {
-                self.workspace.members.contains(&metadata.id.repr)
-            })
+            .filter(|PackageDocument { is_member, .. }| *is_member)
     }
 
     pub fn metadata(&self, selection: &BuildSelection) -> Value {
@@ -76,7 +74,7 @@ impl ResolvedPackages {
 
         json!({
             "metadata": null,
-            "packages": selected.iter().map(|package| &package.metadata).collect::<Vec<_>>(),
+            "packages": selected.iter().map(|package| &package.metadata_json).collect::<Vec<_>>(),
             "resolve": {"nodes": nodes, "root": null},
             "target_directory": self.workspace.target_directory.as_str(),
             "version": 1,

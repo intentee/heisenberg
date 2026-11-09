@@ -132,23 +132,36 @@ fn host_configuration(
         manifest_path: manifest_path.to_path_buf(),
     };
 
-    table["target"]
-        .clone()
-        .try_into::<String>()
-        .map_err(Box::new)
-        .map_err(error_context(
+    table
+        .get("target")
+        .cloned()
+        .ok_or(HeisenbergCheckError::FixtureConfigurationTargetMissing(
             context.clone(),
-            HeisenbergCheckError::FixtureConfigurationTarget,
         ))
-        .and_then(move |target| {
-            table["name"]
-                .clone()
+        .and_then(|target| {
+            target
                 .try_into::<String>()
                 .map_err(Box::new)
                 .map_err(error_context(
-                    context,
-                    HeisenbergCheckError::FixtureConfigurationName,
+                    context.clone(),
+                    HeisenbergCheckError::FixtureConfigurationTarget,
                 ))
+        })
+        .and_then(move |target| {
+            table
+                .get("name")
+                .cloned()
+                .ok_or(HeisenbergCheckError::FixtureConfigurationNameMissing(
+                    context.clone(),
+                ))
+                .and_then(|name| {
+                    name.try_into::<String>()
+                        .map_err(Box::new)
+                        .map_err(error_context(
+                            context,
+                            HeisenbergCheckError::FixtureConfigurationName,
+                        ))
+                })
                 .map(move |name| {
                     (target == HOST_TRIPLE).then_some(HostConfiguration { name, table })
                 })
@@ -280,13 +293,18 @@ impl HostOnlyFixture<'_> {
                 ))
             })
             .and_then(|mut manifest| {
-                host_settings(
-                    &mut manifest["workspace"]["metadata"]["heisenberg"],
-                    &manifest_path,
-                )
-                .and_then(|()| {
-                    to_string(&manifest).map_err(HeisenbergCheckError::FixtureManifestSerialization)
-                })
+                manifest
+                    .get_mut("workspace")
+                    .and_then(|workspace| workspace.get_mut("metadata"))
+                    .and_then(|metadata| metadata.get_mut("heisenberg"))
+                    .ok_or(HeisenbergCheckError::FixtureSettingsMissing(
+                        manifest_path.clone(),
+                    ))
+                    .and_then(|settings| host_settings(settings, &manifest_path))
+                    .and_then(|()| {
+                        to_string(&manifest)
+                            .map_err(HeisenbergCheckError::FixtureManifestSerialization)
+                    })
             })
             .and_then(|text| {
                 fs::write(&manifest_path, text).map_err(error_context(

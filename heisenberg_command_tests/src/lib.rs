@@ -1,3 +1,4 @@
+pub mod binary_check;
 pub mod check_outcome;
 pub mod constants;
 pub mod fixture_configuration;

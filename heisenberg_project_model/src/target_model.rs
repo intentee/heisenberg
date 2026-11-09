@@ -53,12 +53,12 @@ fn loaded_sysroot(
 }
 
 pub struct TargetModel {
-    pub cfg: TargetCfg,
-    pub sysroot: Sysroot,
+    pub(crate) cfg: TargetCfg,
+    pub(crate) sysroot: Sysroot,
 }
 
 impl TargetModel {
-    pub fn new(
+    pub(crate) fn new(
         target: SupportedTarget,
         library: &FeatureGraph,
         sysroot_directory: &AbsPathBuf,

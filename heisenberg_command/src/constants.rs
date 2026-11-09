@@ -1,3 +1,5 @@
+use std::num::NonZeroU16;
+
 use crate::issue_text::IssueText;
 
 macro_rules! resolution_purpose {
@@ -177,6 +179,27 @@ pub const NEGATED_CONFIGURATION: IssueText = IssueText {
     summary: "A cfg predicate that negates a feature, test or debug_assertions",
 };
 
+pub const NEXTEST_CONFIGURATION_MISSING: IssueText = IssueText {
+    definition: "A workspace whose root holds no .config/nextest.toml, the only repository configuration that nextest reads, so that its tests run under nextest's defaults, which never terminate a test.",
+    name: "NextestConfigurationMissing",
+    purpose: "Every test finishes within the limits, so that a slow test shows slow code instead of stalling the run. Add a .config/nextest.toml whose default profile sets a slow-timeout within the limits, and make the tests that exceed them faster.",
+    summary: "A workspace without a nextest configuration",
+};
+
+pub const NEXTEST_OVERRIDE: IssueText = IssueText {
+    definition: "A per-test override in a nextest profile, which changes the timeouts, retries or threads of the tests it selects ahead of every profile setting.",
+    name: "NextestOverride",
+    purpose: "Every test meets the same limits. Remove the override and make the tests it singles out faster.",
+    summary: "A per-test override in the nextest configuration",
+};
+
+pub const NEXTEST_TIMEOUT_NOT_ENFORCED: IssueText = IssueText {
+    definition: "A nextest profile whose slow-timeout flags a test as slow later than the slow limit, terminates it later than the termination limit or never, or counts a timed out test as passing. The default profile sets a slow-timeout, since the one nextest ships never terminates a test, and a profile that sets none inherits the slow-timeout of its parent.",
+    name: "NextestTimeoutNotEnforced",
+    purpose: "A test that runs longer than the limits shows slow code or a slow test. Make the code and the test faster instead of relaxing the timeout.",
+    summary: "A nextest profile whose slow-timeout exceeds the limits",
+};
+
 pub const NON_CONSTANT_IN_CONSTANTS_MODULE: IssueText = IssueText {
     definition: "A public item other than a constant or a module inside the crate's constants module, crate::constants.",
     name: "NonConstantInConstantsModule",
@@ -255,16 +278,16 @@ pub const REEXPORT: IssueText = IssueText {
 };
 
 pub const REQUIRED_CLIPPY_SETTING_MISSING: IssueText = IssueText {
-    definition: "A clippy configuration that does not give each required setting the value it requires: true for the test allowances, which are the only way tests may use expect, unwrap and panic, and false for avoid-breaking-exported-api, which clippy otherwise sets to true and so leaves the lints that would change a public signature silent on public items.",
+    definition: "A clippy configuration that does not give each required setting the value it requires: true for the test allowances, which are the only way tests may use expect and unwrap, and false for avoid-breaking-exported-api, which clippy otherwise sets to true and so leaves the lints that would change a public signature silent on public items.",
     name: "RequiredClippySettingMissing",
-    purpose: "Tests may fail fast with expect, unwrap and panic, and the lints that clippy relaxes for public items by default must hold for them too. Set each required setting to the value it names.",
+    purpose: "Tests may fail fast with expect and unwrap, and the lints that clippy relaxes for public items by default must hold for them too. Set each required setting to the value it names.",
     summary: "A clippy configuration without a required setting",
 };
 
 pub const REQUIRED_LINT_NOT_DENIED: IssueText = IssueText {
-    definition: "A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint or lint group below deny, under either spelling of its name or a name clippy renamed to it, a warn level counting as deny while the warnings group is denied. Every member denies the warnings group and the clippy all, nursery and pedantic groups; every member but a test crate also denies the panicking lints, while a test crate, which may panic, declares its own [lints] table, since cargo cannot override single lints of an inherited table. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].",
+    definition: "A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint or lint group below deny, under either spelling of its name or a name clippy renamed to it, a warn level counting as deny while the warnings group is denied. Every member, a test crate included, denies the warnings group, the clippy all, nursery and pedantic groups and the panicking lints, the clippy lints that report code that can panic. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].",
     name: "RequiredLintNotDenied",
-    purpose: "Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.",
+    purpose: "Every warning and every lint of the clippy groups fails the build, and code reports failures as typed errors instead of panicking, wherever it is written; tests, in every crate alike, fail fast only with expect and unwrap, which the required clippy settings allow in #[test] functions and #[cfg(test)] items. Deny the lint in the [lints] or [workspace.lints] table the package uses.",
     summary: "A workspace member that leaves a required lint or lint group below deny",
 };
 
@@ -412,4 +435,15 @@ pub const UNVETTED_CLIPPY_SETTING: IssueText = IssueText {
     summary: "A clippy configuration setting that Heisenberg has not vetted",
 };
 
+pub const UNVETTED_NEXTEST_SETTING: IssueText = IssueText {
+    definition: "A nextest configuration setting other than the slow-timeout and those that only control concurrency, failure handling and reporting, which can retry, skip or exempt tests, or let a test run past its timeout.",
+    name: "UnvettedNextestSetting",
+    purpose: "Every test runs and passes on its first attempt within the limits. Remove the setting, and make the tests that needed it faster or reliable.",
+    summary: "A nextest configuration setting that Heisenberg has not vetted",
+};
+
+pub const DEFAULT_JOBS: NonZeroU16 = NonZeroU16::MIN.saturating_add(7);
+
 pub const SUPPORTED_RUST_VERSION: &str = "1.99.1";
+
+pub const TARGET_TRIPLE_PLACEHOLDER: &str = "<TRIPLE>";

@@ -6,7 +6,9 @@ use std::fs::DirEntry;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use cargo_metadata::camino::Utf8PathBuf;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::SourceDatabase;
 use ra_ap_ide_db::base_db::SourceRoot;
@@ -14,13 +16,15 @@ use ra_ap_ide_db::base_db::SourceRootId;
 use ra_ap_ide_db::base_db::all_crates;
 use ra_ap_ide_db::base_db::salsa::Durability;
 use ra_ap_paths::AbsPathBuf;
+
 use ra_ap_vfs::FileId;
 use ra_ap_vfs::Vfs;
 use ra_ap_vfs::VfsPath;
 use ra_ap_vfs::file_set::FileSet;
-use triomphe::Arc;
+use triomphe::Arc as SharedSourceRoot;
 
 use heisenberg_error_context::error_context::error_context;
+use heisenberg_task_graph::once_map::OnceMap;
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
 use crate::out_dir_file::OutDirFile;
@@ -56,7 +60,30 @@ fn directory_files(directory: &Path) -> Result<Vec<PathBuf>, ProjectModelError> 
         })
 }
 
+fn out_dir_contents(directory: &Path) -> Result<Vec<OutDirFile>, ProjectModelError> {
+    directory_files(directory).and_then(|files| {
+        files
+            .into_iter()
+            .map(|file| {
+                fs::read(&file)
+                    .map_err(error_context(
+                        file.clone(),
+                        ProjectModelError::UnreadableBuildScriptOutput,
+                    ))
+                    .map(|bytes| {
+                        String::from_utf8(bytes)
+                            .ok()
+                            .map(|text| OutDirFile { path: file, text })
+                    })
+            })
+            .collect::<Result<Vec<Option<OutDirFile>>, ProjectModelError>>()
+            .map(|contents| contents.into_iter().flatten().collect())
+    })
+}
+
 pub struct OutDirFiles<'assignment> {
+    pub contents:
+        &'assignment OnceMap<Utf8PathBuf, Result<Arc<Vec<OutDirFile>>, Arc<ProjectModelError>>>,
     pub crate_packages: &'assignment HashMap<VfsPath, String>,
     pub outputs: &'assignment BTreeMap<String, BuildScriptOutput>,
 }
@@ -93,28 +120,29 @@ impl OutDirFiles<'_> {
             .map(|(source_root, packages)| {
                 packages
                     .iter()
-                    .map(|package| directory_files(self.outputs[package].out_dir.as_std_path()))
-                    .collect::<Result<Vec<Vec<PathBuf>>, ProjectModelError>>()
-                    .and_then(|files| {
-                        files
-                            .into_iter()
-                            .flatten()
-                            .map(|file| {
-                                fs::read(&file)
-                                    .map_err(error_context(
-                                        file.clone(),
-                                        ProjectModelError::UnreadableBuildScriptOutput,
-                                    ))
-                                    .map(|bytes| {
-                                        String::from_utf8(bytes)
-                                            .ok()
-                                            .map(|text| OutDirFile { path: file, text })
-                                    })
+                    .map(|package| {
+                        let out_dir = &self.outputs[package].out_dir;
+
+                        self.contents
+                            .get_or_init(out_dir.clone(), || {
+                                out_dir_contents(out_dir.as_std_path())
+                                    .map(Arc::new)
+                                    .map_err(Arc::new)
                             })
-                            .collect::<Result<Vec<Option<OutDirFile>>, ProjectModelError>>()
+                            .map_err(ProjectModelError::BuildScriptOutputUnavailable)
                     })
+                    .collect::<Result<Vec<Arc<Vec<OutDirFile>>>, ProjectModelError>>()
                     .map(|contents| {
-                        Self::extend(database, vfs, source_root, contents.into_iter().flatten())
+                        Self::extend(
+                            database,
+                            vfs,
+                            source_root,
+                            contents
+                                .iter()
+                                .flat_map(|files| files.iter().cloned())
+                                .collect::<Vec<OutDirFile>>()
+                                .into_iter(),
+                        )
                     })
             })
             .collect::<Result<Vec<Vec<FileId>>, ProjectModelError>>()
@@ -150,7 +178,7 @@ impl OutDirFiles<'_> {
 
         database.set_source_root_with_durability(
             source_root,
-            Arc::new(if existing.is_library {
+            SharedSourceRoot::new(if existing.is_library {
                 SourceRoot::new_library(file_set)
             } else {
                 SourceRoot::new_local(file_set)

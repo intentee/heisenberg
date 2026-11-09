@@ -20,13 +20,13 @@ fn explain_names_the_required_lints() {
         Ok(
             "RequiredLintNotDenied: A workspace member that leaves a required lint or lint group below deny\n\
         \n\
-        A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint or lint group below deny, under either spelling of its name or a name clippy renamed to it, a warn level counting as deny while the warnings group is denied. Every member denies the warnings group and the clippy all, nursery and pedantic groups; every member but a test crate also denies the panicking lints, while a test crate, which may panic, declares its own [lints] table, since cargo cannot override single lints of an inherited table. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].\n\
+        A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint or lint group below deny, under either spelling of its name or a name clippy renamed to it, a warn level counting as deny while the warnings group is denied. Every member, a test crate included, denies the warnings group, the clippy all, nursery and pedantic groups and the panicking lints, the clippy lints that report code that can panic. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].\n\
         \n\
         Required lint groups: clippy::all, clippy::nursery, clippy::pedantic, warnings\n\
         \n\
-        Panicking lints: clippy::expect_used, clippy::panic, clippy::unwrap_used\n\
+        Panicking lints: clippy::arithmetic_side_effects, clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::panic_in_result_fn, clippy::string_slice, clippy::todo, clippy::unimplemented, clippy::unreachable, clippy::unwrap_used\n\
         \n\
-        Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
+        Every warning and every lint of the clippy groups fails the build, and code reports failures as typed errors instead of panicking, wherever it is written; tests, in every crate alike, fail fast only with expect and unwrap, which the required clippy settings allow in #[test] functions and #[cfg(test)] items. Deny the lint in the [lints] or [workspace.lints] table the package uses.\n\
         "
         )
     );

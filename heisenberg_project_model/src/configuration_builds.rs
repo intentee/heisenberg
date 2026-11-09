@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::num::NonZeroU16;
 
 use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
@@ -8,44 +9,45 @@ use ra_ap_toolchain::Tool;
 
 use heisenberg_error_context::error_context::error_context;
 use heisenberg_workspace_build::build_outputs::BuildOutputs;
+use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 use heisenberg_workspace_build::cargo_session::CargoSession;
 use heisenberg_workspace_build::configured_context::ConfiguredContext;
 use heisenberg_workspace_build::workspace_build::WorkspaceBuild;
 
 use crate::configuration::Configuration;
+use crate::constants::CARGO_BUILD_JOBS_VARIABLE;
 use crate::constants::RUSTC_VARIABLE;
 use crate::constants::SYSROOT_BINARY_DIRECTORY;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::resolved_packages::ResolvedPackages;
-use crate::substituted_build_script::SubstitutedBuildScript;
 
 fn with_substituted(
-    configuration: &Configuration,
     mut outputs: BuildOutputs,
-    substituted: &BTreeMap<String, SubstitutedBuildScript>,
+    substituted: &BTreeMap<String, BuildScriptOutput>,
 ) -> BuildOutputs {
-    outputs.build_scripts.extend(
-        substituted
-            .iter()
-            .map(|(package, script)| (package.clone(), script.output(configuration))),
-    );
+    outputs.build_scripts.extend(substituted.clone());
 
     outputs
 }
 
 pub struct ConfigurationBuilds<'builds> {
-    pub configurations: &'builds BTreeSet<Configuration>,
+    pub configurations: &'builds BTreeMap<Configuration, BTreeMap<String, BuildScriptOutput>>,
     pub context: &'builds ConfiguredContext<'builds>,
+    pub jobs: NonZeroU16,
     pub manifest_path: &'builds AbsPath,
     pub resolved: &'builds ResolvedPackages,
-    pub substituted: &'builds BTreeMap<String, SubstitutedBuildScript>,
     pub sysroot: &'builds AbsPath,
 }
 
 impl ConfigurationBuilds<'_> {
     pub fn outputs(&self) -> Result<BTreeMap<Configuration, BuildOutputs>, ProjectModelError> {
-        let substituted_packages: BTreeSet<String> = self.substituted.keys().cloned().collect();
+        let substituted_packages: BTreeSet<String> = self
+            .configurations
+            .values()
+            .flat_map(BTreeMap::keys)
+            .cloned()
+            .collect();
 
         if self.builds_anything(&substituted_packages) {
             let directory = self.sysroot.join(SYSROOT_BINARY_DIRECTORY);
@@ -56,6 +58,7 @@ impl ConfigurationBuilds<'_> {
             })?;
             let mut environment = self.context.environment.clone();
 
+            environment.insert(CARGO_BUILD_JOBS_VARIABLE.to_owned(), self.jobs.to_string());
             environment.insert(RUSTC_VARIABLE.to_owned(), compiler.into_string());
 
             let context = ConfiguredContext {
@@ -74,7 +77,7 @@ impl ConfigurationBuilds<'_> {
                         .and_then(|workspace| {
                             self.configurations
                                 .iter()
-                                .map(|configuration| {
+                                .map(|(configuration, substituted)| {
                                     WorkspaceBuild {
                                         features: &configuration.features.cli_features(),
                                         session: &session,
@@ -91,11 +94,7 @@ impl ConfigurationBuilds<'_> {
                                     .map(|outputs| {
                                         (
                                             configuration.clone(),
-                                            with_substituted(
-                                                configuration,
-                                                outputs,
-                                                self.substituted,
-                                            ),
+                                            with_substituted(outputs, substituted),
                                         )
                                     })
                                 })
@@ -106,10 +105,10 @@ impl ConfigurationBuilds<'_> {
             Ok(self
                 .configurations
                 .iter()
-                .map(|configuration| {
+                .map(|(configuration, substituted)| {
                     (
                         configuration.clone(),
-                        with_substituted(configuration, BuildOutputs::default(), self.substituted),
+                        with_substituted(BuildOutputs::default(), substituted),
                     )
                 })
                 .collect())

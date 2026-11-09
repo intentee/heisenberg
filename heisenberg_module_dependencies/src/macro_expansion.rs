@@ -7,14 +7,16 @@ use ra_ap_syntax::SyntaxKind;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::SyntaxToken;
 
+use crate::expansion_syntax_errors::expansion_syntax_errors;
+
 pub struct MacroExpansion<'expansion> {
     pub call: MacroCallId,
     pub database: &'expansion RootDatabase,
 }
 
-impl MacroExpansion<'_> {
-    pub fn syntax_errors(&self) -> Vec<SyntaxError> {
-        self.parse().errors()
+impl<'expansion> MacroExpansion<'expansion> {
+    pub fn syntax_errors(&self) -> &'expansion [SyntaxError] {
+        expansion_syntax_errors(self.database, self.call)
     }
 
     pub fn unreadable_literals(&self) -> Vec<SyntaxToken> {

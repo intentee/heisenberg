@@ -35,20 +35,26 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration with the standard\n\
     library of its target installed, Cargo.lock is up to date, the cargo home holds every package of\n\
     Cargo.lock (`cargo fetch`), the build runs from the workspace directory with the environment\n\
-    Heisenberg runs with and without --config arguments, and clippy runs without command-line arguments.\n\
+    Heisenberg runs with and without --config arguments, clippy runs without command-line arguments, and\n\
+    nextest runs without the command-line arguments that replace or extend its configuration, retry\n\
+    tests or disable timeouts (--config-file, --tool-config-file, --retries, --debugger and --tracer).\n\
     An environment variable whose name or value is not UTF-8, CARGO_ENCODED_RUSTFLAGS, RUSTFLAGS, RUSTC,\n\
-    RUSTC_WORKSPACE_WRAPPER, RUSTC_WRAPPER, CLIPPY_ARGS, CLIPPY_CONF_DIR or RUSTC_BOOTSTRAP,\n\
-    __CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS in the environment, a workspace directory that is not\n\
-    the root of its cargo workspace, a workspace member or crate root outside the workspace root, a\n\
-    package whose metadata cargo_metadata cannot read, a crate root that two targets share or that\n\
-    cannot be read, a metabuild script, which has no source file, a workspace root, target directory or\n\
-    crate root that is not an absolute UTF-8 path, a clippy.toml or .clippy.toml that discovery finds\n\
-    and cannot read, or that is the only one in its directory and is not valid TOML, rustflags in the\n\
+    RUSTC_WORKSPACE_WRAPPER, RUSTC_WRAPPER, CLIPPY_ARGS, CLIPPY_CONF_DIR, NEXTEST_RETRIES or\n\
+    RUSTC_BOOTSTRAP, __CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS in the environment, a workspace\n\
+    directory that is not the root of its cargo workspace, a workspace member or crate root outside the\n\
+    workspace root, a package whose metadata cargo_metadata cannot read, a crate root that two targets\n\
+    share or that cannot be read, a metabuild script, which has no source file, a workspace root, target\n\
+    directory or crate root that is not an absolute UTF-8 path, a clippy.toml or .clippy.toml that\n\
+    discovery finds and cannot read, or that is the only one in its directory and is not valid TOML, a\n\
+    .config/nextest.toml that cannot be read or is not a valid nextest configuration, rustflags in the\n\
     [build] or [target] tables of the cargo configuration or in the CARGO_BUILD_RUSTFLAGS and\n\
     CARGO_TARGET_<TRIPLE>_RUSTFLAGS variables of a supported target, rustc, rustc-workspace-wrapper or\n\
     rustc-wrapper in the [build] table of the cargo configuration, including through the environment\n\
     variables that set them, and CLIPPY_ARGS, CLIPPY_CONF_DIR or RUSTC_BOOTSTRAP in the [env] table of\n\
-    the cargo configuration, under any letter case, fail the run.\n\
+    the cargo configuration, under any letter case, fail the run. A failing run reports the first\n\
+    failure among loading the project, building it, resolving the standard library of its targets and\n\
+    reading its clippy and nextest configurations, in that order, and otherwise the analysis failures of\n\
+    every configuration.\n\
     \n\
     Analysis: Values that the [env] table of the cargo configuration declares reach the analysis as\n\
     cargo resolves them, OUT_DIR and the cfgs and env a build script emits come from running it, or from\n\
@@ -60,26 +66,28 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     without it. Every run analyses the declared configurations that --configuration selects, which it\n\
     requires, and a --configuration the workspace does not declare or selects twice fails the run. Build\n\
     scripts and procedural macros run: for each analysed configuration, cargo builds the procedural\n\
-    macros offline with the rustc of the sysroot and runs the build scripts, apart from those out_dirs\n\
-    declares, and the sysroot's rust-analyzer-proc-macro-srv expands the procedural macros, whose output\n\
-    is analysed like any macro expansion, its input where it is written and the tokens it generates\n\
-    trusted, and a build script that fails or emits a cfg that does not parse, one that needs a build\n\
-    script out_dirs declares, a build script output that cannot be read, a procedural macro that fails\n\
-    to build or that the server cannot load, a declared target without its standard library, a sysroot\n\
-    without rustc and a sysroot without the server, or whose server cannot start, fail the run. Every\n\
-    decision is semantic, as rust-analyzer resolves the code. Shared module files are analysed in every\n\
-    crate that includes them. The public item, constant, item order, method order and integration test\n\
-    target rules apply to items written in module files, including those that a macro_rules! macro of\n\
-    the crate writes, and the name, tuple and parameter rules to the text written in them; an item that\n\
-    an attribute macro rewrites is analysed through the items of its expansion that rust-analyzer maps\n\
-    back to it, and the rest of the expansion, like the items that procedural macros and the macros of\n\
-    other crates generate, is trusted. Derive macro output is analysed like any macro expansion, except\n\
-    that of the built-in derives that rust-analyzer records as impls of their trait without expanding\n\
-    them, which is trusted; text written outside a crate's module files, such as in other crates or in\n\
-    the build script output that include! brings in, is trusted, and results reflect the files on disk,\n\
-    including generated ones. Test code is every target of a test crate, every integration test target\n\
-    and every module that cfg(test) gates, inline or in its own file and under any name; a test crate is\n\
-    a workspace member that test_crates lists, whose package cannot be published (publish = false), and\n\
+    macros offline with the rustc of the sysroot and --jobs parallel jobs, which build scripts see in\n\
+    NUM_JOBS, and runs the build scripts, apart from those out_dirs declares, and --jobs processes of\n\
+    the sysroot's rust-analyzer-proc-macro-srv expand the procedural macros, whose output is analysed\n\
+    like any macro expansion, its input where it is written and the tokens it generates trusted, and a\n\
+    build script that fails or emits a cfg that does not parse, one that needs a build script out_dirs\n\
+    declares, a build script output that cannot be read, a procedural macro that fails to build or that\n\
+    the server cannot load, a declared target without its standard library, a sysroot without rustc and\n\
+    a sysroot without the server, or whose server cannot start, fail the run. Every decision is\n\
+    semantic, as rust-analyzer resolves the code. The analysis runs on --jobs worker threads and reports\n\
+    the same issues for every count. Shared module files are analysed in every crate that includes them.\n\
+    The public item, constant, item order, method order and integration test target rules apply to items\n\
+    written in module files, including those that a macro_rules! macro of the crate writes, and the\n\
+    name, tuple and parameter rules to the text written in them; an item that an attribute macro\n\
+    rewrites is analysed through the items of its expansion that rust-analyzer maps back to it, and the\n\
+    rest of the expansion, like the items that procedural macros and the macros of other crates\n\
+    generate, is trusted. Derive macro output is analysed like any macro expansion, except that of the\n\
+    built-in derives that rust-analyzer records as impls of their trait without expanding them, which is\n\
+    trusted; text written outside a crate's module files, such as in other crates or in the build script\n\
+    output that include! brings in, is trusted, and results reflect the files on disk, including\n\
+    generated ones. Test code is every target of a test crate, every integration test target and every\n\
+    module that cfg(test) gates, inline or in its own file and under any name; a test crate is a\n\
+    workspace member that test_crates lists, whose package cannot be published (publish = false), and\n\
     that no member other than a test crate depends on through a normal or build dependency.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
@@ -119,6 +127,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ModuleFileInsideBlock: A module file declared inside a block\n  \
     ModuleNotNamedAfterItsItem: A module that is not named after its public item\n  \
     NegatedConfiguration: A cfg predicate that negates a feature, test or debug_assertions\n  \
+    NextestConfigurationMissing: A workspace without a nextest configuration\n  \
+    NextestOverride: A per-test override in the nextest configuration\n  \
+    NextestTimeoutNotEnforced: A nextest profile whose slow-timeout exceeds the limits\n  \
     NonConstantInConstantsModule: A public item other than a constant in crate::constants\n  \
     NonDocComment: A comment that is not a doc comment\n  \
     NonTestItemInTestTarget: An integration test item that is neither a test nor a file-local helper\n  \
@@ -151,12 +162,13 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     UnresolvedModule: A module declaration whose file rust-analyzer cannot resolve\n  \
     UnresolvedPath: A path that rust-analyzer cannot resolve\n  \
     UnsafeCode: Unsafe code in a crate that integrates no foreign code\n  \
-    UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n\
+    UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n  \
+    UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n\
     \n\
     Run `heisenberg explain <ISSUE_TYPE>` for the definition of a rule, why it exists and how to satisfy\n\
     it.\n\
     \n\
-    Usage: heisenberg check --cargo-home <CARGO_HOME> --configuration <NAME> --sysroot <SYSROOT> --workspace <WORKSPACE>\n\
+    Usage: heisenberg check [OPTIONS] --cargo-home <CARGO_HOME> --configuration <NAME> --sysroot <SYSROOT> --workspace <WORKSPACE>\n\
     \n\
     Options:\n      \
     --cargo-home <CARGO_HOME>\n          \
@@ -166,6 +178,11 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     \n      \
     --configuration <NAME>\n          \
     Analyse this declared configuration; repeat it to select several\n\
+    \n      \
+    --jobs <JOBS>\n          \
+    Number of analysis worker threads, cargo jobs and proc-macro server processes\n          \
+    \n          \
+    [default: 8]\n\
     \n      \
     --sysroot <SYSROOT>\n          \
     Absolute path of the Rust 1.99.1 sysroot that contains the rust-src component\n\

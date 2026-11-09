@@ -9,9 +9,16 @@ version = "0.1.0"
 all = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
+arithmetic_side_effects = "deny"
 expect_used = "deny"
+indexing_slicing = "deny"
 panic = "deny"
+panic_in_result_fn = "deny"
+string_slice = "deny"
+todo = "deny"
 too_many_lines = "allow"
+unimplemented = "deny"
+unreachable = "deny"
 unwrap_used = "deny"
 
 [lints.rust]

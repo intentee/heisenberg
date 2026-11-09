@@ -22,6 +22,7 @@ use crate::constants::CARGO_TARGET_TABLE;
 use crate::constants::CLIPPY_ARGUMENTS_VARIABLE;
 use crate::constants::CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE;
 use crate::constants::COMPILER_VARIABLES;
+use crate::constants::NEXTEST_RETRIES_VARIABLE;
 use crate::constants::NIGHTLY_BOOTSTRAP_VARIABLE;
 use crate::constants::NIGHTLY_FEATURE_VARIABLES;
 use crate::constants::RUSTFLAGS_VARIABLES;
@@ -65,44 +66,7 @@ pub struct CargoConfigurationOverrides<'configuration> {
 
 impl CargoConfigurationOverrides<'_> {
     pub fn reject(&self) -> Result<(), ProjectModelError> {
-        RUSTFLAGS_VARIABLES
-            .into_iter()
-            .try_for_each(|variable| {
-                self.reject_environment_variable(
-                    variable,
-                    ProjectModelError::EnvironmentRustflags { variable },
-                )
-            })
-            .and_then(|()| {
-                COMPILER_VARIABLES.into_iter().try_for_each(|variable| {
-                    self.reject_environment_variable(
-                        variable,
-                        ProjectModelError::EnvironmentCompiler { variable },
-                    )
-                })
-            })
-            .and_then(|()| {
-                self.reject_environment_variable(
-                    CLIPPY_ARGUMENTS_VARIABLE,
-                    ProjectModelError::EnvironmentClippyArguments,
-                )
-            })
-            .and_then(|()| {
-                self.reject_environment_variable(
-                    CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE,
-                    ProjectModelError::EnvironmentClippyConfigurationDirectory,
-                )
-            })
-            .and_then(|()| {
-                NIGHTLY_FEATURE_VARIABLES
-                    .into_iter()
-                    .try_for_each(|variable| {
-                        self.reject_environment_variable(
-                            variable,
-                            ProjectModelError::EnvironmentNightlyFeatures { variable },
-                        )
-                    })
-            })
+        self.reject_environment()
             .and_then(|()| {
                 self.reject_configured_rustflags(format!("{CARGO_BUILD_TABLE}.{CARGO_RUSTFLAGS}"))
             })
@@ -192,6 +156,53 @@ impl CargoConfigurationOverrides<'_> {
             .get::<OptValue<StringList>>(&key)
             .map_err(self.unreadable_value(&key))
             .and_then(|rustflags| reject_rustflags(key, rustflags))
+    }
+
+    fn reject_environment(&self) -> Result<(), ProjectModelError> {
+        RUSTFLAGS_VARIABLES
+            .into_iter()
+            .try_for_each(|variable| {
+                self.reject_environment_variable(
+                    variable,
+                    ProjectModelError::EnvironmentRustflags { variable },
+                )
+            })
+            .and_then(|()| {
+                COMPILER_VARIABLES.into_iter().try_for_each(|variable| {
+                    self.reject_environment_variable(
+                        variable,
+                        ProjectModelError::EnvironmentCompiler { variable },
+                    )
+                })
+            })
+            .and_then(|()| {
+                self.reject_environment_variable(
+                    CLIPPY_ARGUMENTS_VARIABLE,
+                    ProjectModelError::EnvironmentClippyArguments,
+                )
+            })
+            .and_then(|()| {
+                self.reject_environment_variable(
+                    CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE,
+                    ProjectModelError::EnvironmentClippyConfigurationDirectory,
+                )
+            })
+            .and_then(|()| {
+                self.reject_environment_variable(
+                    NEXTEST_RETRIES_VARIABLE,
+                    ProjectModelError::EnvironmentNextestRetries,
+                )
+            })
+            .and_then(|()| {
+                NIGHTLY_FEATURE_VARIABLES
+                    .into_iter()
+                    .try_for_each(|variable| {
+                        self.reject_environment_variable(
+                            variable,
+                            ProjectModelError::EnvironmentNightlyFeatures { variable },
+                        )
+                    })
+            })
     }
 
     fn reject_environment_variable(

@@ -112,6 +112,7 @@ impl DeclaredTestCrates {
                         package: name.to_owned(),
                     });
                 }
+                Some(_) if test_crates.contains(name) => {}
                 Some(member) => {
                     violations.extend(
                         production_dependents(resolved, test_crates, member)

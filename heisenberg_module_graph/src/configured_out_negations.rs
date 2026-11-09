@@ -8,3 +8,16 @@ pub struct ConfiguredOutNegations {
     pub declarations: BTreeSet<SourceLocation>,
     pub negations: BTreeSet<Violation>,
 }
+
+impl ConfiguredOutNegations {
+    pub fn merge(
+        &mut self,
+        Self {
+            declarations,
+            negations,
+        }: Self,
+    ) {
+        self.declarations.extend(declarations);
+        self.negations.extend(negations);
+    }
+}

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 use heisenberg_graph_cycles::cycle_components::CycleComponents;
 use heisenberg_graph_cycles::graph_edge::GraphEdge;
-use heisenberg_graph_cycles::shortest_cycle::shortest_cycle;
+use heisenberg_graph_cycles::shortest_cycles::ShortestCycles;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
 use crate::dependency_document::DependencyDocument;
@@ -28,31 +28,6 @@ impl PackageRules<'_> {
         violations.extend(self.tests_without_test_libraries());
 
         violations.into_iter().collect()
-    }
-
-    fn blocking_cycle(
-        &self,
-        destination: &str,
-        dependencies: &BTreeSet<&str>,
-    ) -> Option<Vec<String>> {
-        shortest_cycle(
-            self.package_edges().chain(
-                dependencies
-                    .iter()
-                    .filter(|dependency| **dependency != destination)
-                    .map(|dependency| GraphEdge {
-                        from: destination,
-                        to: *dependency,
-                    }),
-            ),
-            destination,
-        )
-        .map(|cycle| {
-            cycle
-                .into_iter()
-                .map(|package| self.versioned_name(package))
-                .collect()
-        })
     }
 
     fn dependency_cycles(&self) -> Vec<PackageViolation> {
@@ -139,6 +114,13 @@ impl PackageRules<'_> {
     fn tests_without_test_libraries(&self) -> Vec<PackageViolation> {
         let workspace_path = self.resolved.workspace_path();
         let members: Vec<&PackageDocument> = self.resolved.members().collect();
+        let cycles = ShortestCycles::new(self.package_edges());
+        let packages_by_id: BTreeMap<&str, &PackageDocument> = self
+            .resolved
+            .packages
+            .iter()
+            .map(|package| (package.metadata.id.repr.as_str(), package))
+            .collect();
 
         members
             .iter()
@@ -162,7 +144,22 @@ impl PackageRules<'_> {
                     .map(|PackageDocument { metadata, .. }| {
                         (
                             metadata.name.as_str(),
-                            self.blocking_cycle(metadata.id.repr.as_str(), &dependencies)
+                            cycles
+                                .through(
+                                    metadata.id.repr.as_str(),
+                                    &dependencies
+                                        .iter()
+                                        .copied()
+                                        .filter(|dependency| *dependency != metadata.id.repr)
+                                        .collect(),
+                                )
+                                .map(|cycle| {
+                                    cycle
+                                        .into_iter()
+                                        .filter_map(|package| packages_by_id.get(package))
+                                        .map(|package| package.versioned_name())
+                                        .collect::<Vec<String>>()
+                                })
                                 .map_or_else(
                                     || PotentialOwner::Free {
                                         package: metadata.name.to_string(),
@@ -183,14 +180,5 @@ impl PackageRules<'_> {
                 }
             })
             .collect()
-    }
-
-    fn versioned_name(&self, id: &str) -> String {
-        self.resolved
-            .packages
-            .iter()
-            .map(|package| (package.metadata.id.repr.as_str(), package))
-            .collect::<BTreeMap<&str, &PackageDocument>>()[id]
-            .versioned_name()
     }
 }

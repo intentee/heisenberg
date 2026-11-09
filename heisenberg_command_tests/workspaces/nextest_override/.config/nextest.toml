@@ -1,0 +1,6 @@
+[profile.default]
+slow-timeout = { period = "10s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "test(=library_builds)"
+threads-required = 2

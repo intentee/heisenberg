@@ -15,8 +15,8 @@ impl NameWords<'_> {
             .collect();
 
         words.concat() == segments.concat()
-            && Self::boundaries(segments.iter().map(|segment| segment.len()))
-                .is_subset(&Self::boundaries(words.iter().map(String::len)))
+            && Self::boundaries(segments.iter().copied())
+                .is_subset(&Self::boundaries(words.iter().map(String::as_str)))
     }
 
     pub fn snake_case(&self) -> String {
@@ -32,15 +32,18 @@ impl NameWords<'_> {
             })
             .and_then(|tail| tail.checked_sub(1))
             .filter(|start| *start > 0)
-            .map_or_else(|| vec![run], |start| vec![&run[..start], &run[start..]])
+            .and_then(|start| run.split_at_checked(start))
+            .map_or_else(|| vec![run], |(head, tail)| vec![head, tail])
     }
 
-    fn boundaries(lengths: impl Iterator<Item = usize>) -> BTreeSet<usize> {
-        lengths
-            .scan(0, |offset, length| {
-                *offset += length;
+    fn boundaries<'word>(words: impl Iterator<Item = &'word str>) -> BTreeSet<usize> {
+        let mut spelled = String::new();
 
-                Some(*offset)
+        words
+            .map(|word| {
+                spelled.push_str(word);
+
+                spelled.len()
             })
             .collect()
     }

@@ -1,5 +1,4 @@
 use std::cell::OnceCell;
-use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::iter;
@@ -45,6 +44,8 @@ use ra_ap_paths::AbsPath;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::AstToken;
 use ra_ap_syntax::NodeOrToken;
+use ra_ap_syntax::Preorder;
+use ra_ap_syntax::RustLanguage;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::SyntaxNodePtr;
 use ra_ap_syntax::SyntaxToken;
@@ -58,7 +59,6 @@ use ra_ap_syntax::ast::HasVisibility as _;
 use ra_ap_vfs::FileId;
 
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
-use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_module_graph::foreign_module::ForeignModule;
@@ -68,6 +68,7 @@ use heisenberg_module_graph::item_placement::ItemPlacement;
 use heisenberg_module_graph::method_placement::MethodPlacement;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
+use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::shared_module_file::SharedModuleFile;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
@@ -76,6 +77,8 @@ use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_module_graph::violation_set::ViolationSet;
 use heisenberg_module_graph::walked_code::WalkedCode;
 use heisenberg_module_graph::written_tokens::WrittenTokens;
+use heisenberg_project_model::source_file::SourceFile;
+use heisenberg_task_graph::once_map::OnceMap;
 
 use crate::adt_violation::AdtViolation;
 use crate::ancestry::Ancestry;
@@ -87,7 +90,9 @@ use crate::constants_module::ConstantsModule;
 use crate::constructor::Constructor;
 use crate::covered_code::CoveredCode;
 use crate::crate_findings::CrateFindings;
+use crate::defined_items::DefinedItems;
 use crate::definition_usages::DefinitionUsages;
+use crate::expanded_items::ExpandedItems;
 use crate::expansion_chain::ExpansionChain;
 use crate::field_only_parameter::FieldOnlyParameter;
 use crate::file_local_item::FileLocalItem;
@@ -109,6 +114,7 @@ use crate::method_key::MethodKey;
 use crate::method_order::MethodOrder;
 use crate::method_owner::MethodOwner;
 use crate::misordered_entry::MisorderedEntry;
+use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_item::ModuleItem;
 use crate::module_paths::ModulePaths;
 use crate::name_words::NameWords;
@@ -120,6 +126,7 @@ use crate::outside_visibility::OutsideVisibility;
 use crate::parameter_name::ParameterName;
 use crate::path_reference::PathReference;
 use crate::path_reference_outcome::PathReferenceOutcome;
+use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
 use crate::signature_tuple::SignatureTuple;
 use crate::source_locator::SourceLocator;
@@ -131,6 +138,7 @@ use crate::test_target_items::TestTargetItems;
 use crate::token_origin::TokenOrigin;
 use crate::trait_arguments::trait_arguments;
 use crate::unsafe_code_findings::UnsafeCodeFindings;
+use crate::walked_module::WalkedModule;
 use crate::written_token::WrittenToken;
 
 pub struct ModuleWalk<'walk, 'database> {
@@ -140,12 +148,13 @@ pub struct ModuleWalk<'walk, 'database> {
     pub inactive_code: &'walk HashMap<InFile<SyntaxNodePtr>, CfgExpr>,
     pub krate: Crate,
     pub locator: &'walk SourceLocator<'walk>,
-    pub module_paths: &'walk ModulePaths<'database>,
+    pub module_paths: &'walk ModulePaths,
     pub options: &'walk CfgOptions,
+    pub paths: &'walk PathResolutions<'walk, 'database>,
     pub production_options: &'walk CfgOptions,
     pub semantics: &'walk Semantics<'database, RootDatabase>,
     pub test_code: &'walk TestCode<'walk, 'database>,
-    pub test_gated_code: RefCell<HashMap<SyntaxNode, bool>>,
+    pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub token_origin: &'walk TokenOrigin<'walk, 'database>,
     pub unpublished_packages: &'walk BTreeSet<String>,
 }
@@ -154,60 +163,98 @@ impl ModuleWalk<'_, '_> {
     pub fn module(
         &self,
         module: Module,
-        graph: &mut CrateModuleGraph,
-        findings: &mut CrateFindings,
-    ) {
+        walked: &mut WalkedModule,
+    ) -> Result<(), ModuleDependenciesError> {
         let database = self.semantics.db;
 
-        if let Some(source_file_id) = module.as_source_file_id(database) {
-            let file_id = source_file_id.file_id(database);
-            let file_modules = &self.file_modules[&file_id];
-            let file = self.file_start(file_id).file;
-            let analysis = file_modules
-                .first()
-                .filter(|first| **first != module)
-                .map_or(ModuleFileAnalysis::Analysed, |first| {
-                    ModuleFileAnalysis::AlreadyAnalysedAs(self.module_paths.path(*first))
-                });
+        module
+            .as_source_file_id(database)
+            .map_or(Ok(()), |source_file_id| {
+                let file_id = source_file_id.file_id(database);
+                let file_modules = &self.file_modules[&file_id];
 
-            if file_modules.len() > 1 {
-                graph.shared_module_files.insert(SharedModuleFile {
-                    analysis: analysis.clone(),
-                    file: file.clone(),
-                    module: self.module_paths.path(module),
-                });
-            }
+                self.file_start(file_id)
+                    .and_then(|SourceLocation { file, .. }| {
+                        let analysis = file_modules
+                            .first()
+                            .filter(|first| **first != module)
+                            .map_or(ModuleFileAnalysis::Analysed, |first| {
+                                ModuleFileAnalysis::AlreadyAnalysedAs(
+                                    self.module_paths.path(database, *first),
+                                )
+                            });
 
-            if analysis == ModuleFileAnalysis::Analysed {
-                let root = self.semantics.parse(source_file_id).syntax().clone();
+                        if file_modules.len() > 1 {
+                            walked
+                                .findings
+                                .shared_module_files
+                                .insert(SharedModuleFile {
+                                    analysis: analysis.clone(),
+                                    file: file.clone(),
+                                    module: self.module_paths.path(database, module),
+                                });
+                        }
 
-                graph.walked_code.files.insert(file);
-                self.non_doc_comments(file_id, &root, graph);
-                self.walk(
-                    Subtree {
-                        origin: SubtreeOrigin::SourceFile,
-                        root,
-                    },
-                    graph,
-                    findings,
-                );
-            }
-        }
+                        if analysis == ModuleFileAnalysis::Analysed {
+                            let root = self.semantics.parse(source_file_id).syntax().clone();
+
+                            walked.findings.walked_code.files.insert(file);
+                            self.non_doc_comments(file_id, &root, &mut walked.findings)
+                                .and_then(|()| {
+                                    self.walk(
+                                        Subtree {
+                                            origin: SubtreeOrigin::SourceFile,
+                                            root,
+                                        },
+                                        walked,
+                                    )
+                                })
+                        } else {
+                            Ok(())
+                        }
+                    })
+            })
     }
 
     fn activate(
         &self,
         node: &SyntaxNode,
-        CrateModuleGraph {
+        file: HirFileId,
+        ModuleFindings {
             walked_code: WalkedCode { active_tokens, .. },
             ..
-        }: &mut CrateModuleGraph,
-    ) {
-        if !ast::TokenTree::can_cast(node.kind()) {
-            let file = self.semantics.hir_file_for(node);
+        }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        if ast::TokenTree::can_cast(node.kind()) {
+            Ok(())
+        } else {
             let tokens = self.written_tokens(file, code_tokens(node.children_with_tokens()));
 
-            self.record_own_tokens(file, &tokens, active_tokens);
+            self.record_own_tokens(file, &tokens, active_tokens)
+        }
+    }
+
+    fn configured_out(
+        &self,
+        node: &SyntaxNode,
+        file: HirFileId,
+        expression: &CfgExpr,
+        origin: &SubtreeOrigin,
+        module_findings: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        if (NegatedConfiguration { expression }).is_negated() {
+            self.locate_focus(node, origin).and_then(|location| {
+                module_findings
+                    .configured_out_negations
+                    .negations
+                    .insert(Violation {
+                        kind: ViolationKind::NegatedConfiguration,
+                        location: location.clone(),
+                    });
+                self.inactive(node, file, BTreeSet::from([location]), module_findings)
+            })
+        } else {
+            self.inactive(node, file, BTreeSet::new(), module_findings)
         }
     }
 
@@ -215,62 +262,82 @@ impl ModuleWalk<'_, '_> {
         &self,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
-        graph: &mut CrateModuleGraph,
+        module_findings: &mut ModuleFindings,
         CrateFindings { test_target, .. }: &mut CrateFindings,
-    ) {
-        let non_constant = PublicItems {
+    ) -> Result<(), ModuleDependenciesError> {
+        let defined = DefinedItems {
             container: node,
+            options: self.options,
+            semantics: self.semantics,
+        }
+        .items();
+        let expanded = ExpandedItems {
+            options: self.options,
+            semantics: self.semantics,
+            token_origin: self.token_origin,
+        }
+        .of(defined.clone());
+        let non_constant = PublicItems {
+            items: &expanded,
             options: self.options,
             semantics: self.semantics,
             token_origin: self.token_origin,
         }
         .non_constant();
 
-        graph
-            .violations
-            .extend(self.item_order_violations(node, origin));
+        self.item_order_violations(&defined, origin)
+            .and_then(|misordered| {
+                module_findings.violations.extend(misordered);
 
-        if self.is_constants_module(node) {
-            graph.violations.extend(self.item_violations(
-                non_constant.iter(),
-                &ViolationKind::NonConstantInConstantsModule,
-                origin,
-            ));
-        } else {
-            let module_item = self.module_item(node, &non_constant);
-            let accepted = module_item.item();
+                if self.is_constants_module(node) {
+                    self.item_violations(
+                        non_constant.iter(),
+                        &ViolationKind::NonConstantInConstantsModule,
+                        origin,
+                    )
+                    .map(|non_constants| module_findings.violations.extend(non_constants))
+                } else {
+                    self.module_item(node, &non_constant)
+                        .and_then(|module_item| {
+                            let accepted = module_item.item();
 
-            graph.violations.extend(self.item_violations(
-                non_constant.iter().filter(|item| Some(*item) != accepted),
-                &ViolationKind::AdditionalPublicItem,
-                origin,
-            ));
-            graph
-                .violations
-                .extend(self.module_naming_violation(module_item, origin));
-        }
-
-        if self.crate_target.kind == CrateTargetKind::IntegrationTest {
-            self.test_target_violations(
-                &TestTargetItems {
-                    container: node,
-                    crate_target: self.crate_target,
-                    options: self.options,
-                    semantics: self.semantics,
-                    token_origin: self.token_origin,
+                            self.item_violations(
+                                non_constant.iter().filter(|item| Some(*item) != accepted),
+                                &ViolationKind::AdditionalPublicItem,
+                                origin,
+                            )
+                            .and_then(|additional| {
+                                module_findings.violations.extend(additional);
+                                self.module_naming_violation(module_item, origin)
+                            })
+                            .map(|misnamed| module_findings.violations.extend(misnamed))
+                        })
                 }
-                .neither_tests_constants_nor_imports(),
-                origin,
-                graph,
-                test_target,
-            );
-        }
+            })
+            .and_then(|()| {
+                if self.crate_target.kind == CrateTargetKind::IntegrationTest {
+                    self.test_target_violations(
+                        &TestTargetItems {
+                            crate_target: self.crate_target,
+                            items: &expanded,
+                            paths: self.paths,
+                            semantics: self.semantics,
+                        }
+                        .neither_tests_constants_nor_imports(),
+                        origin,
+                        module_findings,
+                        test_target,
+                    )
+                } else {
+                    Ok(())
+                }
+            })
     }
 
     fn contains_unresolved_reference(&self, node: &SyntaxNode) -> bool {
         node.descendants().any(|descendant| {
             ast::Path::cast(descendant.clone())
-                .is_some_and(|path| self.semantics.resolve_path(&path).is_none())
+                .is_some_and(|path| self.paths.resolve(&path).is_none())
                 || ast::MethodCallExpr::cast(descendant)
                     .is_some_and(|call| self.is_unresolved_method_call(&call))
         })
@@ -281,19 +348,22 @@ impl ModuleWalk<'_, '_> {
         declaration: &ast::Module,
         module: Module,
         origin: &SubtreeOrigin,
-        CrateModuleGraph {
+        ModuleFindings {
             configured_out_negations: ConfiguredOutNegations { declarations, .. },
             violations,
             ..
-        }: &mut CrateModuleGraph,
-    ) {
+        }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
         let database = self.semantics.db;
 
         if is_module_inside_block(database, module) {
-            violations.insert(Violation {
-                kind: ViolationKind::ModuleFileInsideBlock,
-                location: self.locate_focus(declaration.syntax(), origin),
-            });
+            self.locate_focus(declaration.syntax(), origin)
+                .map(|location| {
+                    violations.insert(Violation {
+                        kind: ViolationKind::ModuleFileInsideBlock,
+                        location,
+                    });
+                })
         } else if let Some(source_file_id) = module.as_source_file_id(database)
             && !(ConfiguredNode {
                 node: self.semantics.parse(source_file_id).syntax(),
@@ -302,7 +372,12 @@ impl ModuleWalk<'_, '_> {
             .negated_attributes()
             .is_empty()
         {
-            declarations.insert(self.locate_focus(declaration.syntax(), origin));
+            self.locate_focus(declaration.syntax(), origin)
+                .map(|location| {
+                    declarations.insert(location);
+                })
+        } else {
+            Ok(())
         }
     }
 
@@ -311,7 +386,7 @@ impl ModuleWalk<'_, '_> {
         items: &ast::AssocItemList,
         implemented: Trait,
         origin: &SubtreeOrigin,
-    ) -> Vec<Violation> {
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         let database = self.semantics.db;
         let declared = implemented.items(database);
 
@@ -339,50 +414,106 @@ impl ModuleWalk<'_, '_> {
         )
     }
 
+    fn enter(
+        &self,
+        node: &SyntaxNode,
+        file: HirFileId,
+        origin: &SubtreeOrigin,
+        preorder: &mut Preorder<RustLanguage>,
+        pending: &mut Vec<Subtree>,
+        walked: &mut WalkedModule,
+    ) -> Result<(), ModuleDependenciesError> {
+        let configured = ConfiguredNode {
+            node,
+            options: self.options,
+        };
+
+        self.negated_attributes(&configured, origin, &mut walked.findings)
+            .and_then(|negations| {
+                let predicate = self
+                    .inactive_code
+                    .get(&InFile::new(file, SyntaxNodePtr::new(node)));
+
+                if configured.is_disabled() {
+                    preorder.skip_subtree();
+                    self.inactive(node, file, negations, &mut walked.findings)
+                } else if let Some(expression) = predicate {
+                    preorder.skip_subtree();
+                    self.configured_out(node, file, expression, origin, &mut walked.findings)
+                } else {
+                    self.activate(node, file, &mut walked.findings)
+                        .and_then(|()| {
+                            self.unsafe_code(
+                                node,
+                                file,
+                                origin,
+                                &mut walked.crate_findings.unsafe_code,
+                            )
+                        })
+                        .and_then(|()| self.lint_suppressions(node, origin, &mut walked.findings))
+                        .and_then(|()| self.test_only_code(node, origin))
+                        .and_then(|test_only| {
+                            walked.findings.violations.extend(test_only);
+                            self.item(node, origin, preorder, pending, walked)
+                        })
+                }
+            })
+    }
+
     fn expand(
         &self,
         call: &ast::MacroCall,
         origin: &SubtreeOrigin,
         pending: &mut Vec<Subtree>,
-        graph: &mut CrateModuleGraph,
-    ) {
+        module_findings: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
         let database = self.semantics.db;
 
-        if let Some(expansion) = self.semantics.to_def(call) {
+        self.semantics.to_def(call).map_or(Ok(()), |expansion| {
             let call_location = expansion.lookup(database);
 
-            if let Some(included) = call_location
+            call_location
                 .include_file_id(database, expansion)
                 .map(|included| included.file_id(database))
-                && !self.token_origin.is_foreign_text(call.syntax())
-                && !self.build_script_output_files.contains(&included)
-            {
-                graph.violations.insert(Violation {
-                    kind: ViolationKind::IncludedSourceFile {
-                        file: self.locator.file(included),
-                    },
-                    location: self.locate_focus(call.syntax(), origin),
-                });
-            }
+                .filter(|included| {
+                    !self.token_origin.is_foreign_text(call.syntax())
+                        && !self.build_script_output_files.contains(included)
+                })
+                .map_or(Ok(()), |included| {
+                    self.locator.file(included).and_then(|file| {
+                        self.locate_focus(call.syntax(), origin).map(|location| {
+                            module_findings.violations.insert(Violation {
+                                kind: ViolationKind::IncludedSourceFile { file },
+                                location,
+                            });
+                        })
+                    })
+                })
+                .and_then(|()| {
+                    if matches!(
+                        call_location.def.kind,
+                        MacroDefKind::BuiltIn(_, BuiltinFnLikeExpander::CfgSelect)
+                    ) && !self.token_origin.is_foreign_text(call.syntax())
+                    {
+                        self.locate_focus(call.syntax(), origin).map(|location| {
+                            module_findings.violations.insert(Violation {
+                                kind: ViolationKind::ConfigurationSelectionMacro,
+                                location,
+                            });
+                        })
+                    } else {
+                        Ok(())
+                    }
+                })
+                .and_then(|()| {
+                    pending.extend(expansion.eager_arg(database).map(|argument| Subtree {
+                        origin: origin.expansion_of(call.syntax()),
+                        root: self.semantics.parse_or_expand(HirFileId::from(argument)),
+                    }));
 
-            if matches!(
-                call_location.def.kind,
-                MacroDefKind::BuiltIn(_, BuiltinFnLikeExpander::CfgSelect)
-            ) && !self.token_origin.is_foreign_text(call.syntax())
-            {
-                graph.violations.insert(Violation {
-                    kind: ViolationKind::ConfigurationSelectionMacro,
-                    location: self.locate_focus(call.syntax(), origin),
-                });
-            }
-
-            pending.extend(expansion.eager_arg(database).map(|argument| Subtree {
-                origin: origin.expansion_of(call.syntax()),
-                root: self.semantics.parse_or_expand(HirFileId::from(argument)),
-            }));
-
-            self.push_expansion(expansion, call.syntax(), origin, pending, graph);
-        }
+                    self.push_expansion(expansion, call.syntax(), origin, pending, module_findings)
+                })
+        })
     }
 
     fn expand_derives(
@@ -390,10 +521,9 @@ impl ModuleWalk<'_, '_> {
         derive: &ast::Meta,
         origin: &SubtreeOrigin,
         pending: &mut Vec<Subtree>,
-        graph: &mut CrateModuleGraph,
-    ) {
-        for expansion in self
-            .semantics
+        module_findings: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        self.semantics
             .expand_derive_macro(derive)
             .into_iter()
             .flatten()
@@ -401,16 +531,37 @@ impl ModuleWalk<'_, '_> {
             .filter_map(|ExpandResult { value, .. }| {
                 self.semantics.hir_file_for(&value).macro_file()
             })
-        {
-            self.push_expansion(expansion, derive.syntax(), origin, pending, graph);
-        }
+            .try_for_each(|expansion| {
+                self.push_expansion(expansion, derive.syntax(), origin, pending, module_findings)
+            })
     }
 
-    fn file_start(&self, file_id: FileId) -> SourceLocation {
+    fn file_start(&self, file_id: FileId) -> Result<SourceLocation, ModuleDependenciesError> {
         self.locator.locate(FileRangeWrapper {
             file_id,
             range: TextRange::empty(TextSize::from(0)),
         })
+    }
+
+    fn function(
+        &self,
+        function: Function,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        let usages = DefinitionUsages::new(ModuleDef::Function(function), self.semantics);
+
+        self.procedural_function(function, node, origin, &usages)
+            .and_then(|procedural| {
+                violations.extend(procedural);
+                self.function_used_only_by_tests(function, node, origin, &usages)
+            })
+            .and_then(|used_only_by_tests| {
+                violations.extend(used_only_by_tests);
+                self.referenced_test(node, origin, &usages)
+            })
+            .map(|referenced| violations.extend(referenced))
     }
 
     fn function_used_only_by_tests(
@@ -419,7 +570,7 @@ impl ModuleWalk<'_, '_> {
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
         usages: &DefinitionUsages<'_, '_>,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         let database = self.semantics.db;
 
         (function
@@ -444,17 +595,20 @@ impl ModuleWalk<'_, '_> {
                                 .is_some_and(|parent| self.test_code.contains(&parent))
                         })
             })
-        .then(|| Violation {
-            kind: ViolationKind::FunctionUsedOnlyByTests,
-            location: self.locate_focus(node, origin),
+        .then(|| {
+            self.locate_focus(node, origin).map(|location| Violation {
+                kind: ViolationKind::FunctionUsedOnlyByTests,
+                location,
+            })
         })
+        .transpose()
     }
 
     fn generic_parameter_violation(
         &self,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         ast::LifetimeParam::cast(node.clone())
             .and_then(|parameter| parameter.lifetime())
             .and_then(|lifetime| {
@@ -462,7 +616,7 @@ impl ModuleWalk<'_, '_> {
                     .as_str()
                     .strip_prefix(LIFETIME_PREFIX)
                     .and_then(|identifier| ParameterName { identifier }.single_letter_violation())
-                    .and_then(|kind| self.own_violation(kind, lifetime.syntax(), origin))
+                    .map(|kind| self.own_violation(kind, lifetime.syntax(), origin))
             })
             .or_else(|| {
                 ast::TypeParam::cast(node.clone())
@@ -472,7 +626,7 @@ impl ModuleWalk<'_, '_> {
                             identifier: name.as_name().as_str(),
                         }
                         .type_parameter_violation()
-                        .and_then(|kind| self.own_violation(kind, name.syntax(), origin))
+                        .map(|kind| self.own_violation(kind, name.syntax(), origin))
                     })
             })
             .or_else(|| {
@@ -483,9 +637,11 @@ impl ModuleWalk<'_, '_> {
                             identifier: name.as_name().as_str(),
                         }
                         .single_letter_violation()
-                        .and_then(|kind| self.own_violation(kind, name.syntax(), origin))
+                        .map(|kind| self.own_violation(kind, name.syntax(), origin))
                     })
             })
+            .transpose()
+            .map(Option::flatten)
     }
 
     fn grouped_method_order_violations(
@@ -493,7 +649,7 @@ impl ModuleWalk<'_, '_> {
         items: &ast::AssocItemList,
         owner: MethodOwner,
         origin: &SubtreeOrigin,
-    ) -> Vec<Violation> {
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         let grouping = MethodGrouping {
             krate: self.krate,
             owner,
@@ -527,6 +683,41 @@ impl ModuleWalk<'_, '_> {
         visibility.is_some_and(|visibility| !self.token_origin.is_foreign_text(visibility.syntax()))
     }
 
+    fn implementation(
+        &self,
+        written: &ast::Impl,
+        implementation: Impl,
+        origin: &SubtreeOrigin,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        self.misplacement(written, implementation, origin)
+            .and_then(|misplaced| {
+                violations.extend(misplaced);
+
+                if matches!(origin, SubtreeOrigin::SourceFile)
+                    && let Some(items) = written.assoc_item_list()
+                {
+                    implementation
+                        .trait_(self.semantics.db)
+                        .map_or_else(
+                            || {
+                                self.grouped_method_order_violations(
+                                    &items,
+                                    MethodOwner::InherentImpl(implementation),
+                                    origin,
+                                )
+                            },
+                            |implemented| {
+                                self.declared_method_order_violations(&items, implemented, origin)
+                            },
+                        )
+                        .map(|misordered| violations.extend(misordered))
+                } else {
+                    Ok(())
+                }
+            })
+    }
+
     fn implemented_type(&self, implementation: &ast::Impl) -> Option<ImplementedType<'_>> {
         self.semantics
             .to_def(implementation)
@@ -550,6 +741,7 @@ impl ModuleWalk<'_, '_> {
             && imported.iter().all(|path| {
                 LocalMacroImport {
                     path,
+                    paths: self.paths,
                     semantics: self.semantics,
                 }
                 .imported_macro()
@@ -558,30 +750,26 @@ impl ModuleWalk<'_, '_> {
     }
 
     fn in_test_gated_code(&self, node: &SyntaxNode) -> bool {
-        let known = self.test_gated_code.borrow().get(node).copied();
-
-        known.unwrap_or_else(|| {
-            let gated = self.is_test_gated(node)
-                || Ancestry {
-                    node,
-                    semantics: self.semantics,
-                }
-                .enclosing()
-                .is_some_and(|enclosing| self.in_test_gated_code(&enclosing));
-
-            self.test_gated_code
-                .borrow_mut()
-                .insert(node.clone(), gated);
-
-            gated
-        })
+        self.test_gated_code.get_or_init(
+            InFile::new(self.semantics.hir_file_for(node), SyntaxNodePtr::new(node)),
+            || {
+                self.is_test_gated(node)
+                    || Ancestry {
+                        node,
+                        semantics: self.semantics,
+                    }
+                    .enclosing()
+                    .is_some_and(|enclosing| self.in_test_gated_code(&enclosing))
+            },
+        )
     }
 
     fn inactive(
         &self,
         node: &SyntaxNode,
+        file: HirFileId,
         negations: BTreeSet<SourceLocation>,
-        CrateModuleGraph {
+        ModuleFindings {
             walked_code:
                 WalkedCode {
                     inactive_foci,
@@ -589,9 +777,8 @@ impl ModuleWalk<'_, '_> {
                     ..
                 },
             ..
-        }: &mut CrateModuleGraph,
-    ) {
-        let file = self.semantics.hir_file_for(node);
+        }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
         let focus_range = ItemFocus {
             node,
             semantics: self.semantics,
@@ -600,31 +787,39 @@ impl ModuleWalk<'_, '_> {
         let focus = self.token_origin.written_range(file, focus_range);
         let tokens = self.written_tokens(file, code_tokens(node.descendants_with_tokens()));
 
-        self.record_own_tokens(file, &tokens, inactive_tokens);
-
-        if self
-            .token_origin
-            .is_own_written_text(file, focus_range, &focus)
-            && !self.is_compile_error_call(node)
-        {
-            inactive_foci.insert(InactiveFocus {
-                location: self.locator.locate(focus),
-                negations,
-                token_starts: tokens
-                    .iter()
-                    .filter(|WrittenToken { token, .. }| {
-                        focus_range.contains_range(token.text_range())
+        self.record_own_tokens(file, &tokens, inactive_tokens)
+            .and_then(|()| {
+                if self
+                    .token_origin
+                    .is_own_written_text(file, focus_range, &focus)
+                    && !self.is_compile_error_call(node)
+                {
+                    self.locator.locate(focus).map(|location| {
+                        inactive_foci.insert(InactiveFocus {
+                            location,
+                            negations,
+                            token_starts: tokens
+                                .iter()
+                                .filter(|WrittenToken { token, .. }| {
+                                    focus_range.contains_range(token.text_range())
+                                })
+                                .filter(|WrittenToken { written, .. }| {
+                                    written.file_id == focus.file_id
+                                })
+                                .map(|WrittenToken { written, .. }| {
+                                    u32::from(written.range.start())
+                                })
+                                .collect(),
+                        });
                     })
-                    .filter(|WrittenToken { written, .. }| written.file_id == focus.file_id)
-                    .map(|WrittenToken { written, .. }| u32::from(written.range.start()))
-                    .collect(),
-            });
-        }
+                } else {
+                    Ok(())
+                }
+            })
     }
 
-    fn integrates_foreign_code(&self, node: &SyntaxNode) -> bool {
+    fn integrates_foreign_code(&self, node: &SyntaxNode, file: HirFileId) -> bool {
         let database = self.semantics.db;
-        let file = self.semantics.hir_file_for(node);
 
         (ast::ExternBlock::can_cast(node.kind())
             && self.token_origin.is_own_text(
@@ -653,7 +848,7 @@ impl ModuleWalk<'_, '_> {
                     self.token_origin
                         .is_own_text(file, path.syntax().text_range())
                 })
-                .and_then(|path| self.semantics.resolve_path(&path))
+                .and_then(|path| self.paths.resolve(&path))
                 .is_some_and(|resolution| match resolution {
                     PathResolution::Def(ModuleDef::Function(function)) => {
                         function.extern_block(database).is_some()
@@ -699,18 +894,17 @@ impl ModuleWalk<'_, '_> {
     ) -> bool {
         let database = self.semantics.db;
 
-        self.reads_its_receiver(function)
-            || function.as_assoc_item(database).is_some_and(|item| {
-                item.container_or_implemented_trait(database).is_some()
-                    || item.implementing_ty(database).is_some_and(|self_type| {
-                        Constructor {
-                            function,
-                            krate: self.krate,
-                            semantics: self.semantics,
-                        }
-                        .constructs(&self_type)
-                    })
-            })
+        function.as_assoc_item(database).is_some_and(|item| {
+            item.container_or_implemented_trait(database).is_some()
+                || item.implementing_ty(database).is_some_and(|self_type| {
+                    Constructor {
+                        function,
+                        krate: self.krate,
+                        semantics: self.semantics,
+                    }
+                    .constructs(&self_type)
+                })
+        }) || self.reads_its_receiver(function)
             || FileLocalItem {
                 file_id: original_file_id(database, self.semantics.hir_file_for(node)),
                 usages,
@@ -792,20 +986,69 @@ impl ModuleWalk<'_, '_> {
         self.semantics.resolve_method_call(call).is_none()
     }
 
+    fn item(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+        preorder: &mut Preorder<RustLanguage>,
+        pending: &mut Vec<Subtree>,
+        walked: &mut WalkedModule,
+    ) -> Result<(), ModuleDependenciesError> {
+        match ast::Item::cast(node.clone()).map_or(ItemExpansion::Unexpanded, |item| {
+            ItemExpansion::new(&item, self.semantics)
+        }) {
+            ItemExpansion::Parsable { generated, written } => {
+                preorder.skip_subtree();
+                pending.extend(written.iter().map(|item| Subtree {
+                    origin: origin.clone(),
+                    root: item.syntax().clone(),
+                }));
+                pending.extend(generated.iter().map(|item| Subtree {
+                    origin: origin.expansion_of(node),
+                    root: item.syntax().clone(),
+                }));
+
+                Ok(())
+            }
+            ItemExpansion::Unexpanded => match ast::Item::cast(node.clone())
+                .map_or(ItemDefinition::NotDefining, |item| {
+                    ItemDefinition::new(&item, self.semantics)
+                }) {
+                ItemDefinition::Unmapped => {
+                    preorder.skip_subtree();
+                    self.locate_focus(node, origin).map(|location| {
+                        walked.findings.violations.insert(Violation {
+                            kind: ViolationKind::UnmappedItem,
+                            location,
+                        });
+                    })
+                }
+                definition => self.visit(node, &definition, origin, pending, walked),
+            },
+            ItemExpansion::Unparsable { call } => {
+                preorder.skip_subtree();
+                self.locate_focus(node, origin).and_then(|location| {
+                    self.unparsable(call, location, &mut walked.findings.violations)
+                })
+            }
+        }
+    }
+
     fn item_name(item: &ast::Item) -> Option<ast::Name> {
         ast::AnyHasName::cast(item.syntax().clone()).and_then(|named| named.name())
     }
 
     fn item_order_violations(
         &self,
-        container: &SyntaxNode,
+        items: &[ast::Item],
         origin: &SubtreeOrigin,
-    ) -> Vec<Violation> {
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         self.order_violations(
             ItemOrder {
-                container,
+                items,
                 krate: self.krate,
                 options: self.options,
+                paths: self.paths,
                 semantics: self.semantics,
                 token_origin: self.token_origin,
             }
@@ -828,11 +1071,14 @@ impl ModuleWalk<'_, '_> {
         items: impl Iterator<Item = &'items ast::Item>,
         kind: &ViolationKind,
         origin: &SubtreeOrigin,
-    ) -> Vec<Violation> {
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         items
-            .map(|item| Violation {
-                kind: kind.clone(),
-                location: self.locate_focus(item.syntax(), origin),
+            .map(|item| {
+                self.locate_focus(item.syntax(), origin)
+                    .map(|location| Violation {
+                        kind: kind.clone(),
+                        location,
+                    })
             })
             .collect()
     }
@@ -841,40 +1087,48 @@ impl ModuleWalk<'_, '_> {
         &self,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
-        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
-    ) {
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
         let holds_workspace_text = OnceCell::new();
 
-        violations.extend(
-            LintSuppressions {
-                node,
-                options: self.options,
-                semantics: self.semantics,
-            }
-            .attributes()
-            .iter()
-            .filter(|meta| {
-                (self.token_origin.is_workspace_text(meta.syntax())
-                    || self
-                        .token_origin
-                        .is_generated_by_a_workspace_macro(meta.syntax()))
-                    && *holds_workspace_text.get_or_init(|| {
-                        CoveredCode {
-                            options: self.options,
-                            semantics: self.semantics,
-                            token_origin: self.token_origin,
-                        }
-                        .holds_workspace_text(node)
-                    })
-            })
-            .map(|meta| Violation {
-                kind: ViolationKind::LintSuppression,
-                location: self.locate(meta.syntax(), origin),
-            }),
-        );
+        LintSuppressions {
+            node,
+            options: self.options,
+            paths: self.paths,
+            semantics: self.semantics,
+        }
+        .attributes()
+        .iter()
+        .filter(|meta| {
+            (self.token_origin.is_workspace_text(meta.syntax())
+                || self
+                    .token_origin
+                    .is_generated_by_a_workspace_macro(meta.syntax()))
+                && *holds_workspace_text.get_or_init(|| {
+                    CoveredCode {
+                        options: self.options,
+                        semantics: self.semantics,
+                        token_origin: self.token_origin,
+                    }
+                    .holds_workspace_text(node)
+                })
+        })
+        .map(|meta| {
+            self.locate(meta.syntax(), origin)
+                .map(|location| Violation {
+                    kind: ViolationKind::LintSuppression,
+                    location,
+                })
+        })
+        .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
+        .map(|suppressions| violations.extend(suppressions))
     }
 
-    fn locate(&self, node: &SyntaxNode, origin: &SubtreeOrigin) -> SourceLocation {
+    fn locate(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<SourceLocation, ModuleDependenciesError> {
         self.locate_original(
             self.semantics
                 .diagnostics_display_range_for_range(InFile::new(
@@ -885,7 +1139,11 @@ impl ModuleWalk<'_, '_> {
         )
     }
 
-    fn locate_focus(&self, node: &SyntaxNode, origin: &SubtreeOrigin) -> SourceLocation {
+    fn locate_focus(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<SourceLocation, ModuleDependenciesError> {
         self.locate_original(
             ItemFocus {
                 node,
@@ -900,7 +1158,7 @@ impl ModuleWalk<'_, '_> {
         &self,
         original: FileRangeWrapper<FileId>,
         origin: &SubtreeOrigin,
-    ) -> SourceLocation {
+    ) -> Result<SourceLocation, ModuleDependenciesError> {
         match origin {
             SubtreeOrigin::MacroCall(outermost)
                 if !self.token_origin.is_own_file(original.file_id) =>
@@ -938,11 +1196,14 @@ impl ModuleWalk<'_, '_> {
         }
     }
 
-    fn misplaced_impl_kind(&self, home: &LocalImplHome, file: FileId) -> ViolationKind {
+    fn misplaced_impl_kind(
+        &self,
+        home: &LocalImplHome,
+        file: FileId,
+    ) -> Result<ViolationKind, ModuleDependenciesError> {
         let database = self.semantics.db;
-        let home_file = self.locator.file(file);
 
-        match home {
+        self.locator.file(file).map(|home_file| match home {
             LocalImplHome::Type { .. } | LocalImplHome::TypeArgument { .. } => {
                 ViolationKind::MisplacedImpl {
                     type_file: home_file,
@@ -961,7 +1222,7 @@ impl ModuleWalk<'_, '_> {
                     .display(database, self.krate.edition(database))
                     .to_string(),
             },
-        }
+        })
     }
 
     fn misplacement(
@@ -969,88 +1230,97 @@ impl ModuleWalk<'_, '_> {
         implementation: &ast::Impl,
         definition: Impl,
         origin: &SubtreeOrigin,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         let database = self.semantics.db;
         let written_in = original_file_id(
             database,
             self.semantics.hir_file_for(implementation.syntax()),
         );
-        let location = self.locate_focus(implementation.syntax(), origin);
 
-        match (ImplementedType {
-            database,
-            implementation: definition,
-            krate: self.krate,
-        })
-        .home(&trait_arguments(implementation, self.semantics))
-        {
-            ImplHome::Foreign => Some(Violation {
-                kind: ViolationKind::ImplWithoutLocalType,
-                location,
-            }),
-            ImplHome::Local { home } => {
-                home.file(database)
-                    .filter(|file| *file != written_in)
-                    .map(|file| Violation {
-                        kind: self.misplaced_impl_kind(&home, file),
+        self.locate_focus(implementation.syntax(), origin)
+            .and_then(|location| {
+                match (ImplementedType {
+                    database,
+                    implementation: definition,
+                    krate: self.krate,
+                })
+                .home(&trait_arguments(implementation, self.semantics))
+                {
+                    ImplHome::Foreign => Ok(Some(Violation {
+                        kind: ViolationKind::ImplWithoutLocalType,
                         location,
-                    })
-            }
-        }
+                    })),
+                    ImplHome::Local { home } => home
+                        .file(database)
+                        .filter(|file| *file != written_in)
+                        .map(|file| {
+                            self.misplaced_impl_kind(&home, file)
+                                .map(|kind| Violation { kind, location })
+                        })
+                        .transpose(),
+                }
+            })
     }
 
     fn module_item<'items>(
         &self,
         container: &SyntaxNode,
         public_items: &'items [ast::Item],
-    ) -> ModuleItem<'items> {
+    ) -> Result<ModuleItem<'items>, ModuleDependenciesError> {
         self.semantics
             .scope(container)
-            .and_then(|scope| self.module_name(scope.module()))
-            .map_or_else(
-                || {
-                    public_items
-                        .first()
-                        .map_or(ModuleItem::Absent, ModuleItem::Accepted)
-                },
-                |module| {
-                    public_items
-                        .iter()
-                        .find(|item| {
-                            Self::item_name(item).is_some_and(|name| {
-                                NameWords { name: name.text() }.are_spelled_by(&module)
-                            })
-                        })
-                        .map_or_else(
-                            || {
-                                public_items.first().map_or(ModuleItem::Absent, |item| {
-                                    ModuleItem::Misnamed { item, module }
+            .map(|scope| self.module_name(scope.module()))
+            .transpose()
+            .map(|module_name| {
+                module_name.flatten().map_or_else(
+                    || {
+                        public_items
+                            .first()
+                            .map_or(ModuleItem::Absent, ModuleItem::Accepted)
+                    },
+                    |module| {
+                        public_items
+                            .iter()
+                            .find(|item| {
+                                Self::item_name(item).is_some_and(|name| {
+                                    NameWords { name: name.text() }.are_spelled_by(&module)
                                 })
-                            },
-                            ModuleItem::Accepted,
-                        )
-                },
-            )
+                            })
+                            .map_or_else(
+                                || {
+                                    public_items.first().map_or(ModuleItem::Absent, |item| {
+                                        ModuleItem::Misnamed { item, module }
+                                    })
+                                },
+                                ModuleItem::Accepted,
+                            )
+                    },
+                )
+            })
     }
 
-    fn module_name(&self, module: Module) -> Option<String> {
+    fn module_name(&self, module: Module) -> Result<Option<String>, ModuleDependenciesError> {
         let database = self.semantics.db;
 
-        module.name(database).and_then(|name| {
+        module.name(database).map_or(Ok(None), |name| {
             if module.is_inline(database) {
-                Some(name.as_str().to_owned())
+                Ok(Some(name.as_str().to_owned()))
             } else {
-                let path = self.locator.files.path(original_file_id(
-                    database,
-                    module.definition_source_file_id(database),
-                ));
+                let file_id =
+                    original_file_id(database, module.definition_source_file_id(database));
 
-                if module.is_mod_rs(database) {
-                    path.parent().and_then(AbsPath::file_name)
-                } else {
-                    path.file_stem()
-                }
-                .map(str::to_owned)
+                self.locator
+                    .files
+                    .file(file_id)
+                    .ok_or(ModuleDependenciesError::UnknownSourceFile(file_id))
+                    .map(|SourceFile { path, .. }| {
+                        if module.is_mod_rs(database) {
+                            path.parent().and_then(AbsPath::file_name)
+                        } else {
+                            path.file_stem()
+                        }
+                        .map(str::to_owned)
+                    })
             }
         })
     }
@@ -1059,21 +1329,24 @@ impl ModuleWalk<'_, '_> {
         &self,
         module_item: ModuleItem<'_>,
         origin: &SubtreeOrigin,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         match module_item {
-            ModuleItem::Misnamed { item, module } => Self::item_name(item).map(|name| {
-                let text = name.text();
+            ModuleItem::Misnamed { item, module } => Self::item_name(item)
+                .map(|name| {
+                    let text = name.text();
 
-                Violation {
-                    kind: ViolationKind::ModuleNotNamedAfterItsItem {
-                        expected: NameWords { name: text }.snake_case(),
-                        item: text.to_owned(),
-                        module,
-                    },
-                    location: self.locate_focus(item.syntax(), origin),
-                }
-            }),
-            ModuleItem::Absent | ModuleItem::Accepted(_) => None,
+                    self.locate_focus(item.syntax(), origin)
+                        .map(|location| Violation {
+                            kind: ViolationKind::ModuleNotNamedAfterItsItem {
+                                expected: NameWords { name: text }.snake_case(),
+                                item: text.to_owned(),
+                                module,
+                            },
+                            location,
+                        })
+                })
+                .transpose(),
+            ModuleItem::Absent | ModuleItem::Accepted(_) => Ok(None),
         }
     }
 
@@ -1081,41 +1354,44 @@ impl ModuleWalk<'_, '_> {
         &self,
         configured: &ConfiguredNode<'_>,
         origin: &SubtreeOrigin,
-        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
-    ) -> BTreeSet<SourceLocation> {
-        let negations: BTreeSet<SourceLocation> = configured
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<BTreeSet<SourceLocation>, ModuleDependenciesError> {
+        configured
             .negated_attributes()
             .iter()
             .filter(|attribute| !self.token_origin.is_foreign_text(attribute.syntax()))
             .map(|attribute| self.locate(attribute.syntax(), origin))
-            .collect();
-
-        violations.extend(negations.iter().map(|location| Violation {
-            kind: ViolationKind::NegatedConfiguration,
-            location: location.clone(),
-        }));
-
-        negations
+            .collect::<Result<BTreeSet<SourceLocation>, ModuleDependenciesError>>()
+            .inspect(|negations| {
+                violations.extend(negations.iter().map(|location| Violation {
+                    kind: ViolationKind::NegatedConfiguration,
+                    location: location.clone(),
+                }));
+            })
     }
 
     fn non_doc_comments(
         &self,
         file_id: FileId,
         root: &SyntaxNode,
-        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
-    ) {
-        violations.extend(
-            root.descendants_with_tokens()
-                .filter_map(NodeOrToken::into_token)
-                .filter_map(ast::Comment::cast)
-                .map(|comment| Violation {
-                    kind: ViolationKind::NonDocComment,
-                    location: self.locator.locate(FileRangeWrapper {
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        root.descendants_with_tokens()
+            .filter_map(NodeOrToken::into_token)
+            .filter_map(ast::Comment::cast)
+            .map(|comment| {
+                self.locator
+                    .locate(FileRangeWrapper {
                         file_id,
                         range: comment.syntax().text_range(),
-                    }),
-                }),
-        );
+                    })
+                    .map(|location| Violation {
+                        kind: ViolationKind::NonDocComment,
+                        location,
+                    })
+            })
+            .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
+            .map(|comments| violations.extend(comments))
     }
 
     fn order_violations<TKey: Ord>(
@@ -1123,7 +1399,7 @@ impl ModuleWalk<'_, '_> {
         OrderedEntries { entries }: OrderedEntries<TKey>,
         kind: impl Fn(&TKey, &TKey, String) -> ViolationKind,
         origin: &SubtreeOrigin,
-    ) -> Vec<Violation> {
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         OrderedEntries {
             entries: entries
                 .into_iter()
@@ -1141,17 +1417,20 @@ impl ModuleWalk<'_, '_> {
         }
         .misordered()
         .iter()
-        .map(|MisorderedEntry { entry, preceding }| Violation {
-            kind: kind(
-                &entry.key,
-                &preceding.key,
-                ItemFocus {
-                    node: &preceding.node,
-                    semantics: self.semantics,
-                }
-                .text(),
-            ),
-            location: self.locate_focus(&entry.node, origin),
+        .map(|MisorderedEntry { entry, preceding }| {
+            self.locate_focus(&entry.node, origin)
+                .map(|location| Violation {
+                    kind: kind(
+                        &entry.key,
+                        &preceding.key,
+                        ItemFocus {
+                            node: &preceding.node,
+                            semantics: self.semantics,
+                        }
+                        .text(),
+                    ),
+                    location,
+                })
         })
         .collect()
     }
@@ -1161,20 +1440,21 @@ impl ModuleWalk<'_, '_> {
         kind: ViolationKind,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         self.token_origin
             .is_own_text(self.semantics.hir_file_for(node), node.text_range())
-            .then(|| Violation {
-                kind,
-                location: self.locate(node, origin),
+            .then(|| {
+                self.locate(node, origin)
+                    .map(|location| Violation { kind, location })
             })
+            .transpose()
     }
 
     fn parameter_violations(
         &self,
         parameter: &ast::Param,
         origin: &SubtreeOrigin,
-    ) -> Vec<Violation> {
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         parameter
             .pat()
             .into_iter()
@@ -1187,10 +1467,11 @@ impl ModuleWalk<'_, '_> {
                     identifier: name.as_name().as_str(),
                 }
                 .single_letter_violation()
-                .and_then(|kind| self.own_violation(kind, name.syntax(), origin))
+                .map(|kind| self.own_violation(kind, name.syntax(), origin))
             })
-            .chain(self.undestructured_parameter(parameter, origin))
-            .collect()
+            .chain(iter::once(self.undestructured_parameter(parameter, origin)))
+            .collect::<Result<Vec<Option<Violation>>, ModuleDependenciesError>>()
+            .map(|violations| violations.into_iter().flatten().collect())
     }
 
     fn procedural_function(
@@ -1199,7 +1480,7 @@ impl ModuleWalk<'_, '_> {
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
         usages: &DefinitionUsages<'_, '_>,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         let database = self.semantics.db;
 
         function
@@ -1213,15 +1494,18 @@ impl ModuleWalk<'_, '_> {
                 })
             })
             .filter(|_| !self.is_exempt_from_the_procedural_rule(function, node, usages))
-            .map(|adt| Violation {
-                kind: ViolationKind::ProceduralFunction {
-                    type_name: adt
-                        .name(database)
-                        .display(database, self.krate.edition(database))
-                        .to_string(),
-                },
-                location: self.locate_focus(node, origin),
+            .map(|adt| {
+                self.locate_focus(node, origin).map(|location| Violation {
+                    kind: ViolationKind::ProceduralFunction {
+                        type_name: adt
+                            .name(database)
+                            .display(database, self.krate.edition(database))
+                            .to_string(),
+                    },
+                    location,
+                })
             })
+            .transpose()
     }
 
     fn push_expansion(
@@ -1230,8 +1514,8 @@ impl ModuleWalk<'_, '_> {
         call: &SyntaxNode,
         origin: &SubtreeOrigin,
         pending: &mut Vec<Subtree>,
-        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
-    ) {
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
         if (MacroExpansion {
             call: expansion,
             database: self.semantics.db,
@@ -1243,8 +1527,11 @@ impl ModuleWalk<'_, '_> {
                 origin: origin.expansion_of(call),
                 root: self.semantics.parse_or_expand(HirFileId::from(expansion)),
             });
+
+            Ok(())
         } else {
-            self.unparsable(expansion, self.locate(call, origin), violations);
+            self.locate(call, origin)
+                .and_then(|location| self.unparsable(expansion, location, violations))
         }
     }
 
@@ -1272,17 +1559,18 @@ impl ModuleWalk<'_, '_> {
         &self,
         path: &ast::Path,
         origin: &SubtreeOrigin,
-        CrateModuleGraph {
+        ModuleFindings {
             dependencies,
             unresolved_foreign_references,
             violations,
             ..
-        }: &mut CrateModuleGraph,
-    ) {
+        }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
         match (PathReference {
             krate: self.krate,
             module_paths: self.module_paths,
             path,
+            paths: self.paths,
             scope: match origin {
                 SubtreeOrigin::MacroCall(outermost) => outermost,
                 SubtreeOrigin::SourceFile => path.syntax(),
@@ -1293,33 +1581,47 @@ impl ModuleWalk<'_, '_> {
         .outcome()
         {
             PathReferenceOutcome::Dependency(referenced) => {
-                dependencies.insert(ModuleDependency {
-                    from: referenced.from,
-                    location: self.locate(path.syntax(), origin),
-                    to: referenced.to,
-                });
+                self.locate(path.syntax(), origin).map(|location| {
+                    dependencies.insert(ModuleDependency {
+                        from: referenced.from,
+                        location,
+                        to: referenced.to,
+                    });
+                })
             }
-            PathReferenceOutcome::Irrelevant => {}
+            PathReferenceOutcome::Irrelevant => Ok(()),
             PathReferenceOutcome::Unresolved => {
-                violations.insert(Violation {
-                    kind: ViolationKind::UnresolvedPath,
-                    location: self.locate(path.syntax(), origin),
-                });
+                self.locate(path.syntax(), origin).map(|location| {
+                    violations.insert(Violation {
+                        kind: ViolationKind::UnresolvedPath,
+                        location,
+                    });
+                })
             }
             PathReferenceOutcome::UnresolvedInForeignModule { crate_name, module } => {
-                unresolved_foreign_references.insert(UnresolvedForeignReference {
-                    location: self.locate(path.syntax(), origin),
-                    module: ForeignModule {
-                        file: self.locator.file(original_file_id(
+                self.locate(path.syntax(), origin).and_then(|location| {
+                    self.locator
+                        .file(original_file_id(
                             self.semantics.db,
                             module.definition_source_file_id(self.semantics.db),
-                        )),
-                        name: iter::once(crate_name)
-                            .chain(self.module_paths.path(module).segments)
-                            .collect::<Vec<String>>()
-                            .join("::"),
-                    },
-                });
+                        ))
+                        .map(|file| {
+                            unresolved_foreign_references.insert(UnresolvedForeignReference {
+                                location,
+                                module: ForeignModule {
+                                    file,
+                                    name: iter::once(crate_name)
+                                        .chain(
+                                            self.module_paths
+                                                .path(self.semantics.db, module)
+                                                .segments,
+                                        )
+                                        .collect::<Vec<String>>()
+                                        .join("::"),
+                                },
+                            });
+                        })
+                })
             }
         }
     }
@@ -1329,18 +1631,18 @@ impl ModuleWalk<'_, '_> {
         file: HirFileId,
         tokens: &[WrittenToken],
         recorded: &mut WrittenTokens,
-    ) {
-        for WrittenToken { token, written } in tokens {
-            if self
-                .token_origin
-                .is_own_written_text(file, token.text_range(), written)
-            {
-                recorded.insert(
-                    self.locator.file(written.file_id),
-                    u32::from(written.range.start()),
-                );
-            }
-        }
+    ) -> Result<(), ModuleDependenciesError> {
+        tokens
+            .iter()
+            .filter(|WrittenToken { token, written }| {
+                self.token_origin
+                    .is_own_written_text(file, token.text_range(), written)
+            })
+            .try_for_each(|WrittenToken { written, .. }| {
+                self.locator.file(written.file_id).map(|written_file| {
+                    recorded.insert(written_file, u32::from(written.range.start()));
+                })
+            })
     }
 
     fn referenced_test(
@@ -1348,39 +1650,56 @@ impl ModuleWalk<'_, '_> {
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
         usages: &DefinitionUsages<'_, '_>,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         ast::Item::cast(node.clone())
             .filter(|item| {
                 AttributedItem {
                     item,
+                    paths: self.paths,
                     semantics: self.semantics,
                 }
                 .has_test_attribute()
                     && !usages.all().references.is_empty()
             })
-            .map(|_| Violation {
-                kind: ViolationKind::ReferencedTest,
-                location: self.locate_focus(node, origin),
+            .map(|_| {
+                self.locate_focus(node, origin).map(|location| Violation {
+                    kind: ViolationKind::ReferencedTest,
+                    location,
+                })
             })
+            .transpose()
     }
 
-    fn signature_violations(&self, node: &SyntaxNode, origin: &SubtreeOrigin) -> Vec<Violation> {
+    fn signature_violations(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         ast::Param::cast(node.clone()).map_or_else(
             || {
                 ast::TupleType::cast(node.clone())
                     .filter(|tuple| SignatureTuple { tuple }.is_in_a_signature())
-                    .and_then(|tuple| {
-                        self.own_violation(ViolationKind::TupleInSignature, tuple.syntax(), origin)
-                    })
-                    .or_else(|| self.generic_parameter_violation(node, origin))
-                    .into_iter()
-                    .collect()
+                    .map_or_else(
+                        || self.generic_parameter_violation(node, origin),
+                        |tuple| {
+                            self.own_violation(
+                                ViolationKind::TupleInSignature,
+                                tuple.syntax(),
+                                origin,
+                            )
+                        },
+                    )
+                    .map(|violation| violation.into_iter().collect())
             },
             |parameter| self.parameter_violations(&parameter, origin),
         )
     }
 
-    fn test_only_code(&self, node: &SyntaxNode, origin: &SubtreeOrigin) -> Option<Violation> {
+    fn test_only_code(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         (self.is_test_gated(node)
             && !self.token_origin.is_foreign_text(node)
             && !self.test_code.contains(node)
@@ -1390,69 +1709,75 @@ impl ModuleWalk<'_, '_> {
             }
             .enclosing()
             .is_some_and(|enclosing| self.in_test_gated_code(&enclosing)))
-        .then(|| Violation {
-            kind: ViolationKind::TestOnlyCodeInProduction,
-            location: self.locate_focus(node, origin),
+        .then(|| {
+            self.locate_focus(node, origin).map(|location| Violation {
+                kind: ViolationKind::TestOnlyCodeInProduction,
+                location,
+            })
         })
+        .transpose()
     }
 
     fn test_target_violations(
         &self,
         items: &[ast::Item],
         origin: &SubtreeOrigin,
-        CrateModuleGraph { violations, .. }: &mut CrateModuleGraph,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
         TestTargetFindings {
             accepted,
             impl_blocks,
             types,
         }: &mut TestTargetFindings,
-    ) {
-        for item in items {
-            let violation = Violation {
-                kind: ViolationKind::NonTestItemInTestTarget,
-                location: self.locate_focus(item.syntax(), origin),
-            };
+    ) -> Result<(), ModuleDependenciesError> {
+        items.iter().try_for_each(|item| {
+            self.locate_focus(item.syntax(), origin).map(|location| {
+                let violation = Violation {
+                    kind: ViolationKind::NonTestItemInTestTarget,
+                    location,
+                };
 
-            if let ItemDefinition::ModuleDef(definition) = ItemDefinition::new(item, self.semantics)
-                && (FileLocalItem {
-                    file_id: original_file_id(
-                        self.semantics.db,
-                        self.semantics.hir_file_for(item.syntax()),
-                    ),
-                    usages: &DefinitionUsages::new(definition, self.semantics),
+                if let ItemDefinition::ModuleDef(definition) =
+                    ItemDefinition::new(item, self.semantics)
+                    && (FileLocalItem {
+                        file_id: original_file_id(
+                            self.semantics.db,
+                            self.semantics.hir_file_for(item.syntax()),
+                        ),
+                        usages: &DefinitionUsages::new(definition, self.semantics),
+                    })
+                    .is_file_local()
+                {
+                    if let ModuleDef::Adt(adt) = definition {
+                        accepted.push(adt);
+                    }
+                } else if let Some(adt) = (ItemAdt {
+                    item,
+                    semantics: self.semantics,
                 })
-                .is_file_local()
-            {
-                if let ModuleDef::Adt(adt) = definition {
-                    accepted.push(adt);
+                .adt()
+                {
+                    types.push(AdtViolation {
+                        adt,
+                        violation: violation.clone(),
+                    });
+                    violations.insert(violation);
+                } else if let Some(adt) = ast::Impl::cast(item.syntax().clone())
+                    .and_then(|implementation| self.implemented_type(&implementation))
+                    .and_then(|implemented| implemented.adt())
+                {
+                    impl_blocks.push(AdtViolation { adt, violation });
+                } else {
+                    violations.insert(violation);
                 }
-            } else if let Some(adt) = (ItemAdt {
-                item,
-                semantics: self.semantics,
             })
-            .adt()
-            {
-                types.push(AdtViolation {
-                    adt,
-                    violation: violation.clone(),
-                });
-                violations.insert(violation);
-            } else if let Some(adt) = ast::Impl::cast(item.syntax().clone())
-                .and_then(|implementation| self.implemented_type(&implementation))
-                .and_then(|implemented| implemented.adt())
-            {
-                impl_blocks.push(AdtViolation { adt, violation });
-            } else {
-                violations.insert(violation);
-            }
-        }
+        })
     }
 
     fn undestructured_parameter(
         &self,
         parameter: &ast::Param,
         origin: &SubtreeOrigin,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         let database = self.semantics.db;
 
         parameter
@@ -1470,15 +1795,19 @@ impl ModuleWalk<'_, '_> {
                     token_origin: self.token_origin,
                 }
                 .destructurable_type()
-                .map(|held| Violation {
-                    kind: ViolationKind::UndestructuredParameter {
-                        type_name: held
-                            .display(database, self.krate.to_display_target(database))
-                            .to_string(),
-                    },
-                    location: self.locate_focus(binding.syntax(), origin),
+                .map(|held| {
+                    self.locate_focus(binding.syntax(), origin)
+                        .map(|location| Violation {
+                            kind: ViolationKind::UndestructuredParameter {
+                                type_name: held
+                                    .display(database, self.krate.to_display_target(database))
+                                    .to_string(),
+                            },
+                            location,
+                        })
                 })
             })
+            .transpose()
     }
 
     fn unparsable(
@@ -1486,7 +1815,7 @@ impl ModuleWalk<'_, '_> {
         call: MacroCallId,
         location: SourceLocation,
         violations: &mut ViolationSet,
-    ) {
+    ) -> Result<(), ModuleDependenciesError> {
         let violation = Violation {
             kind: ViolationKind::UnparsableMacroExpansion,
             location,
@@ -1494,22 +1823,24 @@ impl ModuleWalk<'_, '_> {
 
         violations.insert(violation.clone());
 
-        for finding in (ExpansionChain {
+        (ExpansionChain {
             call,
             locator: self.locator,
             semantics: self.semantics,
         })
         .findings()
-        {
-            violations.fold(violation.clone(), finding);
-        }
+        .map(|findings| {
+            for finding in findings {
+                violations.fold(violation.clone(), finding);
+            }
+        })
     }
 
     fn unresolved_method_call(
         &self,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
-    ) -> Option<Violation> {
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
         ast::MethodCallExpr::cast(node.clone())
             .filter(|call| {
                 self.is_unresolved_method_call(call)
@@ -1519,44 +1850,50 @@ impl ModuleWalk<'_, '_> {
             })
             .and_then(|call| call.name_ref())
             .filter(|name| !self.token_origin.is_foreign_text(name.syntax()))
-            .map(|name| Violation {
-                kind: ViolationKind::UnresolvedMethodCall,
-                location: self.locate(name.syntax(), origin),
+            .map(|name| {
+                self.locate(name.syntax(), origin)
+                    .map(|location| Violation {
+                        kind: ViolationKind::UnresolvedMethodCall,
+                        location,
+                    })
             })
+            .transpose()
     }
 
     fn unsafe_code(
         &self,
         node: &SyntaxNode,
+        file: HirFileId,
         origin: &SubtreeOrigin,
         UnsafeCodeFindings {
             integrates_foreign_code,
             sites,
         }: &mut UnsafeCodeFindings,
-    ) {
-        let file = self.semantics.hir_file_for(node);
-
-        sites.extend(
-            code_tokens(node.children_with_tokens())
-                .filter(|token| {
-                    token.kind() == T![unsafe]
-                        && !ast::FnPtrType::can_cast(node.kind())
-                        && !ast::TokenTree::can_cast(node.kind())
-                        && self.token_origin.is_own_text(file, token.text_range())
-                })
-                .map(|token| Violation {
+    ) -> Result<(), ModuleDependenciesError> {
+        code_tokens(node.children_with_tokens())
+            .filter(|token| {
+                token.kind() == T![unsafe]
+                    && !ast::FnPtrType::can_cast(node.kind())
+                    && !ast::TokenTree::can_cast(node.kind())
+                    && self.token_origin.is_own_text(file, token.text_range())
+            })
+            .map(|token| {
+                self.locate_original(
+                    self.semantics
+                        .diagnostics_display_range_for_range(InFile::new(file, token.text_range())),
+                    origin,
+                )
+                .map(|location| Violation {
                     kind: ViolationKind::UnsafeCode,
-                    location: self.locate_original(
-                        self.semantics
-                            .diagnostics_display_range_for_range(InFile::new(
-                                file,
-                                token.text_range(),
-                            )),
-                        origin,
-                    ),
-                }),
-        );
-        *integrates_foreign_code = *integrates_foreign_code || self.integrates_foreign_code(node);
+                    location,
+                })
+            })
+            .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
+            .map(|unsafe_sites| {
+                sites.extend(unsafe_sites);
+                *integrates_foreign_code =
+                    *integrates_foreign_code || self.integrates_foreign_code(node, file);
+            })
     }
 
     fn visit(
@@ -1565,209 +1902,109 @@ impl ModuleWalk<'_, '_> {
         definition: &ItemDefinition,
         origin: &SubtreeOrigin,
         pending: &mut Vec<Subtree>,
-        graph: &mut CrateModuleGraph,
-        findings: &mut CrateFindings,
-    ) {
-        graph
-            .violations
-            .extend(self.unresolved_method_call(node, origin));
+        WalkedModule {
+            crate_findings,
+            findings,
+        }: &mut WalkedModule,
+    ) -> Result<(), ModuleDependenciesError> {
+        self.unresolved_method_call(node, origin)
+            .and_then(|unresolved| {
+                findings.violations.extend(unresolved);
 
-        if let Some(path) = ast::Path::cast(node.clone()) {
-            self.record(&path, origin, graph);
-        } else if let Some(call) = ast::MacroCall::cast(node.clone()) {
-            self.expand(&call, origin, pending, graph);
-        } else if let Some(derive) = ast::Meta::cast(node.clone()) {
-            self.expand_derives(&derive, origin, pending, graph);
-        } else if let ItemDefinition::Module(module) = definition
-            && let Some(declaration) = ast::Module::cast(node.clone())
-                .filter(|declaration| declaration.item_list().is_none())
-        {
-            self.declare(&declaration, *module, origin, graph);
-        } else if let ItemDefinition::Impl(implementation) = definition
-            && let Some(written) = ast::Impl::cast(node.clone())
-                .filter(|written| !self.token_origin.is_foreign_text(written.syntax()))
-        {
-            graph
-                .violations
-                .extend(self.misplacement(&written, *implementation, origin));
-
-            if matches!(origin, SubtreeOrigin::SourceFile)
-                && let Some(items) = written.assoc_item_list()
-            {
-                graph
-                    .violations
-                    .extend(implementation.trait_(self.semantics.db).map_or_else(
-                        || {
-                            self.grouped_method_order_violations(
-                                &items,
-                                MethodOwner::InherentImpl(*implementation),
-                                origin,
-                            )
-                        },
-                        |implemented| {
-                            self.declared_method_order_violations(&items, implemented, origin)
-                        },
-                    ));
-            }
-        } else if self.is_reexport(node, definition) {
-            graph.violations.insert(Violation {
-                kind: ViolationKind::Reexport,
-                location: self.locate_focus(node, origin),
-            });
-        } else if let Some(tree) = ast::UseTree::cast(node.clone()).filter(|tree| {
-            tree.star_token().is_some_and(|star| {
-                self.token_origin.is_own_text(
-                    self.semantics.hir_file_for(tree.syntax()),
-                    star.text_range(),
-                )
+                if let Some(path) = ast::Path::cast(node.clone()) {
+                    self.record(&path, origin, findings)
+                } else if let Some(call) = ast::MacroCall::cast(node.clone()) {
+                    self.expand(&call, origin, pending, findings)
+                } else if let Some(derive) = ast::Meta::cast(node.clone()) {
+                    self.expand_derives(&derive, origin, pending, findings)
+                } else if let ItemDefinition::Module(module) = definition
+                    && let Some(declaration) = ast::Module::cast(node.clone())
+                        .filter(|declaration| declaration.item_list().is_none())
+                {
+                    self.declare(&declaration, *module, origin, findings)
+                } else if let ItemDefinition::Impl(implementation) = definition
+                    && let Some(written) = ast::Impl::cast(node.clone())
+                        .filter(|written| !self.token_origin.is_foreign_text(written.syntax()))
+                {
+                    self.implementation(&written, *implementation, origin, findings)
+                } else if self.is_reexport(node, definition) {
+                    self.locate_focus(node, origin).map(|location| {
+                        findings.violations.insert(Violation {
+                            kind: ViolationKind::Reexport,
+                            location,
+                        });
+                    })
+                } else if let Some(tree) = ast::UseTree::cast(node.clone()).filter(|tree| {
+                    tree.star_token().is_some_and(|star| {
+                        self.token_origin.is_own_text(
+                            self.semantics.hir_file_for(tree.syntax()),
+                            star.text_range(),
+                        )
+                    })
+                }) {
+                    self.locate(tree.syntax(), origin).map(|location| {
+                        findings.violations.insert(Violation {
+                            kind: ViolationKind::GlobImport,
+                            location,
+                        });
+                    })
+                } else if matches!(origin, SubtreeOrigin::SourceFile)
+                    && let ItemDefinition::Const(constant) = definition
+                    && let Some(kind) = self.misplaced_constant(*constant)
+                {
+                    self.locate_focus(node, origin).map(|location| {
+                        findings.violations.insert(Violation { kind, location });
+                    })
+                } else if matches!(origin, SubtreeOrigin::SourceFile)
+                    && let ItemDefinition::ModuleDef(ModuleDef::Function(function)) = definition
+                {
+                    self.function(*function, node, origin, findings)
+                } else if matches!(origin, SubtreeOrigin::SourceFile)
+                    && let ItemDefinition::ModuleDef(ModuleDef::Trait(declaring)) = definition
+                    && let Some(items) =
+                        ast::Trait::cast(node.clone()).and_then(|written| written.assoc_item_list())
+                {
+                    self.grouped_method_order_violations(
+                        &items,
+                        MethodOwner::TraitDeclaration(*declaring),
+                        origin,
+                    )
+                    .map(|misordered| findings.violations.extend(misordered))
+                } else if matches!(origin, SubtreeOrigin::SourceFile)
+                    && Self::is_public_item_container(node)
+                {
+                    self.container(node, origin, findings, crate_findings)
+                } else {
+                    self.signature_violations(node, origin)
+                        .map(|violations| findings.violations.extend(violations))
+                }
             })
-        }) {
-            graph.violations.insert(Violation {
-                kind: ViolationKind::GlobImport,
-                location: self.locate(tree.syntax(), origin),
-            });
-        } else if matches!(origin, SubtreeOrigin::SourceFile)
-            && let ItemDefinition::Const(constant) = definition
-            && let Some(kind) = self.misplaced_constant(*constant)
-        {
-            graph.violations.insert(Violation {
-                kind,
-                location: self.locate_focus(node, origin),
-            });
-        } else if matches!(origin, SubtreeOrigin::SourceFile)
-            && let ItemDefinition::ModuleDef(ModuleDef::Function(function)) = definition
-        {
-            let usages = DefinitionUsages::new(ModuleDef::Function(*function), self.semantics);
-
-            graph
-                .violations
-                .extend(self.procedural_function(*function, node, origin, &usages));
-            graph
-                .violations
-                .extend(self.function_used_only_by_tests(*function, node, origin, &usages));
-            graph
-                .violations
-                .extend(self.referenced_test(node, origin, &usages));
-        } else if matches!(origin, SubtreeOrigin::SourceFile)
-            && let ItemDefinition::ModuleDef(ModuleDef::Trait(declaring)) = definition
-            && let Some(items) =
-                ast::Trait::cast(node.clone()).and_then(|written| written.assoc_item_list())
-        {
-            graph
-                .violations
-                .extend(self.grouped_method_order_violations(
-                    &items,
-                    MethodOwner::TraitDeclaration(*declaring),
-                    origin,
-                ));
-        } else if matches!(origin, SubtreeOrigin::SourceFile)
-            && Self::is_public_item_container(node)
-        {
-            self.container(node, origin, graph, findings);
-        } else {
-            graph
-                .violations
-                .extend(self.signature_violations(node, origin));
-        }
     }
 
-    fn walk(&self, root: Subtree, graph: &mut CrateModuleGraph, findings: &mut CrateFindings) {
+    fn walk(
+        &self,
+        root: Subtree,
+        walked: &mut WalkedModule,
+    ) -> Result<(), ModuleDependenciesError> {
         let mut pending = vec![root];
+        let mut outcome = Ok(());
 
-        while let Some(subtree) = pending.pop() {
-            let mut preorder = subtree.root.preorder();
+        while outcome.is_ok()
+            && let Some(Subtree { origin, root }) = pending.pop()
+        {
+            let file = self.semantics.hir_file_for(&root);
+            let mut preorder = root.preorder();
 
-            while let Some(event) = preorder.next() {
+            while outcome.is_ok()
+                && let Some(event) = preorder.next()
+            {
                 if let WalkEvent::Enter(node) = event {
-                    let configured = ConfiguredNode {
-                        node: &node,
-                        options: self.options,
-                    };
-
-                    let negations = self.negated_attributes(&configured, &subtree.origin, graph);
-
-                    let predicate = self.inactive_code.get(&InFile::new(
-                        self.semantics.hir_file_for(&node),
-                        SyntaxNodePtr::new(&node),
-                    ));
-
-                    if configured.is_disabled() {
-                        preorder.skip_subtree();
-                        self.inactive(&node, negations, graph);
-                    } else if let Some(expression) = predicate {
-                        preorder.skip_subtree();
-
-                        let mut predicate_negations = BTreeSet::new();
-
-                        if (NegatedConfiguration { expression }).is_negated() {
-                            let location = self.locate_focus(&node, &subtree.origin);
-
-                            graph.configured_out_negations.negations.insert(Violation {
-                                kind: ViolationKind::NegatedConfiguration,
-                                location: location.clone(),
-                            });
-                            predicate_negations.insert(location);
-                        }
-
-                        self.inactive(&node, predicate_negations, graph);
-                    } else {
-                        self.activate(&node, graph);
-                        self.unsafe_code(&node, &subtree.origin, &mut findings.unsafe_code);
-                        self.lint_suppressions(&node, &subtree.origin, graph);
-                        graph
-                            .violations
-                            .extend(self.test_only_code(&node, &subtree.origin));
-
-                        match ast::Item::cast(node.clone())
-                            .map_or(ItemExpansion::Unexpanded, |item| {
-                                ItemExpansion::new(&item, self.semantics)
-                            }) {
-                            ItemExpansion::Parsable { generated, written } => {
-                                preorder.skip_subtree();
-                                pending.extend(written.iter().map(|item| Subtree {
-                                    origin: subtree.origin.clone(),
-                                    root: item.syntax().clone(),
-                                }));
-                                pending.extend(generated.iter().map(|item| Subtree {
-                                    origin: subtree.origin.expansion_of(&node),
-                                    root: item.syntax().clone(),
-                                }));
-                            }
-                            ItemExpansion::Unexpanded => match ast::Item::cast(node.clone())
-                                .map_or(ItemDefinition::NotDefining, |item| {
-                                    ItemDefinition::new(&item, self.semantics)
-                                }) {
-                                ItemDefinition::Unmapped => {
-                                    preorder.skip_subtree();
-                                    graph.violations.insert(Violation {
-                                        kind: ViolationKind::UnmappedItem,
-                                        location: self.locate_focus(&node, &subtree.origin),
-                                    });
-                                }
-                                definition => {
-                                    self.visit(
-                                        &node,
-                                        &definition,
-                                        &subtree.origin,
-                                        &mut pending,
-                                        graph,
-                                        findings,
-                                    );
-                                }
-                            },
-                            ItemExpansion::Unparsable { call } => {
-                                preorder.skip_subtree();
-                                self.unparsable(
-                                    call,
-                                    self.locate_focus(&node, &subtree.origin),
-                                    &mut graph.violations,
-                                );
-                            }
-                        }
-                    }
+                    outcome = self.enter(&node, file, &origin, &mut preorder, &mut pending, walked);
                 }
             }
         }
+
+        outcome
     }
 
     fn written_tokens(

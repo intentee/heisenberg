@@ -4,20 +4,22 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
-heisenberg_analysis_threads = { workspace = true }
-heisenberg_error_context = { workspace = true }
 heisenberg_module_graph = { workspace = true }
 heisenberg_project_model = { workspace = true }
+heisenberg_task_graph = { workspace = true }
 ra_ap_cfg = { workspace = true }
 ra_ap_hir = { workspace = true }
 ra_ap_hir_def = { workspace = true }
 ra_ap_hir_expand = { workspace = true }
 ra_ap_ide_db = { workspace = true }
 ra_ap_intern = { workspace = true }
+ra_ap_parser = { workspace = true }
 ra_ap_paths = { workspace = true }
 ra_ap_syntax = { workspace = true }
 ra_ap_syntax-bridge = { workspace = true }
 ra_ap_vfs = { workspace = true }
+rayon = { workspace = true }
+salsa = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

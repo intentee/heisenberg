@@ -1,9 +1,17 @@
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::num::NonZeroU64;
+use std::time::Duration;
+
+use humantime::format_duration;
 
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
+use crate::constants::MAXIMUM_SLOW_TEST_PERIOD;
+use crate::constants::MAXIMUM_TEST_DURATION;
+use crate::constants::NEXTEST_CONFIGURATION_DIRECTORY;
+use crate::constants::NEXTEST_CONFIGURATION_FILE;
 use crate::lint_table::LintTable;
 use crate::potential_owner::PotentialOwner;
 
@@ -20,6 +28,35 @@ pub enum PackageViolation {
         lint: String,
         table: LintTable,
         tool: String,
+    },
+    NextestConfigurationMissing {
+        manifest: String,
+    },
+    NextestOverride {
+        file: String,
+        profile: String,
+    },
+    NextestSlowPeriodTooLong {
+        file: String,
+        period: Duration,
+        profile: String,
+    },
+    NextestSlowTimeoutUnset {
+        file: String,
+    },
+    NextestTestNeverTerminated {
+        file: String,
+        profile: String,
+    },
+    NextestTestTerminatedTooLate {
+        file: String,
+        period: Duration,
+        periods: NonZeroU64,
+        profile: String,
+    },
+    NextestTimeoutPasses {
+        file: String,
+        profile: String,
     },
     PackageDependencyCycle {
         manifest: String,
@@ -64,6 +101,10 @@ pub enum PackageViolation {
         file: String,
         setting: String,
     },
+    UnvettedNextestSetting {
+        file: String,
+        setting: String,
+    },
 }
 
 impl PackageViolation {
@@ -79,6 +120,13 @@ impl PackageViolation {
             Self::ClippyConfigurationAmbiguous { .. }
             | Self::ClippyConfigurationMissing { .. }
             | Self::LintAllowedInManifest { .. }
+            | Self::NextestConfigurationMissing { .. }
+            | Self::NextestOverride { .. }
+            | Self::NextestSlowPeriodTooLong { .. }
+            | Self::NextestSlowTimeoutUnset { .. }
+            | Self::NextestTestNeverTerminated { .. }
+            | Self::NextestTestTerminatedTooLate { .. }
+            | Self::NextestTimeoutPasses { .. }
             | Self::PackageDependencyCycle { .. }
             | Self::PackageDependsOnItself { .. }
             | Self::PublishableTestCrate { .. }
@@ -87,7 +135,8 @@ impl PackageViolation {
             | Self::TestCrateDeclaredTwice { .. }
             | Self::TestCrateNotAMember { .. }
             | Self::TestCrateUsedByProduction { .. }
-            | Self::UnvettedClippySetting { .. } => Vec::new(),
+            | Self::UnvettedClippySetting { .. }
+            | Self::UnvettedNextestSetting { .. } => Vec::new(),
         }
     }
 
@@ -97,7 +146,15 @@ impl PackageViolation {
             Self::ClippyConfigurationAmbiguous { file }
             | Self::RequiredClippySettingMissing { file, .. }
             | Self::UnvettedClippySetting { file, .. }
+            | Self::NextestOverride { file, .. }
+            | Self::NextestSlowPeriodTooLong { file, .. }
+            | Self::NextestSlowTimeoutUnset { file }
+            | Self::NextestTestNeverTerminated { file, .. }
+            | Self::NextestTestTerminatedTooLate { file, .. }
+            | Self::NextestTimeoutPasses { file, .. }
+            | Self::UnvettedNextestSetting { file, .. }
             | Self::ClippyConfigurationMissing { manifest: file, .. }
+            | Self::NextestConfigurationMissing { manifest: file }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
             | Self::PublishableTestCrate { manifest: file, .. }
@@ -125,6 +182,44 @@ impl Display for PackageViolation {
             Self::LintAllowedInManifest { lint, table, tool } => {
                 write!(formatter, "{table} allows {lint} in its {tool} lints")
             }
+            Self::NextestConfigurationMissing { .. } => write!(
+                formatter,
+                "Workspace has no {NEXTEST_CONFIGURATION_DIRECTORY}/{NEXTEST_CONFIGURATION_FILE}"
+            ),
+            Self::NextestOverride { profile, .. } => write!(
+                formatter,
+                "Profile {profile} overrides the settings of some tests"
+            ),
+            Self::NextestSlowPeriodTooLong {
+                period, profile, ..
+            } => write!(
+                formatter,
+                "Profile {profile} flags a test as slow after {}, beyond {}",
+                format_duration(*period),
+                format_duration(MAXIMUM_SLOW_TEST_PERIOD)
+            ),
+            Self::NextestSlowTimeoutUnset { .. } => write!(
+                formatter,
+                "Profile default sets no slow-timeout, so nextest never terminates a test"
+            ),
+            Self::NextestTestNeverTerminated { profile, .. } => {
+                write!(formatter, "Profile {profile} never terminates a slow test")
+            }
+            Self::NextestTestTerminatedTooLate {
+                period,
+                periods,
+                profile,
+                ..
+            } => write!(
+                formatter,
+                "Profile {profile} terminates a test after {periods} periods of {}, beyond {}",
+                format_duration(*period),
+                format_duration(MAXIMUM_TEST_DURATION)
+            ),
+            Self::NextestTimeoutPasses { profile, .. } => write!(
+                formatter,
+                "Profile {profile} counts a timed out test as passing"
+            ),
             Self::PackageDependencyCycle { packages, .. } => write!(
                 formatter,
                 "Packages {} depend on each other through dev-dependencies",
@@ -168,6 +263,10 @@ impl Display for PackageViolation {
             Self::UnvettedClippySetting { setting, .. } => write!(
                 formatter,
                 "Clippy configuration sets {setting}, which Heisenberg has not vetted"
+            ),
+            Self::UnvettedNextestSetting { setting, .. } => write!(
+                formatter,
+                "Nextest configuration sets {setting}, which Heisenberg has not vetted"
             ),
         }
     }

@@ -14,57 +14,15 @@ use crate::covering_ancestors::CoveringAncestors;
 use crate::diagnostic_site::DiagnosticSite;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
-use crate::token_origin::TokenOrigin;
 use crate::unresolved_import_binding::UnresolvedImportBinding;
 
 pub struct DiagnosticViolation<'violation, 'database> {
     pub diagnostic: &'violation AnyDiagnostic<'database>,
     pub semantics: &'violation Semantics<'database, RootDatabase>,
-    pub token_origin: &'violation TokenOrigin<'violation, 'database>,
 }
 
 impl DiagnosticViolation<'_, '_> {
-    pub fn violation(&self) -> Option<LocatedViolation> {
-        self.site()
-            .filter(|DiagnosticSite { origin, .. }| {
-                self.token_origin.is_own_text(origin.file_id, origin.value)
-            })
-            .map(|DiagnosticSite { violation, .. }| violation)
-    }
-
-    fn focus<TNode: AstNode>(&self, pointer: InFile<AstPtr<TNode>>) -> FileRangeWrapper<FileId> {
-        ItemFocus {
-            node: self.semantics.to_node(pointer).syntax(),
-            semantics: self.semantics,
-        }
-        .original_range()
-    }
-
-    fn is_bound_by_unresolved_import(
-        &self,
-        UnresolvedMacroCall { path, range, .. }: &UnresolvedMacroCall,
-    ) -> bool {
-        let semantics = self.semantics;
-
-        path.as_ident().is_some_and(|name| {
-            CoveringAncestors {
-                range: *range,
-                semantics,
-            }
-            .nodes()
-            .next()
-            .and_then(|node| semantics.scope(&node))
-            .is_some_and(|scope| {
-                UnresolvedImportBinding {
-                    name,
-                    scope: &scope,
-                }
-                .binds()
-            })
-        })
-    }
-
-    fn site(&self) -> Option<DiagnosticSite> {
+    pub fn site(&self) -> Option<DiagnosticSite> {
         let semantics = self.semantics;
 
         match self.diagnostic {
@@ -116,5 +74,37 @@ impl DiagnosticViolation<'_, '_> {
             }),
             _ => None,
         }
+    }
+
+    fn focus<TNode: AstNode>(&self, pointer: InFile<AstPtr<TNode>>) -> FileRangeWrapper<FileId> {
+        ItemFocus {
+            node: self.semantics.to_node(pointer).syntax(),
+            semantics: self.semantics,
+        }
+        .original_range()
+    }
+
+    fn is_bound_by_unresolved_import(
+        &self,
+        UnresolvedMacroCall { path, range, .. }: &UnresolvedMacroCall,
+    ) -> bool {
+        let semantics = self.semantics;
+
+        path.as_ident().is_some_and(|name| {
+            CoveringAncestors {
+                range: *range,
+                semantics,
+            }
+            .nodes()
+            .next()
+            .and_then(|node| semantics.scope(&node))
+            .is_some_and(|scope| {
+                UnresolvedImportBinding {
+                    name,
+                    scope: &scope,
+                }
+                .binds()
+            })
+        })
     }
 }

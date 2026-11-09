@@ -24,7 +24,7 @@ fn lint_table_inherited_from_the_workspace_is_reported_once_at_the_workspace_man
             - Cargo.toml: Workspace allows too_many_lines in its clippy lints\n\
             \n\
             RequiredLintNotDenied: 1 violation\n\
-            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
+            Every warning and every lint of the clippy groups fails the build, and code reports failures as typed errors instead of panicking, wherever it is written; tests, in every crate alike, fail fast only with expect and unwrap, which the required clippy settings allow in #[test] functions and #[cfg(test)] items. Deny the lint in the [lints] or [workspace.lints] table the package uses.\n\
             \n\
             - Cargo.toml: Workspace does not deny clippy::panic\n\
             \n\

@@ -16,6 +16,7 @@ use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
 use heisenberg_module_graph::source_location::SourceLocation;
 
 use crate::macro_expansion::MacroExpansion;
+use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::source_locator::SourceLocator;
 
 pub struct ExpansionChain<'chain, 'database> {
@@ -25,7 +26,7 @@ pub struct ExpansionChain<'chain, 'database> {
 }
 
 impl ExpansionChain<'_, '_> {
-    pub fn findings(&self) -> Vec<FoldedFinding> {
+    pub fn findings(&self) -> Result<Vec<FoldedFinding>, ModuleDependenciesError> {
         let database = self.semantics.db;
         let expansion = MacroExpansion {
             call: self.call,
@@ -50,12 +51,8 @@ impl ExpansionChain<'_, '_> {
                         |definition| definition.to_node(database).name(),
                         |definition| definition.to_node(database).name(),
                     )
-                    .map(|name| FoldedFinding {
-                        kind: FoldedFindingKind::MacroExpansion {
-                            depth,
-                            name: name.text().to_owned(),
-                        },
-                        location: self.locate(match location.kind.file_id() {
+                    .map(|name| {
+                        self.locate(match location.kind.file_id() {
                             HirFileId::FileId(_) => {
                                 location.kind.original_call_range(database, location.krate)
                             }
@@ -66,42 +63,51 @@ impl ExpansionChain<'_, '_> {
                                     .original_node_file_range(database)
                                     .0
                             }
-                        }),
+                        })
+                        .map(|located| FoldedFinding {
+                            kind: FoldedFindingKind::MacroExpansion {
+                                depth,
+                                name: name.text().to_owned(),
+                            },
+                            location: located,
+                        })
                     })
             })
-            .chain(
-                expansion
-                    .syntax_errors()
-                    .into_iter()
-                    .map(|error| FoldedFinding {
+            .chain(expansion.syntax_errors().iter().map(|error| {
+                self.located_in_expansion(error.range())
+                    .map(|location| FoldedFinding {
                         kind: FoldedFindingKind::SyntaxError {
                             message: error.to_string(),
                         },
-                        location: self.located_in_expansion(error.range()),
-                    }),
-            )
-            .chain(
-                expansion
-                    .unreadable_literals()
-                    .into_iter()
-                    .map(|literal| FoldedFinding {
+                        location,
+                    })
+            }))
+            .chain(expansion.unreadable_literals().into_iter().map(|literal| {
+                self.located_in_expansion(literal.text_range())
+                    .map(|location| FoldedFinding {
                         kind: FoldedFindingKind::UnreadableLiteral {
                             text: literal.text().to_owned(),
                         },
-                        location: self.located_in_expansion(literal.text_range()),
-                    }),
-            )
+                        location,
+                    })
+            }))
             .collect()
     }
 
-    fn locate(&self, FileRange { file_id, range }: FileRange) -> SourceLocation {
+    fn locate(
+        &self,
+        FileRange { file_id, range }: FileRange,
+    ) -> Result<SourceLocation, ModuleDependenciesError> {
         self.locator.locate(FileRangeWrapper {
             file_id: file_id.file_id(self.semantics.db),
             range,
         })
     }
 
-    fn located_in_expansion(&self, range: TextRange) -> SourceLocation {
+    fn located_in_expansion(
+        &self,
+        range: TextRange,
+    ) -> Result<SourceLocation, ModuleDependenciesError> {
         self.locate(
             InFile::new(HirFileId::from(self.call), range)
                 .original_node_file_range(self.semantics.db)

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::lint_tool::LintTool;
 use crate::required_clippy_setting::RequiredClippySetting;
 use crate::required_lint::RequiredLint;
@@ -8,6 +10,8 @@ pub const SUPPORTED_TARGETS: [SupportedTarget; 3] = [
     SupportedTarget::X86_64PcWindowsMsvc,
     SupportedTarget::X86_64UnknownLinuxGnu,
 ];
+
+pub const CARGO_BUILD_JOBS_VARIABLE: &str = "CARGO_BUILD_JOBS";
 
 pub const CARGO_BUILD_TABLE: &str = "build";
 
@@ -46,6 +50,18 @@ pub const LINT_NAME_SEPARATOR: &str = "_";
 
 pub const LINT_NAME_SEPARATOR_ALIAS: &str = "-";
 
+pub const MAXIMUM_SLOW_TEST_PERIOD: Duration = Duration::from_secs(10);
+
+pub const MAXIMUM_TEST_DURATION: Duration = Duration::from_secs(20);
+
+pub const NEXTEST_CONFIGURATION_DIRECTORY: &str = ".config";
+
+pub const NEXTEST_CONFIGURATION_FILE: &str = "nextest.toml";
+
+pub const NEXTEST_DEFAULT_PROFILE: &str = "default";
+
+pub const NEXTEST_RETRIES_VARIABLE: &str = "NEXTEST_RETRIES";
+
 pub const NIGHTLY_BOOTSTRAP_VARIABLE: &str = "RUSTC_BOOTSTRAP";
 
 pub const NIGHTLY_FEATURE_VARIABLES: [&str; 2] = [
@@ -53,7 +69,13 @@ pub const NIGHTLY_FEATURE_VARIABLES: [&str; 2] = [
     "__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS",
 ];
 
-pub const PANICKING_LINTS: [RequiredLint; 3] = [
+pub const PANICKING_LINTS: [RequiredLint; 10] = [
+    RequiredLint {
+        former_names: &["integer_arithmetic"],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "arithmetic_side_effects",
+        tool: LintTool::Clippy,
+    },
     RequiredLint {
         former_names: &["option_expect_used", "result_expect_used"],
         groups: &[CLIPPY_RESTRICTION_GROUP],
@@ -63,7 +85,43 @@ pub const PANICKING_LINTS: [RequiredLint; 3] = [
     RequiredLint {
         former_names: &[],
         groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "indexing_slicing",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
         name: "panic",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "panic_in_result_fn",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "string_slice",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "todo",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "unimplemented",
+        tool: LintTool::Clippy,
+    },
+    RequiredLint {
+        former_names: &[],
+        groups: &[CLIPPY_RESTRICTION_GROUP],
+        name: "unreachable",
         tool: LintTool::Clippy,
     },
     RequiredLint {
@@ -76,13 +134,9 @@ pub const PANICKING_LINTS: [RequiredLint; 3] = [
 
 pub const PARENT_DIRECTORY: &str = "..";
 
-pub const REQUIRED_CLIPPY_SETTINGS: [RequiredClippySetting; 4] = [
+pub const REQUIRED_CLIPPY_SETTINGS: [RequiredClippySetting; 3] = [
     RequiredClippySetting {
         name: "allow-expect-in-tests",
-        value: true,
-    },
-    RequiredClippySetting {
-        name: "allow-panic-in-tests",
         value: true,
     },
     RequiredClippySetting {
@@ -137,3 +191,21 @@ pub const RUST_WARNINGS_LINT: RequiredLint = RequiredLint {
 };
 
 pub const SYSROOT_BINARY_DIRECTORY: &str = "bin";
+
+pub const VETTED_NEXTEST_PROFILE_SETTINGS: [&str; 10] = [
+    "fail-fast",
+    "failure-output",
+    "final-status-level",
+    "global-timeout",
+    "inherits",
+    "junit",
+    "slow-timeout",
+    "status-level",
+    "success-output",
+    "test-threads",
+];
+
+pub const VETTED_NEXTEST_SETTINGS: [&str; 1] = ["nextest-version"];
+
+pub const VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS: [&str; 3] =
+    ["on-timeout", "period", "terminate-after"];

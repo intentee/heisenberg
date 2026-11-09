@@ -20,13 +20,15 @@ use crate::local_macro_import::LocalMacroImport;
 use crate::ordered_entries::OrderedEntries;
 use crate::ordered_entry::OrderedEntry;
 use crate::outside_visibility::OutsideVisibility;
+use crate::path_resolutions::PathResolutions;
 use crate::token_origin::TokenOrigin;
 use crate::trait_arguments::trait_arguments;
 
 pub struct ItemOrder<'order, 'database> {
-    pub container: &'order SyntaxNode,
+    pub items: &'order [ast::Item],
     pub krate: Crate,
     pub options: &'order CfgOptions,
+    pub paths: &'order PathResolutions<'order, 'database>,
     pub semantics: &'order Semantics<'database, RootDatabase>,
     pub token_origin: &'order TokenOrigin<'order, 'database>,
 }
@@ -35,7 +37,7 @@ impl ItemOrder<'_, '_> {
     pub fn entries(&self) -> OrderedEntries<ItemGroup> {
         OrderedEntries {
             entries: self
-                .defined_in(self.container)
+                .items
                 .iter()
                 .flat_map(|item| self.item_entries(item))
                 .collect(),
@@ -94,6 +96,7 @@ impl ItemOrder<'_, '_> {
             |path| {
                 LocalMacroImport {
                     path: &path,
+                    paths: self.paths,
                     semantics: self.semantics,
                 }
                 .imported_macro()
@@ -142,6 +145,7 @@ impl ItemOrder<'_, '_> {
             ast::Item::Fn(_)
                 if (AttributedItem {
                     item,
+                    paths: self.paths,
                     semantics: self.semantics,
                 })
                 .has_test_attribute() =>
@@ -172,7 +176,7 @@ impl ItemOrder<'_, '_> {
     fn path_crate(&self, path: &ast::Path) -> Option<Crate> {
         let database = self.semantics.db;
 
-        match self.semantics.resolve_path(&path.first_qualifier_or_self()) {
+        match self.paths.resolve(&path.first_qualifier_or_self()) {
             Some(PathResolution::Def(ModuleDef::Module(module))) => Some(module.krate(database)),
             Some(PathResolution::Def(definition)) => definition
                 .module(database)

@@ -1,6 +1,3 @@
-use std::iter::repeat_n;
-
-use ra_ap_paths::Utf8Component;
 use ra_ap_paths::Utf8Path;
 
 use crate::constants::CARGO_MANIFEST_FILE;
@@ -18,14 +15,17 @@ impl WorkspacePath<'_> {
 
     #[must_use]
     pub fn relative(&self, absolute: &Utf8Path) -> String {
-        let root: Vec<Utf8Component<'_>> = self.root.components().collect();
-        let shared = root
-            .iter()
+        let shared = self
+            .root
+            .components()
             .zip(absolute.components())
-            .take_while(|(root_component, component)| **root_component == *component)
+            .take_while(|(root_component, component)| root_component == component)
             .count();
 
-        repeat_n(PARENT_DIRECTORY, root.len() - shared)
+        self.root
+            .components()
+            .skip(shared)
+            .map(|_| PARENT_DIRECTORY)
             .chain(
                 absolute
                     .components()

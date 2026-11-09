@@ -3,6 +3,7 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
+use std::str::Utf8Error;
 use std::sync::Arc;
 
 use cargo::context::Definition;
@@ -16,6 +17,7 @@ use serde_json::error;
 use thiserror::Error;
 use toml::de;
 
+use heisenberg_analysis_threads::analysis_threads_error::AnalysisThreadsError;
 use heisenberg_error_context::contextual_error::ContextualError;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_workspace_build::workspace_build_error::WorkspaceBuildError;
@@ -25,6 +27,7 @@ use crate::configuration_list::ConfigurationList;
 use crate::constants::CARGO_ENVIRONMENT_TABLE;
 use crate::constants::CLIPPY_ARGUMENTS_VARIABLE;
 use crate::constants::CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE;
+use crate::constants::NEXTEST_RETRIES_VARIABLE;
 use crate::constants::NIGHTLY_BOOTSTRAP_VARIABLE;
 use crate::supported_target_list::SupportedTargetList;
 
@@ -138,6 +141,18 @@ pub enum ProjectModelError {
         #[source]
         source: io::Error,
     },
+    #[error("the nextest configuration `{path}` is not valid")]
+    NextestConfigurationInvalid {
+        path: PathBuf,
+        #[source]
+        source: Box<de::Error>,
+    },
+    #[error("the nextest configuration `{path}` cannot be read")]
+    NextestConfigurationUnreadable {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error("the `{key}` value of the cargo configuration of `{manifest_path}` cannot be read")]
     CargoConfigurationValue {
         key: String,
@@ -178,6 +193,11 @@ pub enum ProjectModelError {
     )]
     EnvironmentClippyArguments,
     #[error(
+        "`{variable}` is set in the environment, and Heisenberg cannot account for tests that nextest retries",
+        variable = NEXTEST_RETRIES_VARIABLE
+    )]
+    EnvironmentNextestRetries,
+    #[error(
         "`{variable}` is set in the environment, and Heisenberg cannot account for nightly features"
     )]
     EnvironmentNightlyFeatures { variable: &'static str },
@@ -196,6 +216,12 @@ pub enum ProjectModelError {
     },
     #[error("the crate root `{}` cannot be read", .0.context.display())]
     CrateRootUnreadable(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("`{}` is not UTF-8, so rust-analyzer loads it without text", .0.context)]
+    SourceFileNotUtf8(#[source] ContextualError<AbsPathBuf, Utf8Error>),
+    #[error("`{}` cannot be read to confirm that rust-analyzer loaded its text", .0.context)]
+    SourceFileUnreadable(#[source] ContextualError<AbsPathBuf, io::Error>),
+    #[error(transparent)]
+    SourceFileUnavailable(Arc<Self>),
     #[error(
         "the embedded standard library cfg table of the target is not `rustc --print cfg` output"
     )]
@@ -271,6 +297,8 @@ pub enum ProjectModelError {
     BuildScriptCfg(#[source] ContextualError<String, ParseError>),
     #[error("the build script output `{}` cannot be read", .0.context.display())]
     UnreadableBuildScriptOutput(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("the procedural macro crate rooted at `{0}` has no built library")]
+    ProcMacroLibraryMissing(VfsPath),
     #[error("the procedural macros of `{}` cannot be loaded", .0.context)]
     ProcMacroLoad(#[source] ContextualError<AbsPathBuf, ProcMacroLoadingError>),
     #[error("the sysroot has no rustc in `{directory}`")]
@@ -281,6 +309,10 @@ pub enum ProjectModelError {
     ProcMacroServerSpawn(#[source] ContextualError<AbsPathBuf, io::Error>),
     #[error(transparent)]
     ProcMacroServerUnavailable(Arc<Self>),
+    #[error(transparent)]
+    BuildScriptOutputUnavailable(Arc<Self>),
+    #[error("the standard library resolution thread cannot be started")]
+    LibraryResolutionThread(#[source] AnalysisThreadsError),
     #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
     UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]

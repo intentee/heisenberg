@@ -28,8 +28,12 @@ pub enum HeisenbergCheckError {
     CargoHome(#[source] VarError),
     #[error("the name of configuration {} of the fixture manifest `{}` is not a string", .0.context.index, .0.context.manifest_path.display())]
     FixtureConfigurationName(#[source] ContextualError<FixtureConfiguration, Box<de::Error>>),
+    #[error("configuration {} of the fixture manifest `{}` has no name", .0.index, .0.manifest_path.display())]
+    FixtureConfigurationNameMissing(FixtureConfiguration),
     #[error("the target of configuration {} of the fixture manifest `{}` is not a string", .0.context.index, .0.context.manifest_path.display())]
     FixtureConfigurationTarget(#[source] ContextualError<FixtureConfiguration, Box<de::Error>>),
+    #[error("configuration {} of the fixture manifest `{}` has no target", .0.index, .0.manifest_path.display())]
+    FixtureConfigurationTargetMissing(FixtureConfiguration),
     #[error("the configurations of the fixture manifest `{}` are not an array of tables", .0.context.display())]
     FixtureConfigurations(#[source] ContextualError<PathBuf, de::Error>),
     #[error("`{}` cannot be copied into the host-only fixture", .0.context.display())]
@@ -50,6 +54,8 @@ pub enum HeisenbergCheckError {
     FixtureOutDirs(#[source] ContextualError<PathBuf, de::Error>),
     #[error("the previous host-only fixture `{}` cannot be removed", .0.context.display())]
     FixtureReset(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("the fixture manifest `{}` has no [workspace.metadata.heisenberg] table", .0.display())]
+    FixtureSettingsMissing(PathBuf),
     #[error("the modification time of `{}` cannot be given to its host-only fixture copy", .0.context.display())]
     FixtureTimestamp(#[source] ContextualError<PathBuf, io::Error>),
     #[error("{SYSROOT_VARIABLE} cannot be read")]

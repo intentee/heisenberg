@@ -1,5 +1,6 @@
 use cargo_metadata::Package;
 use cargo_util_schemas::manifest::TomlLints;
+use serde_json::Value;
 
 use crate::dependency_document::DependencyDocument;
 use crate::lint_table::LintTable;
@@ -8,9 +9,11 @@ use crate::workspace_path::WorkspacePath;
 
 pub struct PackageDocument {
     pub dependencies: Vec<DependencyDocument>,
+    pub is_member: bool,
     pub lints: TomlLints,
     pub lints_source: LintsSource,
     pub metadata: Package,
+    pub metadata_json: Value,
 }
 
 impl PackageDocument {

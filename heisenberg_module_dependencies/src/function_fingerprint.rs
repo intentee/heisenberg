@@ -1,7 +1,9 @@
-use ra_ap_hir::Crate;
 use ra_ap_hir::FieldSource;
 use ra_ap_hir::FileRange;
+use ra_ap_hir::HirFileId;
+use ra_ap_hir::InFile;
 use ra_ap_hir::Semantics;
+use ra_ap_hir_expand::Lookup;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
 use ra_ap_ide_db::defs::IdentClass;
@@ -10,21 +12,36 @@ use ra_ap_syntax::AstToken;
 use ra_ap_syntax::NodeOrToken;
 use ra_ap_syntax::SyntaxElement;
 use ra_ap_syntax::SyntaxToken;
+use ra_ap_syntax::TextRange;
+use ra_ap_syntax::TextSize;
 use ra_ap_syntax::ast;
 
+use heisenberg_module_graph::definition_identity::DefinitionIdentity;
+use heisenberg_module_graph::fingerprint_token::FingerprintToken;
+use heisenberg_module_graph::source_position::SourcePosition;
+use heisenberg_module_graph::token_spelling::TokenSpelling;
+use heisenberg_module_graph::written_offset::WrittenOffset;
+
 use crate::code_tokens::code_tokens;
+use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::original_file_id::original_file_id;
 use crate::source_locator::SourceLocator;
 
+fn spelling(token: &SyntaxToken) -> TokenSpelling {
+    TokenSpelling {
+        kind: u16::from(token.kind()),
+        text: token.text().to_owned(),
+    }
+}
+
 pub struct FunctionFingerprint<'fingerprint, 'database> {
     pub function: &'fingerprint ast::Fn,
-    pub krate: Crate,
     pub locator: &'fingerprint SourceLocator<'fingerprint>,
     pub semantics: &'fingerprint Semantics<'database, RootDatabase>,
 }
 
 impl<'database> FunctionFingerprint<'_, 'database> {
-    pub fn tokens(&self) -> Vec<String> {
+    pub fn tokens(&self) -> Result<Vec<FingerprintToken>, ModuleDependenciesError> {
         let mut declared: Vec<Definition<'database>> = Vec::new();
 
         self.function
@@ -56,7 +73,7 @@ impl<'database> FunctionFingerprint<'_, 'database> {
     fn declaration_index(
         definition: Definition<'database>,
         declared: &mut Vec<Definition<'database>>,
-    ) -> String {
+    ) -> DefinitionIdentity {
         let index = declared
             .iter()
             .position(|seen| *seen == definition)
@@ -66,7 +83,7 @@ impl<'database> FunctionFingerprint<'_, 'database> {
             declared.push(definition);
         }
 
-        format!("declared {index}")
+        DefinitionIdentity::Declared { index }
     }
 
     fn declaration_range(&self, definition: Definition<'database>) -> Option<FileRange> {
@@ -89,40 +106,73 @@ impl<'database> FunctionFingerprint<'_, 'database> {
         &self,
         definition: Definition<'database>,
         declared: &mut Vec<Definition<'database>>,
-    ) -> String {
+        token: &SyntaxToken,
+    ) -> Result<DefinitionIdentity, ModuleDependenciesError> {
         let database = self.semantics.db;
 
         match definition {
             Definition::Local(local) if !local.is_self(database) => {
-                Self::declaration_index(definition, declared)
+                Ok(Self::declaration_index(definition, declared))
             }
             Definition::GenericParam(_) | Definition::Label(_) => {
-                Self::declaration_index(definition, declared)
+                Ok(Self::declaration_index(definition, declared))
             }
-            other => self
-                .declaration_range(other)
-                .map_or_else(|| self.label(other), |range| self.location(range)),
+            Definition::SelfType(implementation) => self
+                .semantics
+                .source(implementation)
+                .ok_or(ModuleDependenciesError::SelfTypeWithoutSource(
+                    implementation,
+                ))
+                .and_then(|InFile { file_id, value }| {
+                    self.position(file_id, value.syntax().text_range().start())
+                })
+                .map(DefinitionIdentity::Impl),
+            other => self.declaration_range(other).map_or_else(
+                || self.unplaced(other, declared, token),
+                |range| self.written(range).map(DefinitionIdentity::Written),
+            ),
         }
     }
 
-    fn label(&self, definition: Definition<'database>) -> String {
+    fn position(
+        &self,
+        file_id: HirFileId,
+        offset: TextSize,
+    ) -> Result<SourcePosition, ModuleDependenciesError> {
         let database = self.semantics.db;
 
-        format!(
-            "label {}",
-            definition.label(database, self.krate.to_display_target(database))
-        )
+        match file_id {
+            HirFileId::FileId(file) => self
+                .written(FileRange {
+                    file_id: file,
+                    range: TextRange::empty(offset),
+                })
+                .map(SourcePosition::Written),
+            HirFileId::MacroFile(call) => {
+                let location = call.lookup(database);
+                let InFile {
+                    file_id: node_file,
+                    value: node,
+                } = location.to_node(database);
+
+                self.position(node_file, node.text_range().start())
+                    .and_then(|node| {
+                        self.written(location.kind.original_call_range(database, location.krate))
+                            .map(|call| SourcePosition::Expanded {
+                                call,
+                                call_node: Box::new(node),
+                                offset: u32::from(offset),
+                            })
+                    })
+            }
+        }
     }
 
-    fn location(&self, FileRange { file_id, range }: FileRange) -> String {
-        format!(
-            "definition {}:{}",
-            self.locator.file(file_id.file_id(self.semantics.db)),
-            u32::from(range.start())
-        )
-    }
-
-    fn token(&self, token: &SyntaxToken, declared: &mut Vec<Definition<'database>>) -> String {
+    fn token(
+        &self,
+        token: &SyntaxToken,
+        declared: &mut Vec<Definition<'database>>,
+    ) -> Result<FingerprintToken, ModuleDependenciesError> {
         let candidates: Vec<SyntaxToken> = if token
             .parent_ancestors()
             .any(|ancestor| ast::TokenTree::can_cast(ancestor.kind()))
@@ -154,20 +204,70 @@ impl<'database> FunctionFingerprint<'_, 'database> {
         if !definitions.is_empty() {
             definitions
                 .into_iter()
-                .map(|definition| self.identity(definition, declared))
-                .collect::<Vec<String>>()
-                .join(" | ")
+                .map(|definition| self.identity(definition, declared, token))
+                .collect::<Result<Vec<DefinitionIdentity>, ModuleDependenciesError>>()
+                .map(FingerprintToken::Definitions)
         } else if named.is_empty() {
-            format!("{:?} {}", token.kind(), token.text())
+            Ok(FingerprintToken::Spelling(spelling(token)))
         } else {
-            format!(
-                "unresolved {}:{}",
-                self.locator.file(original_file_id(
+            self.locator
+                .file(original_file_id(
                     self.semantics.db,
-                    self.semantics.hir_file_for(self.function.syntax())
-                )),
-                u32::from(token.text_range().start())
-            )
+                    self.semantics.hir_file_for(self.function.syntax()),
+                ))
+                .map(|file| {
+                    FingerprintToken::Unresolved(WrittenOffset {
+                        file,
+                        offset: u32::from(token.text_range().start()),
+                    })
+                })
         }
+    }
+
+    fn unplaced(
+        &self,
+        definition: Definition<'database>,
+        declared: &mut Vec<Definition<'database>>,
+        token: &SyntaxToken,
+    ) -> Result<DefinitionIdentity, ModuleDependenciesError> {
+        let database = self.semantics.db;
+        let name = definition
+            .name(database)
+            .map(|name| name.as_str().to_owned());
+
+        match definition.enclosing_definition(database) {
+            Some(enclosing) => self.identity(enclosing, declared, token).map(|container| {
+                DefinitionIdentity::Member {
+                    container: Box::new(container),
+                    name,
+                }
+            }),
+            None => match definition.krate(database) {
+                Some(krate) => self
+                    .locator
+                    .file(krate.root_file(database))
+                    .map(|crate_root| DefinitionIdentity::CrateLevel {
+                        crate_root,
+                        name,
+                        spelling: spelling(token),
+                    }),
+                None => Ok(DefinitionIdentity::Builtin {
+                    name,
+                    spelling: spelling(token),
+                }),
+            },
+        }
+    }
+
+    fn written(
+        &self,
+        FileRange { file_id, range }: FileRange,
+    ) -> Result<WrittenOffset, ModuleDependenciesError> {
+        self.locator
+            .file(file_id.file_id(self.semantics.db))
+            .map(|file| WrittenOffset {
+                file,
+                offset: u32::from(range.start()),
+            })
     }
 }

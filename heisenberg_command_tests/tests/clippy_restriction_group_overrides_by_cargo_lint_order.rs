@@ -26,16 +26,27 @@ fn clippy_restriction_group_overrides_by_cargo_lint_order() {
             - preceded/Cargo.toml: Package preceded allows restriction in its clippy lints\n\
             - same_priority/Cargo.toml: Package same_priority allows restriction in its clippy lints\n\
             \n\
-            RequiredLintNotDenied: 4 violations\n\
-            Every warning and every lint of the clippy groups fails the build, and production code reports failures as typed errors instead of panicking. Deny the lint in the [lints] or [workspace.lints] table the package uses; only a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists, may leave the panicking lints undenied, in its own lints table.\n\
+            RequiredLintNotDenied: 15 violations\n\
+            Every warning and every lint of the clippy groups fails the build, and code reports failures as typed errors instead of panicking, wherever it is written; tests, in every crate alike, fail fast only with expect and unwrap, which the required clippy settings allow in #[test] functions and #[cfg(test)] items. Deny the lint in the [lints] or [workspace.lints] table the package uses.\n\
             \n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::arithmetic_side_effects\n\
             - overridden/Cargo.toml: Package overridden does not deny clippy::expect_used\n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::indexing_slicing\n\
             - overridden/Cargo.toml: Package overridden does not deny clippy::panic\n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::panic_in_result_fn\n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::string_slice\n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::todo\n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::unimplemented\n\
+            - overridden/Cargo.toml: Package overridden does not deny clippy::unreachable\n\
             - overridden/Cargo.toml: Package overridden does not deny clippy::unwrap_used\n\
+            - same_priority/Cargo.toml: Package same_priority does not deny clippy::string_slice\n\
+            - same_priority/Cargo.toml: Package same_priority does not deny clippy::todo\n\
+            - same_priority/Cargo.toml: Package same_priority does not deny clippy::unimplemented\n\
+            - same_priority/Cargo.toml: Package same_priority does not deny clippy::unreachable\n\
             - same_priority/Cargo.toml: Package same_priority does not deny clippy::unwrap_used\n\
             \n\
             ------------------------------\n\
-            8 errors found\n\
+            19 errors found\n\
             ------------------------------\n", host_footer(6, 6).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

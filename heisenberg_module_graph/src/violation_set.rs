@@ -25,6 +25,15 @@ impl ViolationSet {
     pub fn iter(&self) -> btree_map::Iter<'_, Violation, BTreeSet<FoldedFinding>> {
         self.folded_findings.iter()
     }
+
+    pub fn merge(&mut self, Self { folded_findings }: Self) {
+        for (violation, findings) in folded_findings {
+            self.folded_findings
+                .entry(violation)
+                .or_default()
+                .extend(findings);
+        }
+    }
 }
 
 impl Extend<Violation> for ViolationSet {
