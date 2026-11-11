@@ -8,13 +8,17 @@ use ra_ap_vfs::VfsPath;
 
 use heisenberg_module_graph::crate_target::CrateTarget;
 
+use crate::confinement_model::ConfinementModel;
+use crate::crate_package::CratePackage;
+use crate::declared_confined_packages::DeclaredConfinedPackages;
 use crate::declared_test_crates::DeclaredTestCrates;
 use crate::member_target::MemberTarget;
 use crate::package_document::PackageDocument;
 use crate::resolved_packages::ResolvedPackages;
 
 pub struct WorkspacePackages {
-    pub crate_packages: HashMap<VfsPath, String>,
+    pub confinement: ConfinementModel,
+    pub crate_packages: HashMap<VfsPath, CratePackage>,
     pub member_targets: HashMap<VfsPath, CrateTarget>,
     pub test_crates: BTreeSet<String>,
     pub unpublished_packages: BTreeSet<String>,
@@ -22,8 +26,13 @@ pub struct WorkspacePackages {
 
 impl WorkspacePackages {
     #[must_use]
-    pub fn new(resolved: &ResolvedPackages, declared_test_crates: &DeclaredTestCrates) -> Self {
+    pub fn new(
+        resolved: &ResolvedPackages,
+        declared_confined_packages: &DeclaredConfinedPackages,
+        declared_test_crates: &DeclaredTestCrates,
+    ) -> Self {
         Self {
+            confinement: declared_confined_packages.model(resolved),
             crate_packages: resolved
                 .packages
                 .iter()
@@ -35,7 +44,10 @@ impl WorkspacePackages {
                         .map(|Target { src_path, .. }| {
                             (
                                 VfsPath::from(AbsPathBuf::assert(src_path.clone())),
-                                metadata.id.repr.clone(),
+                                CratePackage {
+                                    id: metadata.id.repr.clone(),
+                                    name: metadata.name.to_string(),
+                                },
                             )
                         })
                 })

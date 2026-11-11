@@ -14,6 +14,8 @@ use crate::project_model_error::ProjectModelError;
 pub struct HeisenbergSettings {
     pub configurations: Vec<DeclaredConfiguration>,
     #[serde(default)]
+    pub confined_packages: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
     pub out_dirs: BTreeMap<String, DeclaredOutDir>,
     #[serde(default)]
     pub test_crates: Vec<String>,

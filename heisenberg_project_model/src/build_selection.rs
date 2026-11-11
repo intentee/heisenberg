@@ -1,17 +1,21 @@
-use crate::package_edge::PackageEdge;
-use crate::resolved_build::ResolvedBuild;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
-pub enum BuildSelection {
+use crate::package_edge::PackageEdge;
+
+pub enum BuildSelection<'build> {
     Everything,
-    Resolved(ResolvedBuild),
+    Resolved {
+        edges: BTreeSet<PackageEdge>,
+        features: &'build BTreeMap<String, BTreeSet<String>>,
+    },
 }
 
-impl BuildSelection {
+impl BuildSelection<'_> {
     pub fn features(&self, package_id: &str) -> Vec<String> {
         match self {
             Self::Everything => Vec::new(),
-            Self::Resolved(build) => build
-                .features
+            Self::Resolved { features, .. } => features
                 .get(package_id)
                 .into_iter()
                 .flatten()
@@ -23,14 +27,14 @@ impl BuildSelection {
     pub fn includes_edge(&self, edge: &PackageEdge) -> bool {
         match self {
             Self::Everything => true,
-            Self::Resolved(build) => build.edges.contains(edge),
+            Self::Resolved { edges, .. } => edges.contains(edge),
         }
     }
 
     pub fn includes_package(&self, package_id: &str) -> bool {
         match self {
             Self::Everything => true,
-            Self::Resolved(build) => build.features.contains_key(package_id),
+            Self::Resolved { features, .. } => features.contains_key(package_id),
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
@@ -14,7 +15,7 @@ fn empty_library_is_not_judged_in_a_partial_run() {
         }
         .path(),
     }
-    .run_with_arguments(&["--configuration", HOST_CONFIGURATION])
+    .run_with_arguments(&[CONFIGURATION_ARGUMENT, HOST_CONFIGURATION])
     .expect("the arguments must parse");
 
     assert_eq!(

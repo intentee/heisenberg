@@ -88,6 +88,10 @@ pub enum ProjectModelError {
         manifest_path: AbsPathBuf,
     },
     #[error(
+        "guppy resolves the package `{package_id}` into the build of the configuration, but the resolved workspace does not hold it"
+    )]
+    UnknownBuildGraphPackage { package_id: String },
+    #[error(
         "the configuration `{configuration}` of `{manifest_path}` selects the feature `{feature}`, which no workspace member defines"
     )]
     UnknownConfigurationFeature {
@@ -297,10 +301,23 @@ pub enum ProjectModelError {
     BuildScriptCfg(#[source] ContextualError<String, ParseError>),
     #[error("the build script output `{}` cannot be read", .0.context.display())]
     UnreadableBuildScriptOutput(#[source] ContextualError<PathBuf, io::Error>),
+    #[error(
+        "the build script of `{package}` writes `{}` into its OUT_DIR, and that name is not UTF-8",
+        name.display()
+    )]
+    NonUtf8BuildScriptOutputName {
+        name: PathBuf,
+        out_dir: AbsPathBuf,
+        package: String,
+    },
+    #[error("the build script output `{0}` is not an absolute path")]
+    RelativeBuildScriptOutput(Utf8PathBuf),
     #[error("the procedural macro crate rooted at `{0}` has no built library")]
     ProcMacroLibraryMissing(VfsPath),
     #[error("the procedural macros of `{}` cannot be loaded", .0.context)]
     ProcMacroLoad(#[source] ContextualError<AbsPathBuf, ProcMacroLoadingError>),
+    #[error("the procedural macros of `{}` cannot be loaded on a thread of their own", .0.context)]
+    ProcMacroLoadThread(#[source] ContextualError<AbsPathBuf, AnalysisThreadsError>),
     #[error("the sysroot has no rustc in `{directory}`")]
     SysrootWithoutCompiler { directory: AbsPathBuf },
     #[error("the sysroot has no procedural macro server")]
@@ -313,6 +330,8 @@ pub enum ProjectModelError {
     BuildScriptOutputUnavailable(Arc<Self>),
     #[error("the standard library resolution thread cannot be started")]
     LibraryResolutionThread(#[source] AnalysisThreadsError),
+    #[error("the source text check thread cannot be started")]
+    SourceTextCheckThread(#[source] AnalysisThreadsError),
     #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
     UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]

@@ -39,6 +39,13 @@ pub const CODE_ACTIVE_IN_NO_CONFIGURATION: IssueText = IssueText {
     summary: "Code that no declared configuration builds",
 };
 
+pub const CODE_WITHOUT_COVERAGE_DATA: IssueText = IssueText {
+    definition: "A measured function, one with a body whose opening brace is production code as UncoveredCode defines it, written directly or by a macro, that no region of the coverage export falls into, because no instrumented build of the measured run compiled it.",
+    name: "CodeWithoutCoverageData",
+    purpose: "Every production function is measured. Build and run the target that holds the function under the instrumented tests, and keep the function instrumented: rustc records no coverage for #[automatically_derived] code, and cfg(coverage) leaves code out of the instrumented build.",
+    summary: "A production function without coverage data",
+};
+
 pub const CONFIGURATION_SELECTION_MACRO: IssueText = IssueText {
     definition: "A cfg_select! call, whose unselected arms escape the analysis.",
     name: "ConfigurationSelectionMacro",
@@ -46,8 +53,36 @@ pub const CONFIGURATION_SELECTION_MACRO: IssueText = IssueText {
     summary: "A cfg_select! call",
 };
 
+pub const CONFINED_PACKAGE_REACHED_OUTSIDE_ITS_USERS: IssueText = IssueText {
+    definition: "A workspace member that confined_packages does not list as a user of a package, while cargo builds the package for the member in an analysed configuration: through the normal and build dependencies of every package on the way, other workspace members and third-party packages alike, and through the member's own dev-dependencies, starting from the side its own targets build on, the host for a procedural macro crate and the target otherwise, each dependency on the target or the host where cargo builds it; a member never reaches its own package. The issue is reported once per member and package at the manifest of the member, with a shortest dependency path to the package, and names the configurations it holds in when it does not hold in every analysed one.",
+    name: "ConfinedPackageReachedOutsideItsUsers",
+    purpose: "A confined package is built and used only by its declared users, so nothing else reaches what it provides, even through another member. Remove the dependency that the path names; code that needs the package belongs in one of its users.",
+    summary: "A member that reaches a confined package without being one of its users",
+};
+
+pub const CONFINED_PACKAGE_USER_LISTED_TWICE: IssueText = IssueText {
+    definition: "A name that confined_packages lists more than once among the users of one package.",
+    name: "ConfinedPackageUserListedTwice",
+    purpose: "Each user of a confined package is listed once. Remove the repeated entry from confined_packages.",
+    summary: "A confined package user listed more than once",
+};
+
+pub const CONFINED_PACKAGE_USER_NOT_A_MEMBER: IssueText = IssueText {
+    definition: "A user of a confined package, in confined_packages, that names no workspace member.",
+    name: "ConfinedPackageUserNotAMember",
+    purpose: "Only a workspace member can use a confined package. Remove the entry from confined_packages, or add the package to the workspace.",
+    summary: "A confined package user that is not a workspace member",
+};
+
+pub const CONFINED_PACKAGE_USER_NOT_REACHING_IT: IssueText = IssueText {
+    definition: "A workspace member that confined_packages lists as a user of a package that cargo builds for it in no declared configuration, reported at the workspace manifest. A partial run does not evaluate it.",
+    name: "ConfinedPackageUserNotReachingIt",
+    purpose: "The users of a confined package are exactly the members that reach it, so the list states where the package is used. Remove the member from the users of the package.",
+    summary: "A confined package user that never reaches the package",
+};
+
 pub const DUPLICATED_FUNCTION_BODY: IssueText = IssueText {
-    definition: "Functions written in the module files of workspace members whose signatures and bodies are identical once every name is replaced by the definition it resolves to, with names a function declares itself compared by declaration order and names that resolve to nothing never equal. Functions with an empty body are not compared, and neither are the entry points that Rust requires one of per target or per macro: the main function of a binary, a build script, an example, or a test or benchmark target without libtest's harness, and the functions of procedural macros.",
+    definition: "Functions written in the module files of workspace members whose signatures and bodies are identical once every name is replaced by the definition it resolves to, with names a function declares itself compared by declaration order and names that resolve to nothing never equal; a format or assembly template compares by its written text and by the definitions its placeholders capture, and the name of a named format argument by its spelling. Functions with an empty body are not compared, and neither are the entry points that Rust requires one of per target or per macro: the main function of a binary, a build script, an example, or a test or benchmark target without libtest's harness, and the functions of procedural macros.",
     name: "DuplicatedFunctionBody",
     purpose: "Duplicated code drifts apart when one copy changes. Keep one function and call it from every place that needs it.",
     summary: "Functions whose signatures and bodies are identical",
@@ -347,6 +382,13 @@ pub const TUPLE_IN_SIGNATURE: IssueText = IssueText {
     summary: "A tuple type in an item signature",
 };
 
+pub const UNCOVERED_CODE: IssueText = IssueText {
+    definition: "A region of production code that the coverage export records and that no test executed. A function that no test executes is reported at its name, a function that tests execute in part once at its name with every unexecuted region, and a region outside every function, such as one in a macro_rules! definition that only test code calls, at the region itself. A region counts as executed when any instrumented build executed it, whichever instantiation, crate type or function written from the same text it belongs to. Production code is the text written in the module files of every crate target that is neither an integration test target nor a target of a test crate, active in the measured configuration and outside the modules that cfg(test) gates.",
+    name: "UncoveredCode",
+    purpose: "Every line of production code runs under the tests. Add tests that execute the code, or remove the code that nothing needs.",
+    summary: "Production code that no test executes",
+};
+
 pub const UNDESTRUCTURED_PARAMETER: IssueText = IssueText {
     definition: "A function or closure parameter bound by an identifier, other than self, whose every use, at least one, accesses a field of the struct or tuple the parameter holds, directly or behind references, with the field name written in a module file. Fields reached through Box or another Deref implementation, and fields of unions, do not count, and neither does a parameter that holds by value a type implementing Drop and reads a field that is not Copy, which a pattern cannot move out of.",
     name: "UndestructuredParameter",
@@ -359,6 +401,13 @@ pub const UNIMPLEMENTED_BUILTIN_MACRO: IssueText = IssueText {
     name: "UnimplementedBuiltinMacro",
     purpose: "rust-analyzer cannot expand this built-in macro, so its output cannot be analysed. Replace the call with code that can be analysed.",
     summary: "A built-in macro that rust-analyzer cannot expand",
+};
+
+pub const UNKNOWN_CONFINED_PACKAGE: IssueText = IssueText {
+    definition: "A confined_packages entry that names no package that the workspace resolves, member or dependency.",
+    name: "UnknownConfinedPackage",
+    purpose: "A confinement holds only for a package that the workspace resolves. Remove the entry from confined_packages, or correct the package name.",
+    summary: "A confined package that the workspace does not resolve",
 };
 
 pub const UNMAPPED_ITEM: IssueText = IssueText {

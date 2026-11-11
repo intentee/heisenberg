@@ -5,15 +5,20 @@ use clap::Parser;
 
 use heisenberg_command::heisenberg_command::HeisenbergCommand;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::EXPLAIN_SUBCOMMAND;
+use heisenberg_command_tests::constants::PROGRAM_NAME;
 
 #[test]
 fn explain_names_the_required_lints() {
     let mut output = Vec::new();
     let mut errors = Vec::new();
-    let status =
-        HeisenbergCommand::try_parse_from(["heisenberg", "explain", "RequiredLintNotDenied"])
-            .expect("the arguments must parse")
-            .run(&BTreeMap::new(), &mut output, &mut errors);
+    let status = HeisenbergCommand::try_parse_from([
+        PROGRAM_NAME,
+        EXPLAIN_SUBCOMMAND,
+        "RequiredLintNotDenied",
+    ])
+    .expect("the arguments must parse")
+    .run(&BTreeMap::new(), &mut output, &mut errors);
 
     assert_eq!(
         str::from_utf8(&output),

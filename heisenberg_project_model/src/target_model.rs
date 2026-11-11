@@ -30,7 +30,7 @@ fn loaded_sysroot(
         .map_err(ProjectModelError::LibraryFeatureResolution)
         .and_then(|build| {
             library
-                .metadata(build)
+                .metadata(&build)
                 .map_err(ProjectModelError::LibraryMetadata)
         })
         .and_then(|metadata| {

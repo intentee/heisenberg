@@ -1,0 +1,36 @@
+[workspace]
+exclude = ["vendor"]
+members = ["both", "builder", "consumer", "cyclic", "dependent", "enabler", "forked", "harness", "idle", "scriptor", "stranger", "tested", "tool", "unlisted", "user", "wrapper"]
+resolver = "3"
+
+[workspace.metadata.heisenberg.confined_packages]
+absent = ["wrapper"]
+confined = ["user", "user", "missing", "wrapper", "idle"]
+cyclic = ["harness"]
+x = ["tested"]
+y = ["builder", "tested"]
+z = ["scriptor"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = ["bundled"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = ["bundled"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc-without-features"
+target = "x86_64-pc-windows-msvc"
+default_features = false
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu-without-features"
+target = "x86_64-unknown-linux-gnu"
+default_features = false
+features = []

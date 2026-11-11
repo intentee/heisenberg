@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::num::NonZeroU16;
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::thread::scope;
 
 use ra_ap_ide_db::ChangeWithProcMacros;
 use ra_ap_ide_db::FxHashMap;
@@ -20,6 +21,8 @@ use ra_ap_vfs::FileExcluded;
 use ra_ap_vfs::Vfs;
 use ra_ap_vfs::VfsPath;
 
+use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
+use heisenberg_analysis_threads::joined::joined;
 use heisenberg_error_context::error_context::error_context;
 
 use crate::project_model_error::ProjectModelError;
@@ -62,26 +65,43 @@ impl LoadedProcMacros<'_> {
 
         self.servers(&proc_macro_crates)
             .and_then(|servers| {
-                servers
-                    .iter()
-                    .flat_map(|server| {
-                        proc_macro_crates.iter().map(|krate| {
-                            let root = self.vfs.file_path(crate_graph[*krate].basic.root_file_id);
+                scope(|scope| {
+                    let threads = &AnalysisThreads { scope };
+                    let crate_graph = &crate_graph;
+                    let dylibs = &dylibs;
+                    let loading: Vec<_> = servers
+                        .iter()
+                        .flat_map(|server| {
+                            proc_macro_crates.iter().map(move |krate| {
+                                let root =
+                                    self.vfs.file_path(crate_graph[*krate].basic.root_file_id);
 
-                            dylibs
-                                .get(root)
-                                .ok_or(ProjectModelError::ProcMacroLibraryMissing(root.clone()))
-                                .and_then(|dylib| {
-                                    load_proc_macro(server, dylib, &[])
-                                        .map_err(error_context(
-                                            dylib.clone(),
-                                            ProjectModelError::ProcMacroLoad,
-                                        ))
-                                        .map(|macros| (*krate, Ok(macros)))
-                                })
+                                dylibs
+                                    .get(root)
+                                    .ok_or(ProjectModelError::ProcMacroLibraryMissing(root.clone()))
+                                    .and_then(|dylib| {
+                                        threads
+                                            .spawn(move || {
+                                                load_proc_macro(server, dylib, &[])
+                                                    .map_err(error_context(
+                                                        dylib.clone(),
+                                                        ProjectModelError::ProcMacroLoad,
+                                                    ))
+                                                    .map(|macros| (*krate, Ok(macros)))
+                                            })
+                                            .map_err(error_context(
+                                                dylib.clone(),
+                                                ProjectModelError::ProcMacroLoadThread,
+                                            ))
+                                    })
+                            })
                         })
-                    })
-                    .collect::<Result<Vec<_>, ProjectModelError>>()
+                        .collect();
+
+                    joined(loading)
+                        .into_iter()
+                        .collect::<Result<Vec<_>, ProjectModelError>>()
+                })
             })
             .map(|proc_macros| {
                 let mut change = ChangeWithProcMacros::default();

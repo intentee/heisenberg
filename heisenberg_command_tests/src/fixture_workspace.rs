@@ -9,6 +9,11 @@ pub struct FixtureWorkspace<'name> {
 
 impl FixtureWorkspace<'_> {
     #[must_use]
+    pub fn coverage_export(&self, file: &str) -> PathBuf {
+        self.path().join("target").join(file)
+    }
+
+    #[must_use]
     pub fn path(&self) -> PathBuf {
         Path::new(PACKAGE_DIRECTORY)
             .join("workspaces")

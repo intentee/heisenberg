@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -26,6 +27,11 @@ impl CrateTarget {
             }
             CrateTargetKind::Library => false,
         }
+    }
+
+    #[must_use]
+    pub fn is_test_code(&self, test_crates: &BTreeSet<String>) -> bool {
+        self.kind == CrateTargetKind::IntegrationTest || test_crates.contains(&self.package_name)
     }
 }
 

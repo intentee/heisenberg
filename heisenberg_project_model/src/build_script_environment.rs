@@ -11,9 +11,10 @@ use ra_ap_vfs::VfsPath;
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
 use crate::constants::CARGO_OUT_DIR_VARIABLE;
+use crate::crate_package::CratePackage;
 
 pub struct BuildScriptEnvironment<'assignment> {
-    pub crate_packages: &'assignment HashMap<VfsPath, String>,
+    pub crate_packages: &'assignment HashMap<VfsPath, CratePackage>,
     pub outputs: &'assignment BTreeMap<String, BuildScriptOutput>,
     pub vfs: &'assignment Vfs,
 }
@@ -24,7 +25,7 @@ impl BuildScriptEnvironment<'_> {
             if let Some(BuildScriptOutput { env, out_dir, .. }) = self
                 .crate_packages
                 .get(self.vfs.file_path(krate.data(database).root_file_id))
-                .and_then(|package| self.outputs.get(package))
+                .and_then(|CratePackage { id, .. }| self.outputs.get(id))
             {
                 let mut environment = krate.env(database).clone();
 

@@ -1,0 +1,22 @@
+[package]
+name = "coverage_unexecuted_test_crate"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+members = ["testing"]
+
+[workspace.metadata.heisenberg]
+test_crates = ["coverage_unexecuted_test_crate_testing"]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

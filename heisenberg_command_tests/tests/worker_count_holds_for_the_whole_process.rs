@@ -2,6 +2,7 @@ use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::constants::HOST_SELECTION;
+use heisenberg_command_tests::constants::JOBS_ARGUMENT;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 
@@ -15,7 +16,7 @@ fn worker_count_holds_for_the_whole_process() {
         workspace: &workspace,
     };
     let single_worker = check
-        .run_with_arguments(&[HOST_SELECTION.as_slice(), &["--jobs", "1"]].concat())
+        .run_with_arguments(&[HOST_SELECTION.as_slice(), &[JOBS_ARGUMENT, "1"]].concat())
         .expect("the arguments must parse");
     let default_workers = check.run().expect("the arguments must parse");
 

@@ -1,0 +1,11 @@
+[package]
+name = "q"
+edition = "2024"
+version = "0.1.0"
+publish = false
+
+[dependencies]
+y = { path = "../y", optional = true }
+
+[features]
+extra = ["dep:y"]

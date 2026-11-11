@@ -2,6 +2,7 @@ use std::path::Path;
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::constants::FULL_RUN_FOOTER_END;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
@@ -18,9 +19,9 @@ fn module_file_skipped_in_some_configurations_names_them() {
         .expect("the host-only fixture must be prepared"),
     }
     .run_with_arguments(&[
-        "--configuration",
+        CONFIGURATION_ARGUMENT,
         &format!("{HOST_CONFIGURATION}-early"),
-        "--configuration",
+        CONFIGURATION_ARGUMENT,
         &format!("{HOST_CONFIGURATION}-late"),
     ])
     .expect("the arguments must parse");

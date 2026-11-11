@@ -3,6 +3,7 @@ use std::io;
 use std::path::PathBuf;
 
 use clap::Error;
+use serde_json::error;
 use thiserror::Error;
 use toml::de;
 use toml::ser;
@@ -26,6 +27,16 @@ pub enum HeisenbergCheckError {
     FixtureCargoConfigurationWrite(#[source] ContextualError<PathBuf, io::Error>),
     #[error("{CARGO_HOME_VARIABLE} cannot be read")]
     CargoHome(#[source] VarError),
+    #[error("the coverage export `{}` cannot be parsed", .0.context.display())]
+    CoverageExportParse(#[source] ContextualError<PathBuf, error::Error>),
+    #[error("the coverage export `{}` cannot be read", .0.context.display())]
+    CoverageExportRead(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("the tampered coverage export `{}` cannot be serialized", .0.context.display())]
+    CoverageExportSerialization(#[source] ContextualError<PathBuf, error::Error>),
+    #[error("the coverage export holds no value at `{pointer}` to tamper with")]
+    CoverageExportValueMissing { pointer: &'static str },
+    #[error("the tampered coverage export `{}` cannot be written", .0.context.display())]
+    CoverageExportWrite(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the name of configuration {} of the fixture manifest `{}` is not a string", .0.context.index, .0.context.manifest_path.display())]
     FixtureConfigurationName(#[source] ContextualError<FixtureConfiguration, Box<de::Error>>),
     #[error("configuration {} of the fixture manifest `{}` has no name", .0.index, .0.manifest_path.display())]

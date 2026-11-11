@@ -33,17 +33,19 @@ fn checked_text(path: &AbsPath) -> Result<(), Arc<ProjectModelError>> {
         .map_err(Arc::new)
 }
 
+fn recorded_text_check(
+    text_checks: &OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
+    real_path: &AbsPath,
+) -> Result<(), Arc<ProjectModelError>> {
+    text_checks.get_or_init(real_path.to_path_buf(), || checked_text(real_path))
+}
+
 pub struct SourceFiles {
     files: HashMap<FileId, SourceFile>,
 }
 
 impl SourceFiles {
-    /// # Errors
-    ///
-    /// Returns [`ProjectModelError::VirtualSourceFile`] when rust-analyzer holds a file that
-    /// is not on disk, and [`ProjectModelError::SourceFileUnavailable`] when a file it holds
-    /// cannot be read or is not UTF-8, which leaves it without text in rust-analyzer.
-    pub fn new(
+    pub(crate) fn new(
         vfs: &Vfs,
         workspace_root: &AbsPath,
         text_checks: &OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
@@ -60,8 +62,7 @@ impl SourceFiles {
                 path.as_path()
                     .ok_or_else(|| ProjectModelError::VirtualSourceFile(path.clone()))
                     .and_then(|real_path| {
-                        text_checks
-                            .get_or_init(real_path.to_path_buf(), || checked_text(real_path))
+                        recorded_text_check(text_checks, real_path)
                             .map_err(ProjectModelError::SourceFileUnavailable)
                             .map(|()| {
                                 (
@@ -81,6 +82,17 @@ impl SourceFiles {
     #[must_use]
     pub fn file(&self, file_id: FileId) -> Option<&SourceFile> {
         self.files.get(&file_id)
+    }
+
+    pub(crate) fn check_texts(
+        vfs: &Vfs,
+        text_checks: &OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
+    ) {
+        vfs.iter()
+            .filter_map(|(_, path)| path.as_path())
+            .for_each(|real_path| {
+                drop(recorded_text_check(text_checks, real_path));
+            });
     }
 }
 

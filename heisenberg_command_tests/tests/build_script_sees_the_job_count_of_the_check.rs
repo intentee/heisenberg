@@ -2,6 +2,7 @@ use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::constants::HOST_SELECTION;
+use heisenberg_command_tests::constants::JOBS_ARGUMENT;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_command_tests::host_footer::host_footer;
@@ -14,7 +15,7 @@ fn build_script_sees_the_job_count_of_the_check() {
         }
         .path(),
     }
-    .run_with_arguments(&[HOST_SELECTION.as_slice(), &["--jobs", "3"]].concat())
+    .run_with_arguments(&[HOST_SELECTION.as_slice(), &[JOBS_ARGUMENT, "3"]].concat())
     .expect("the arguments must parse");
 
     assert_eq!(

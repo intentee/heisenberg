@@ -1,3 +1,4 @@
+use heisenberg_command_tests::constants::JOBS_ARGUMENT;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_command_tests::heisenberg_check_error::HeisenbergCheckError;
@@ -10,7 +11,7 @@ fn job_count_beyond_the_worker_limit_is_a_usage_error() {
         }
         .path(),
     }
-    .run_with_arguments(&["--jobs", "65536"])
+    .run_with_arguments(&[JOBS_ARGUMENT, "65536"])
     .err();
 
     assert!(

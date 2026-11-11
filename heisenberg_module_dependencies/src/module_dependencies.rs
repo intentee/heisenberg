@@ -14,42 +14,31 @@ use ra_ap_ide_db::base_db::salsa::Durability;
 use ra_ap_ide_db::base_db::set_all_crates_with_durability;
 use ra_ap_syntax::SyntaxNodePtr;
 use ra_ap_vfs::FileId;
-use ra_ap_vfs::VfsPath;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
+use heisenberg_attached_work::attached_work::attached_work;
+use heisenberg_configured_code::test_modules::TestModules;
+use heisenberg_member_crates::member_crates::member_crates;
+use heisenberg_member_crates::module_files::module_files;
+use heisenberg_member_crates::resolved_member_crate::ResolvedMemberCrate;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
-use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_project_model::loaded_project::LoadedProject;
-use heisenberg_project_model::source_file::SourceFile;
+use heisenberg_source_locator::source_locator::SourceLocator;
 use heisenberg_task_graph::once_map::OnceMap;
 
-use crate::attached_modules::attached_modules;
 use crate::crate_extraction::CrateExtraction;
 use crate::crate_walk::CrateWalk;
 use crate::inactive_code_site::InactiveCodeSite;
-use crate::member_crate::MemberCrate;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
 use crate::module_paths::ModulePaths;
-use crate::name_resolution_priming::NameResolutionPriming;
-use crate::resolved_member_crate::ResolvedMemberCrate;
-use crate::source_locator::SourceLocator;
-use crate::test_modules::TestModules;
 
 fn inactive_code(diagnostics: &[ModuleDiagnostics]) -> HashMap<InFile<SyntaxNodePtr>, CfgExpr> {
     diagnostics
         .iter()
         .flat_map(|ModuleDiagnostics { inactive_code, .. }| inactive_code)
         .map(|InactiveCodeSite { cfg, node }| (*node, cfg.clone()))
-        .collect()
-}
-
-fn module_files<'members>(
-    members: impl Iterator<Item = &'members ResolvedMemberCrate>,
-) -> BTreeSet<FileId> {
-    members
-        .flat_map(|ResolvedMemberCrate { files, .. }| files.iter().copied())
         .collect()
 }
 
@@ -60,25 +49,13 @@ pub struct ModuleDependencies<'project, 'resolved> {
 impl ModuleDependencies<'_, '_> {
     /// # Errors
     ///
-    /// Returns [`ModuleDependenciesError`] when name resolution cannot be scheduled over the
-    /// crate dependency graph, or when rust-analyzer refers to a source file or offset that the
+    /// Returns [`ModuleDependenciesError`] when name resolution and trait implementations
+    /// cannot be scheduled over the crate dependency graph, or when rust-analyzer refers to a source file or offset that the
     /// loaded project does not hold.
     pub fn extract(&mut self) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
-        self.members().and_then(|members| {
-            NameResolutionPriming {
-                database: &self.project.database,
-                members: &members
-                    .iter()
-                    .map(|MemberCrate { krate, .. }| *krate)
-                    .collect::<Vec<Crate>>(),
-            }
-            .prime()
-            .and_then(|()| {
-                let resolved = self.resolved_members(members);
-
-                self.member_graphs(&resolved)
-            })
-        })
+        member_crates(self.project)
+            .map_err(ModuleDependenciesError::MemberCrates)
+            .and_then(|resolved| self.member_graphs(&resolved))
     }
 
     fn file_modules(&self, files: &BTreeSet<FileId>) -> HashMap<FileId, Vec<Module>> {
@@ -128,13 +105,10 @@ impl ModuleDependencies<'_, '_> {
                             .copied()
                             .collect()
                     });
-                    let diagnostics = attached_modules(
-                        database,
-                        &modules_with_files,
-                        |module_database, module| {
-                            ModuleDiagnostics::new(&Semantics::new(module_database), module)
-                        },
-                    );
+                    let diagnostics =
+                        attached_work(database, &modules_with_files, |module_database, module| {
+                            ModuleDiagnostics::new(&Semantics::new(module_database), *module)
+                        });
                     let inactive_code = inactive_code(&diagnostics);
                     let crate_walk = CrateWalk {
                         build_script_output_files,
@@ -151,11 +125,10 @@ impl ModuleDependencies<'_, '_> {
                         unpublished_packages,
                         workspace_files,
                     };
-                    let walked = attached_modules(
-                        database,
-                        &modules_with_files,
-                        |module_database, module| crate_walk.module(module_database, module),
-                    );
+                    let walked =
+                        attached_work(database, &modules_with_files, |module_database, module| {
+                            crate_walk.module(module_database, *module)
+                        });
 
                     attach_db(database, || {
                         CrateExtraction {
@@ -185,12 +158,7 @@ impl ModuleDependencies<'_, '_> {
         let workspace_files = module_files(members.iter());
         let test_code_files = module_files(members.iter().filter(
             |ResolvedMemberCrate { crate_target, .. }| {
-                crate_target.kind == CrateTargetKind::IntegrationTest
-                    || self
-                        .project
-                        .packages
-                        .test_crates
-                        .contains(&crate_target.package_name)
+                crate_target.is_test_code(&self.project.packages.test_crates)
             },
         ));
         let file_modules = self.file_modules(&workspace_files);
@@ -252,36 +220,6 @@ impl ModuleDependencies<'_, '_> {
         })
     }
 
-    fn members(&self) -> Result<Vec<MemberCrate>, ModuleDependenciesError> {
-        let project = &*self.project;
-        let database = &project.database;
-
-        attach_db(database, || {
-            Crate::all(database)
-                .into_iter()
-                .filter_map(|krate| {
-                    let root = krate.root_file(database);
-
-                    project
-                        .files
-                        .file(root)
-                        .ok_or(ModuleDependenciesError::UnknownSourceFile(root))
-                        .map(|SourceFile { path, .. }| {
-                            project
-                                .packages
-                                .member_targets
-                                .get(&VfsPath::from(path.to_path_buf()))
-                                .map(|crate_target| MemberCrate {
-                                    crate_target: crate_target.clone(),
-                                    krate,
-                                })
-                        })
-                        .transpose()
-                })
-                .collect()
-        })
-    }
-
     fn put_first(&mut self, krate: Crate) {
         let database = &mut self.project.database;
         let first = DatabaseCrate::from(krate);
@@ -295,16 +233,5 @@ impl ModuleDependencies<'_, '_> {
             .collect();
 
         set_all_crates_with_durability(database, order, Durability::MEDIUM);
-    }
-
-    fn resolved_members(&self, members: Vec<MemberCrate>) -> Vec<ResolvedMemberCrate> {
-        let database = &self.project.database;
-
-        attach_db(database, || {
-            members
-                .into_iter()
-                .map(|member| member.resolved(database))
-                .collect()
-        })
     }
 }

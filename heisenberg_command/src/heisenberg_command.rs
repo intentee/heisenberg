@@ -25,6 +25,15 @@ fn written(
         .map_err(|error| vec![failure(error)])
 }
 
+fn reported(
+    output: &mut dyn Write,
+    report: Result<RenderedReport, Vec<HeisenbergCommandError>>,
+) -> Result<HeisenbergExitStatus, Vec<HeisenbergCommandError>> {
+    report.and_then(|RenderedReport { status, text }| {
+        written(output, &text, status, HeisenbergCommandError::WriteReport)
+    })
+}
+
 #[derive(Debug, Parser)]
 #[command(
     about = "Deterministic, zero-heuristics Rust linter",
@@ -44,11 +53,14 @@ impl HeisenbergCommand {
         errors: &mut dyn Write,
     ) -> HeisenbergExitStatus {
         let outcome = match &self.subcommand {
-            HeisenbergSubcommand::Check(check) => check.execute(environment).and_then(|report| {
-                let RenderedReport { status, text } = report.render();
-
-                written(output, &text, status, HeisenbergCommandError::WriteReport)
-            }),
+            HeisenbergSubcommand::Check(check) => reported(
+                output,
+                check.execute(environment).map(|report| report.render()),
+            ),
+            HeisenbergSubcommand::CoverageCheck(coverage) => reported(
+                output,
+                coverage.execute(environment).map(|report| report.render()),
+            ),
             HeisenbergSubcommand::Explain(ExplainCommand { issue_type }) => written(
                 output,
                 &issue_type.explanation(),

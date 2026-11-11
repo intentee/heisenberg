@@ -2,6 +2,9 @@ use clap::Parser;
 use clap::error::ErrorKind;
 
 use heisenberg_command::heisenberg_command::HeisenbergCommand;
+use heisenberg_command_tests::constants::CHECK_SUBCOMMAND;
+use heisenberg_command_tests::constants::HELP_ARGUMENT;
+use heisenberg_command_tests::constants::PROGRAM_NAME;
 
 const CHECK_HELP: &str = "Report module dependency cycles and structural violations in every crate of a Cargo workspace, in\n\
     the configurations it declares.\n\
@@ -17,20 +20,28 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     a directory, relative to the workspace root, with the files the build script writes to OUT_DIR, and\n\
     the cfgs and env the build script emits; that build script then never runs, and the declared files,\n\
     cfgs and env stand in for its output; its optional test_crates list names the workspace members that\n\
-    hold only code for tests. A missing table, an unknown key, an empty configuration list, an empty or\n\
-    repeated configuration name, a configuration with an unknown target, with a feature that no\n\
-    workspace member defines or with a feature listed twice, two configurations with the same target and\n\
-    features, a configuration that selects features other than the default ones in a workspace that uses\n\
-    resolver 1 with a root package and other members, where cargo applies a feature selection to the\n\
-    root package only, an out-dir for a package the workspace does not resolve, for a name that several\n\
-    resolved versions share or for a package without a build script, an out-dir directory outside the\n\
-    workspace or that cannot be read, an out-dir without the output of a declared configuration or with\n\
-    the output of an undeclared configuration, and a declared cfg that does not parse fail the run. A\n\
-    test_crates entry that is not a workspace member, that is listed twice, whose package can be\n\
-    published, or that a member other than a test crate depends on through a normal or build dependency\n\
-    is a violation, and an entry that fails these conditions is not a test crate. No setting exempts\n\
-    code from any rule: test_crates declares which members are test code, and Heisenberg verifies the\n\
-    declaration.\n\
+    hold only code for tests; and its optional confined_packages table maps the name of a package, which\n\
+    names every resolved version of it, to the workspace members that may depend on it, directly or\n\
+    transitively. A missing table, an unknown key, an empty configuration list, an empty or repeated\n\
+    configuration name, a configuration with an unknown target, with a feature that no workspace member\n\
+    defines or with a feature listed twice, two configurations with the same target and features, a\n\
+    configuration that selects features other than the default ones in a workspace that uses resolver 1\n\
+    with a root package and other members, where cargo applies a feature selection to the root package\n\
+    only, an out-dir for a package the workspace does not resolve, for a name that several resolved\n\
+    versions share or for a package without a build script, an out-dir directory outside the workspace\n\
+    or that cannot be read, an out-dir without the output of a declared configuration or with the output\n\
+    of an undeclared configuration, and a declared cfg that does not parse fail the run. A test_crates\n\
+    entry that is not a workspace member, that is listed twice, whose package can be published, or that\n\
+    a member other than a test crate depends on through a normal or build dependency is a violation, and\n\
+    an entry that fails these conditions is not a test crate. A confined_packages entry for a package\n\
+    that the workspace does not resolve, a user that is listed twice for one package or that is not a\n\
+    workspace member, a member other than the users of a package for which cargo builds the package in\n\
+    an analysed configuration, through the normal and build dependencies of any package and the member's\n\
+    own dev-dependencies, on the target or the host where cargo builds it, a member never reaching its\n\
+    own package, and a user for which cargo builds the package in no declared configuration are\n\
+    violations. No setting exempts code from any rule: test_crates declares which members are test code,\n\
+    confined_packages declares which members may depend on a package, and Heisenberg verifies both\n\
+    declarations.\n\
     \n\
     Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration with the standard\n\
     library of its target installed, Cargo.lock is up to date, the cargo home holds every package of\n\
@@ -99,8 +110,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     in some of the crate targets or configurations that analyse its file, the message names them. A\n\
     cause and its direct consequences form one issue. A partial run, one that leaves out a declared\n\
     configuration, names the configurations it left out after the analysed ones and does not evaluate\n\
-    CodeActiveInNoConfiguration or the empty-library check of TestsOnlyPackageWithoutTestLibraries,\n\
-    which hold only over every declared configuration; a partial run without issues exits as compliant.\n\
+    CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt or the empty-library check of\n\
+    TestsOnlyPackageWithoutTestLibraries, which hold only over every declared configuration; a partial\n\
+    run without issues exits as compliant.\n\
     \n\
     Rules:\n  \
     AdditionalPublicItem: A module with more than one public item\n  \
@@ -108,6 +120,11 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ClippyConfigurationMissing: A workspace member without a clippy configuration\n  \
     CodeActiveInNoConfiguration: Code that no declared configuration builds\n  \
     ConfigurationSelectionMacro: A cfg_select! call\n  \
+    ConfinedPackageReachedOutsideItsUsers: A member that reaches a confined package without being one\n  \
+    of its users\n  \
+    ConfinedPackageUserListedTwice: A confined package user listed more than once\n  \
+    ConfinedPackageUserNotAMember: A confined package user that is not a workspace member\n  \
+    ConfinedPackageUserNotReachingIt: A confined package user that never reaches the package\n  \
     DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n  \
     FailedMacroExpansion: A macro call that fails to expand\n  \
     FunctionUsedOnlyByTests: A production function that only tests use\n  \
@@ -153,6 +170,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     TupleInSignature: A tuple type in an item signature\n  \
     UndestructuredParameter: A parameter used only through its fields\n  \
     UnimplementedBuiltinMacro: A built-in macro that rust-analyzer cannot expand\n  \
+    UnknownConfinedPackage: A confined package that the workspace does not resolve\n  \
     UnmappedItem: An item that cannot be mapped to its definition\n  \
     UnparsableMacroExpansion: A macro expansion that does not parse\n  \
     UnprefixedTypeParameter: A type parameter not named T followed by a capitalized word\n  \
@@ -196,7 +214,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
 
 #[test]
 fn check_help_lists_every_rule() {
-    let error = HeisenbergCommand::try_parse_from(["heisenberg", "check", "--help"])
+    let error = HeisenbergCommand::try_parse_from([PROGRAM_NAME, CHECK_SUBCOMMAND, HELP_ARGUMENT])
         .expect_err("the help must be displayed instead of a command");
 
     assert_eq!(error.kind(), ErrorKind::DisplayHelp);

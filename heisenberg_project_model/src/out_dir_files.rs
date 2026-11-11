@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::DirEntry;
 use std::io;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -15,7 +14,9 @@ use ra_ap_ide_db::base_db::SourceRoot;
 use ra_ap_ide_db::base_db::SourceRootId;
 use ra_ap_ide_db::base_db::all_crates;
 use ra_ap_ide_db::base_db::salsa::Durability;
+use ra_ap_paths::AbsPath;
 use ra_ap_paths::AbsPathBuf;
+use ra_ap_paths::Utf8Path;
 
 use ra_ap_vfs::FileId;
 use ra_ap_vfs::Vfs;
@@ -27,47 +28,70 @@ use heisenberg_error_context::error_context::error_context;
 use heisenberg_task_graph::once_map::OnceMap;
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
+use crate::crate_package::CratePackage;
 use crate::out_dir_file::OutDirFile;
 use crate::project_model_error::ProjectModelError;
 
-fn directory_files(directory: &Path) -> Result<Vec<PathBuf>, ProjectModelError> {
-    fs::read_dir(directory)
+fn directory_files(
+    out_dir: &AbsPath,
+    below: &Utf8Path,
+    package: &str,
+) -> Result<Vec<AbsPathBuf>, ProjectModelError> {
+    let directory = out_dir.join(below);
+
+    fs::read_dir(&directory)
         .and_then(Iterator::collect::<io::Result<Vec<DirEntry>>>)
         .map_err(error_context(
-            directory.to_path_buf(),
+            PathBuf::from(directory),
             ProjectModelError::UnreadableBuildScriptOutput,
         ))
         .and_then(|entries| {
             entries
                 .iter()
                 .map(|entry| {
-                    entry
-                        .file_type()
-                        .map_err(error_context(
-                            entry.path(),
-                            ProjectModelError::UnreadableBuildScriptOutput,
-                        ))
-                        .and_then(|kind| {
-                            if kind.is_dir() {
-                                directory_files(&entry.path())
-                            } else {
-                                Ok(vec![entry.path()])
-                            }
+                    let name = entry.file_name();
+
+                    name.to_str()
+                        .map(|written| below.join(written))
+                        .ok_or_else(|| ProjectModelError::NonUtf8BuildScriptOutputName {
+                            name: below.as_std_path().join(&name),
+                            out_dir: out_dir.to_path_buf(),
+                            package: package.to_owned(),
+                        })
+                        .and_then(|relative| {
+                            let path = out_dir.join(&relative);
+
+                            entry
+                                .file_type()
+                                .map_err(error_context(
+                                    PathBuf::from(path.clone()),
+                                    ProjectModelError::UnreadableBuildScriptOutput,
+                                ))
+                                .and_then(|kind| {
+                                    if kind.is_dir() {
+                                        directory_files(out_dir, &relative, package)
+                                    } else {
+                                        Ok(vec![path])
+                                    }
+                                })
                         })
                 })
-                .collect::<Result<Vec<Vec<PathBuf>>, ProjectModelError>>()
+                .collect::<Result<Vec<Vec<AbsPathBuf>>, ProjectModelError>>()
                 .map(|files| files.into_iter().flatten().collect())
         })
 }
 
-fn out_dir_contents(directory: &Path) -> Result<Vec<OutDirFile>, ProjectModelError> {
-    directory_files(directory).and_then(|files| {
+fn out_dir_contents(
+    out_dir: &AbsPath,
+    package: &str,
+) -> Result<Vec<OutDirFile>, ProjectModelError> {
+    directory_files(out_dir, &Utf8PathBuf::new(), package).and_then(|files| {
         files
             .into_iter()
             .map(|file| {
                 fs::read(&file)
                     .map_err(error_context(
-                        file.clone(),
+                        PathBuf::from(file.clone()),
                         ProjectModelError::UnreadableBuildScriptOutput,
                     ))
                     .map(|bytes| {
@@ -84,8 +108,9 @@ fn out_dir_contents(directory: &Path) -> Result<Vec<OutDirFile>, ProjectModelErr
 pub struct OutDirFiles<'assignment> {
     pub contents:
         &'assignment OnceMap<Utf8PathBuf, Result<Arc<Vec<OutDirFile>>, Arc<ProjectModelError>>>,
-    pub crate_packages: &'assignment HashMap<VfsPath, String>,
+    pub crate_packages: &'assignment HashMap<VfsPath, CratePackage>,
     pub outputs: &'assignment BTreeMap<String, BuildScriptOutput>,
+    pub text_checks: &'assignment OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
 }
 
 impl OutDirFiles<'_> {
@@ -94,15 +119,14 @@ impl OutDirFiles<'_> {
         database: &mut RootDatabase,
         vfs: &mut Vfs,
     ) -> Result<BTreeSet<FileId>, ProjectModelError> {
-        let mut source_roots: BTreeMap<SourceRootId, BTreeSet<String>> = BTreeMap::new();
+        let mut source_roots: BTreeMap<SourceRootId, BTreeMap<&CratePackage, &BuildScriptOutput>> =
+            BTreeMap::new();
 
         for krate in all_crates(database).iter() {
             let root_file = krate.data(database).root_file_id;
 
-            if let Some(package) = self
-                .crate_packages
-                .get(vfs.file_path(root_file))
-                .filter(|package| self.outputs.contains_key(*package))
+            if let Some(package) = self.crate_packages.get(vfs.file_path(root_file))
+                && let Some(output) = self.outputs.get(&package.id)
             {
                 source_roots
                     .entry(
@@ -111,7 +135,7 @@ impl OutDirFiles<'_> {
                             .source_root_id(database),
                     )
                     .or_default()
-                    .insert(package.clone());
+                    .insert(package, output);
             }
         }
 
@@ -120,20 +144,22 @@ impl OutDirFiles<'_> {
             .map(|(source_root, packages)| {
                 packages
                     .iter()
-                    .map(|package| {
-                        let out_dir = &self.outputs[package].out_dir;
-
-                        self.contents
-                            .get_or_init(out_dir.clone(), || {
-                                out_dir_contents(out_dir.as_std_path())
-                                    .map(Arc::new)
-                                    .map_err(Arc::new)
-                            })
-                            .map_err(ProjectModelError::BuildScriptOutputUnavailable)
-                    })
+                    .map(
+                        |(CratePackage { name, .. }, BuildScriptOutput { out_dir, .. })| {
+                            self.contents
+                                .get_or_init(out_dir.clone(), || {
+                                    AbsPathBuf::try_from(out_dir.clone())
+                                        .map_err(ProjectModelError::RelativeBuildScriptOutput)
+                                        .and_then(|directory| out_dir_contents(&directory, name))
+                                        .map(Arc::new)
+                                        .map_err(Arc::new)
+                                })
+                                .map_err(ProjectModelError::BuildScriptOutputUnavailable)
+                        },
+                    )
                     .collect::<Result<Vec<Arc<Vec<OutDirFile>>>, ProjectModelError>>()
                     .map(|contents| {
-                        Self::extend(
+                        self.extend(
                             database,
                             vfs,
                             source_root,
@@ -150,6 +176,7 @@ impl OutDirFiles<'_> {
     }
 
     fn extend(
+        &self,
         database: &mut RootDatabase,
         vfs: &mut Vfs,
         source_root: SourceRootId,
@@ -164,7 +191,9 @@ impl OutDirFiles<'_> {
 
         let added: Vec<FileId> = contents
             .filter_map(|OutDirFile { path, text }| {
-                let path = VfsPath::from(AbsPathBuf::assert_utf8(path));
+                drop(self.text_checks.get_or_init(path.clone(), || Ok(())));
+
+                let path = VfsPath::from(path);
 
                 vfs.set_file_contents(path.clone(), Some(text.clone().into_bytes()));
                 vfs.file_id(&path).map(|(file_id, _)| {

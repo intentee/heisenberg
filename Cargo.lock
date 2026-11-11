@@ -2403,7 +2403,6 @@ dependencies = [
  "clap",
  "heisenberg_command",
  "heisenberg_command_tests",
- "heisenberg_project_model",
 ]
 
 [[package]]
@@ -2424,12 +2423,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "heisenberg_attached_work"
+version = "0.1.0"
+dependencies = [
+ "ra_ap_hir",
+ "ra_ap_ide_db",
+ "rayon",
+]
+
+[[package]]
 name = "heisenberg_command"
 version = "0.1.0"
 dependencies = [
  "clap",
  "heisenberg_absolute_path",
  "heisenberg_analysis_threads",
+ "heisenberg_coverage_export",
+ "heisenberg_coverage_measurement",
  "heisenberg_error_context",
  "heisenberg_module_cycles",
  "heisenberg_module_dependencies",
@@ -2447,10 +2457,67 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "heisenberg_command",
+ "heisenberg_coverage_export",
  "heisenberg_error_context",
+ "heisenberg_project_model",
+ "humantime",
  "rayon",
+ "serde_json",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "heisenberg_configured_code"
+version = "0.1.0"
+dependencies = [
+ "heisenberg_source_locator",
+ "heisenberg_task_graph",
+ "ra_ap_cfg",
+ "ra_ap_hir",
+ "ra_ap_hir_expand",
+ "ra_ap_ide_db",
+ "ra_ap_intern",
+ "ra_ap_syntax",
+ "ra_ap_vfs",
+]
+
+[[package]]
+name = "heisenberg_coverage_export"
+version = "0.1.0"
+dependencies = [
+ "heisenberg_absolute_path",
+ "heisenberg_error_context",
+ "ra_ap_paths",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "heisenberg_coverage_measurement"
+version = "0.1.0"
+dependencies = [
+ "heisenberg_attached_work",
+ "heisenberg_configured_code",
+ "heisenberg_coverage_export",
+ "heisenberg_error_context",
+ "heisenberg_expanded_code",
+ "heisenberg_member_crates",
+ "heisenberg_module_graph",
+ "heisenberg_project_model",
+ "heisenberg_source_locator",
+ "heisenberg_task_graph",
+ "humantime",
+ "ra_ap_cfg",
+ "ra_ap_hir",
+ "ra_ap_hir_expand",
+ "ra_ap_ide_db",
+ "ra_ap_paths",
+ "ra_ap_syntax",
+ "ra_ap_vfs",
+ "rayon",
+ "thiserror",
 ]
 
 [[package]]
@@ -2458,10 +2525,39 @@ name = "heisenberg_error_context"
 version = "0.1.0"
 
 [[package]]
+name = "heisenberg_expanded_code"
+version = "0.1.0"
+dependencies = [
+ "ra_ap_hir",
+ "ra_ap_hir_expand",
+ "ra_ap_ide_db",
+ "ra_ap_intern",
+ "ra_ap_parser",
+ "ra_ap_syntax",
+ "ra_ap_syntax-bridge",
+ "ra_ap_vfs",
+ "salsa",
+]
+
+[[package]]
 name = "heisenberg_graph_cycles"
 version = "0.1.0"
 dependencies = [
  "petgraph",
+]
+
+[[package]]
+name = "heisenberg_member_crates"
+version = "0.1.0"
+dependencies = [
+ "heisenberg_module_graph",
+ "heisenberg_project_model",
+ "heisenberg_source_locator",
+ "heisenberg_task_graph",
+ "ra_ap_hir",
+ "ra_ap_ide_db",
+ "ra_ap_vfs",
+ "thiserror",
 ]
 
 [[package]]
@@ -2476,8 +2572,13 @@ dependencies = [
 name = "heisenberg_module_dependencies"
 version = "0.1.0"
 dependencies = [
+ "heisenberg_attached_work",
+ "heisenberg_configured_code",
+ "heisenberg_expanded_code",
+ "heisenberg_member_crates",
  "heisenberg_module_graph",
  "heisenberg_project_model",
+ "heisenberg_source_locator",
  "heisenberg_task_graph",
  "ra_ap_cfg",
  "ra_ap_hir",
@@ -2485,13 +2586,11 @@ dependencies = [
  "ra_ap_hir_expand",
  "ra_ap_ide_db",
  "ra_ap_intern",
- "ra_ap_parser",
  "ra_ap_paths",
  "ra_ap_syntax",
  "ra_ap_syntax-bridge",
  "ra_ap_vfs",
  "rayon",
- "salsa",
  "thiserror",
 ]
 
@@ -2530,6 +2629,21 @@ dependencies = [
  "thiserror",
  "toml",
  "triomphe",
+]
+
+[[package]]
+name = "heisenberg_source_locator"
+version = "0.1.0"
+dependencies = [
+ "heisenberg_module_graph",
+ "heisenberg_project_model",
+ "ra_ap_hir",
+ "ra_ap_hir_expand",
+ "ra_ap_ide_db",
+ "ra_ap_paths",
+ "ra_ap_syntax",
+ "ra_ap_vfs",
+ "thiserror",
 ]
 
 [[package]]
