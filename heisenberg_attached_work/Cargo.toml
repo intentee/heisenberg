@@ -1,0 +1,12 @@
+[package]
+name = "heisenberg_attached_work"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+ra_ap_hir = { workspace = true }
+ra_ap_ide_db = { workspace = true }
+rayon = { workspace = true }
+
+[lints]
+workspace = true

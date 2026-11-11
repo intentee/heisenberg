@@ -58,6 +58,11 @@ use ra_ap_syntax::ast::HasName as _;
 use ra_ap_syntax::ast::HasVisibility as _;
 use ra_ap_vfs::FileId;
 
+use heisenberg_configured_code::ancestry::Ancestry;
+use heisenberg_configured_code::configured_node::ConfiguredNode;
+use heisenberg_configured_code::negated_configuration::NegatedConfiguration;
+use heisenberg_configured_code::test_code::TestCode;
+use heisenberg_expanded_code::code_tokens::code_tokens;
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
@@ -78,13 +83,13 @@ use heisenberg_module_graph::violation_set::ViolationSet;
 use heisenberg_module_graph::walked_code::WalkedCode;
 use heisenberg_module_graph::written_tokens::WrittenTokens;
 use heisenberg_project_model::source_file::SourceFile;
+use heisenberg_source_locator::original_file_id::original_file_id;
+use heisenberg_source_locator::source_locator::SourceLocator;
+use heisenberg_source_locator::written_range::written_range;
 use heisenberg_task_graph::once_map::OnceMap;
 
 use crate::adt_violation::AdtViolation;
-use crate::ancestry::Ancestry;
 use crate::attributed_item::AttributedItem;
-use crate::code_tokens::code_tokens;
-use crate::configured_node::ConfiguredNode;
 use crate::constants::LIFETIME_PREFIX;
 use crate::constants_module::ConstantsModule;
 use crate::constructor::Constructor;
@@ -96,6 +101,7 @@ use crate::expanded_items::ExpandedItems;
 use crate::expansion_chain::ExpansionChain;
 use crate::field_only_parameter::FieldOnlyParameter;
 use crate::file_local_item::FileLocalItem;
+use crate::function_bodies::FunctionBodies;
 use crate::impl_home::ImplHome;
 use crate::implemented_type::ImplementedType;
 use crate::is_module_inside_block::is_module_inside_block;
@@ -118,10 +124,8 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_item::ModuleItem;
 use crate::module_paths::ModulePaths;
 use crate::name_words::NameWords;
-use crate::negated_configuration::NegatedConfiguration;
 use crate::ordered_entries::OrderedEntries;
 use crate::ordered_entry::OrderedEntry;
-use crate::original_file_id::original_file_id;
 use crate::outside_visibility::OutsideVisibility;
 use crate::parameter_name::ParameterName;
 use crate::path_reference::PathReference;
@@ -129,10 +133,9 @@ use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
 use crate::signature_tuple::SignatureTuple;
-use crate::source_locator::SourceLocator;
 use crate::subtree::Subtree;
 use crate::subtree_origin::SubtreeOrigin;
-use crate::test_code::TestCode;
+use crate::template_captures::TemplateCaptures;
 use crate::test_target_findings::TestTargetFindings;
 use crate::test_target_items::TestTargetItems;
 use crate::token_origin::TokenOrigin;
@@ -153,6 +156,7 @@ pub struct ModuleWalk<'walk, 'database> {
     pub paths: &'walk PathResolutions<'walk, 'database>,
     pub production_options: &'walk CfgOptions,
     pub semantics: &'walk Semantics<'database, RootDatabase>,
+    pub template_captures: &'walk TemplateCaptures<'walk, 'database>,
     pub test_code: &'walk TestCode<'walk, 'database>,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub token_origin: &'walk TokenOrigin<'walk, 'database>,
@@ -204,10 +208,20 @@ impl ModuleWalk<'_, '_> {
                                     self.walk(
                                         Subtree {
                                             origin: SubtreeOrigin::SourceFile,
-                                            root,
+                                            root: root.clone(),
                                         },
                                         walked,
                                     )
+                                })
+                                .and_then(|()| {
+                                    FunctionBodies {
+                                        crate_target: self.crate_target,
+                                        locator: self.locator,
+                                        semantics: self.semantics,
+                                        template_captures: self.template_captures,
+                                    }
+                                    .written_in(&root)
+                                    .map(|bodies| walked.function_bodies.extend(bodies))
                                 })
                         } else {
                             Ok(())
@@ -449,6 +463,9 @@ impl ModuleWalk<'_, '_> {
                                 origin,
                                 &mut walked.crate_findings.unsafe_code,
                             )
+                        })
+                        .and_then(|()| {
+                            self.unresolved_captures(node, file, origin, &mut walked.findings)
                         })
                         .and_then(|()| self.lint_suppressions(node, origin, &mut walked.findings))
                         .and_then(|()| self.test_only_code(node, origin))
@@ -784,7 +801,7 @@ impl ModuleWalk<'_, '_> {
             semantics: self.semantics,
         }
         .range();
-        let focus = self.token_origin.written_range(file, focus_range);
+        let focus = written_range(self.semantics.db, file, focus_range);
         let tokens = self.written_tokens(file, code_tokens(node.descendants_with_tokens()));
 
         self.record_own_tokens(file, &tokens, inactive_tokens)
@@ -1310,9 +1327,7 @@ impl ModuleWalk<'_, '_> {
                     original_file_id(database, module.definition_source_file_id(database));
 
                 self.locator
-                    .files
-                    .file(file_id)
-                    .ok_or(ModuleDependenciesError::UnknownSourceFile(file_id))
+                    .source_file(file_id)
                     .map(|SourceFile { path, .. }| {
                         if module.is_mod_rs(database) {
                             path.parent().and_then(AbsPath::file_name)
@@ -1547,11 +1562,9 @@ impl ModuleWalk<'_, '_> {
                     .and_then(|receiver| receiver.as_local(database))
             })
             .is_some_and(|receiver| {
-                !Definition::Local(receiver)
+                Definition::Local(receiver)
                     .usages(self.semantics)
-                    .all()
-                    .references
-                    .is_empty()
+                    .at_least_one()
             })
     }
 
@@ -1836,6 +1849,35 @@ impl ModuleWalk<'_, '_> {
         })
     }
 
+    fn unresolved_captures(
+        &self,
+        node: &SyntaxNode,
+        file: HirFileId,
+        origin: &SubtreeOrigin,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        code_tokens(node.children_with_tokens())
+            .filter(|token| {
+                ast::TokenTree::can_cast(node.kind())
+                    && ast::String::can_cast(token.kind())
+                    && self.token_origin.is_own_text(file, token.text_range())
+                    && self.template_captures.captures(token).contains(&None)
+            })
+            .map(|token| {
+                self.locate_original(
+                    self.semantics
+                        .diagnostics_display_range_for_range(InFile::new(file, token.text_range())),
+                    origin,
+                )
+                .map(|location| Violation {
+                    kind: ViolationKind::UnresolvedPath,
+                    location,
+                })
+            })
+            .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
+            .map(|unresolved| violations.extend(unresolved))
+    }
+
     fn unresolved_method_call(
         &self,
         node: &SyntaxNode,
@@ -1905,6 +1947,7 @@ impl ModuleWalk<'_, '_> {
         WalkedModule {
             crate_findings,
             findings,
+            ..
         }: &mut WalkedModule,
     ) -> Result<(), ModuleDependenciesError> {
         self.unresolved_method_call(node, origin)
@@ -2014,7 +2057,7 @@ impl ModuleWalk<'_, '_> {
     ) -> Vec<WrittenToken> {
         tokens
             .map(|token| WrittenToken {
-                written: self.token_origin.written_range(file, token.text_range()),
+                written: written_range(self.semantics.db, file, token.text_range()),
                 token,
             })
             .collect()

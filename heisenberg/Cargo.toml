@@ -9,7 +9,6 @@ heisenberg_command = { workspace = true }
 
 [dev-dependencies]
 heisenberg_command_tests = { workspace = true }
-heisenberg_project_model = { workspace = true }
 
 [lints]
 workspace = true

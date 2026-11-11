@@ -1,6 +1,7 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::constants::LEFT_OUT_CONFIGURATION;
 use heisenberg_command_tests::constants::PARTIAL_RUN_FOOTER_END;
@@ -16,9 +17,9 @@ fn cycle_found_in_some_configurations_names_them() {
         .path(),
     }
     .run_with_arguments(&[
-        "--configuration",
+        CONFIGURATION_ARGUMENT,
         HOST_CONFIGURATION,
-        "--configuration",
+        CONFIGURATION_ARGUMENT,
         &format!("{HOST_CONFIGURATION}-without-features"),
     ])
     .expect("the arguments must parse");

@@ -5,14 +5,16 @@ use clap::Parser;
 
 use heisenberg_command::heisenberg_command::HeisenbergCommand;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::EXPLAIN_SUBCOMMAND;
+use heisenberg_command_tests::constants::PROGRAM_NAME;
 
 #[test]
 fn explain_names_the_required_clippy_settings() {
     let mut output = Vec::new();
     let mut errors = Vec::new();
     let status = HeisenbergCommand::try_parse_from([
-        "heisenberg",
-        "explain",
+        PROGRAM_NAME,
+        EXPLAIN_SUBCOMMAND,
         "RequiredClippySettingMissing",
     ])
     .expect("the arguments must parse")

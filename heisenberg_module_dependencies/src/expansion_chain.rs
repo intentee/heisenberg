@@ -14,10 +14,10 @@ use ra_ap_syntax::ast::HasName;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
 use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_source_locator::source_locator::SourceLocator;
 
 use crate::macro_expansion::MacroExpansion;
 use crate::module_dependencies_error::ModuleDependenciesError;
-use crate::source_locator::SourceLocator;
 
 pub struct ExpansionChain<'chain, 'database> {
     pub call: MacroCallId,

@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use cargo::workspace::dependency::DepKind;
 
+use crate::declared_names::DeclaredNames;
 use crate::dependency_document::DependencyDocument;
 use crate::dependency_kind_document::DependencyKindDocument;
 use crate::package_document::PackageDocument;
@@ -83,23 +84,17 @@ impl DeclaredTestCrates {
         test_crates: &BTreeSet<String>,
     ) -> Vec<PackageViolation> {
         let workspace_path = resolved.workspace_path();
-        let mut declared: BTreeSet<&str> = BTreeSet::new();
-        let mut violations: BTreeSet<PackageViolation> = BTreeSet::new();
+        let DeclaredNames { distinct, repeated } = DeclaredNames::new(&self.names);
+        let mut violations: BTreeSet<PackageViolation> = repeated
+            .into_iter()
+            .map(|name| PackageViolation::TestCrateDeclaredTwice {
+                manifest: workspace_path.manifest(),
+                package: name.to_owned(),
+            })
+            .collect();
 
-        for name in &self.names {
-            if !declared.insert(name) {
-                violations.insert(PackageViolation::TestCrateDeclaredTwice {
-                    manifest: workspace_path.manifest(),
-                    package: name.clone(),
-                });
-            }
-        }
-
-        for name in declared {
-            match resolved
-                .members()
-                .find(|PackageDocument { metadata, .. }| metadata.name.as_str() == name)
-            {
+        for name in distinct {
+            match resolved.member_named(name) {
                 None => {
                     violations.insert(PackageViolation::TestCrateNotAMember {
                         manifest: workspace_path.manifest(),

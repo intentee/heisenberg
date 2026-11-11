@@ -1,6 +1,7 @@
 use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 
@@ -13,7 +14,7 @@ fn undeclared_selected_configuration_fails_to_load_the_project() {
     let outcome = HeisenbergCheck {
         workspace: &workspace,
     }
-    .run_with_arguments(&["--configuration", "aarch64-apple-darwin"])
+    .run_with_arguments(&[CONFIGURATION_ARGUMENT, "aarch64-apple-darwin"])
     .expect("the arguments must parse");
 
     assert_eq!(

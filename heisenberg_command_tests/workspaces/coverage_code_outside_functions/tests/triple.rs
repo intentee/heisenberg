@@ -1,0 +1,4 @@
+#[test]
+fn two_tripled_is_six() {
+    assert_eq!(coverage_code_outside_functions::triple(2), 6);
+}

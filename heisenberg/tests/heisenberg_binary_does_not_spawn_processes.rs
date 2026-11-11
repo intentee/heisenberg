@@ -6,6 +6,7 @@ use std::str;
 
 use heisenberg_command_tests::binary_check::BinaryCheck;
 use heisenberg_command_tests::constants::CARGO_HOME_VARIABLE;
+use heisenberg_command_tests::constants::CHECK_SUBCOMMAND;
 use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::host_footer::host_footer;
@@ -18,6 +19,7 @@ fn heisenberg_binary_analyses_the_real_sysroot_without_spawning_processes() {
     let output = BinaryCheck {
         binary: Path::new(env!("CARGO_BIN_EXE_heisenberg")),
         cargo_home: Path::new(&cargo_home),
+        subcommand: CHECK_SUBCOMMAND,
         sysroot: Path::new(&sysroot),
         workspace: &FixtureWorkspace {
             name: "acyclic_modules",
@@ -56,6 +58,7 @@ fn heisenberg_binary_runs_without_spawning_processes() {
     let output = BinaryCheck {
         binary: Path::new(env!("CARGO_BIN_EXE_heisenberg")),
         cargo_home: &cargo_home,
+        subcommand: CHECK_SUBCOMMAND,
         sysroot: &fixture.join("sysroot"),
         workspace: &fixture.join("workspace"),
     }

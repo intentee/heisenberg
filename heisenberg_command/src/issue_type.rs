@@ -5,6 +5,7 @@ use clap::builder::PossibleValue;
 use humantime::format_duration;
 
 use heisenberg_module_graph::violation_kind::ViolationKind;
+use heisenberg_project_model::confinement_violation::ConfinementViolation;
 use heisenberg_project_model::constants::CLIPPY_CONFIGURATION_FILE;
 use heisenberg_project_model::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
 use heisenberg_project_model::constants::MAXIMUM_SLOW_TEST_PERIOD;
@@ -23,7 +24,12 @@ use crate::constants::ADDITIONAL_PUBLIC_ITEM;
 use crate::constants::CLIPPY_CONFIGURATION_AMBIGUOUS;
 use crate::constants::CLIPPY_CONFIGURATION_MISSING;
 use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
+use crate::constants::CODE_WITHOUT_COVERAGE_DATA;
 use crate::constants::CONFIGURATION_SELECTION_MACRO;
+use crate::constants::CONFINED_PACKAGE_REACHED_OUTSIDE_ITS_USERS;
+use crate::constants::CONFINED_PACKAGE_USER_LISTED_TWICE;
+use crate::constants::CONFINED_PACKAGE_USER_NOT_A_MEMBER;
+use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
 use crate::constants::DUPLICATED_FUNCTION_BODY;
 use crate::constants::FAILED_MACRO_EXPANSION;
 use crate::constants::FUNCTION_USED_ONLY_BY_TESTS;
@@ -67,8 +73,10 @@ use crate::constants::TEST_CRATE_USED_BY_PRODUCTION;
 use crate::constants::TEST_ONLY_CODE_IN_PRODUCTION;
 use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
 use crate::constants::TUPLE_IN_SIGNATURE;
+use crate::constants::UNCOVERED_CODE;
 use crate::constants::UNDESTRUCTURED_PARAMETER;
 use crate::constants::UNIMPLEMENTED_BUILTIN_MACRO;
+use crate::constants::UNKNOWN_CONFINED_PACKAGE;
 use crate::constants::UNMAPPED_ITEM;
 use crate::constants::UNPARSABLE_MACRO_EXPANSION;
 use crate::constants::UNPREFIXED_TYPE_PARAMETER;
@@ -88,7 +96,12 @@ pub enum IssueType {
     ClippyConfigurationAmbiguous,
     ClippyConfigurationMissing,
     CodeActiveInNoConfiguration,
+    CodeWithoutCoverageData,
     ConfigurationSelectionMacro,
+    ConfinedPackageReachedOutsideItsUsers,
+    ConfinedPackageUserListedTwice,
+    ConfinedPackageUserNotAMember,
+    ConfinedPackageUserNotReachingIt,
     DuplicatedFunctionBody,
     FailedMacroExpansion,
     FunctionUsedOnlyByTests,
@@ -132,8 +145,10 @@ pub enum IssueType {
     TestOnlyCodeInProduction,
     TestsOnlyPackageWithoutTestLibraries,
     TupleInSignature,
+    UncoveredCode,
     UndestructuredParameter,
     UnimplementedBuiltinMacro,
+    UnknownConfinedPackage,
     UnmappedItem,
     UnparsableMacroExpansion,
     UnprefixedTypeParameter,
@@ -172,13 +187,25 @@ impl IssueType {
     }
 
     #[must_use]
+    pub const fn measures_coverage(self) -> bool {
+        matches!(self, Self::CodeWithoutCoverageData | Self::UncoveredCode)
+    }
+
+    #[must_use]
     pub const fn text(self) -> IssueText {
         match self {
             Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
             Self::ClippyConfigurationAmbiguous => CLIPPY_CONFIGURATION_AMBIGUOUS,
             Self::ClippyConfigurationMissing => CLIPPY_CONFIGURATION_MISSING,
             Self::CodeActiveInNoConfiguration => CODE_ACTIVE_IN_NO_CONFIGURATION,
+            Self::CodeWithoutCoverageData => CODE_WITHOUT_COVERAGE_DATA,
             Self::ConfigurationSelectionMacro => CONFIGURATION_SELECTION_MACRO,
+            Self::ConfinedPackageReachedOutsideItsUsers => {
+                CONFINED_PACKAGE_REACHED_OUTSIDE_ITS_USERS
+            }
+            Self::ConfinedPackageUserListedTwice => CONFINED_PACKAGE_USER_LISTED_TWICE,
+            Self::ConfinedPackageUserNotAMember => CONFINED_PACKAGE_USER_NOT_A_MEMBER,
+            Self::ConfinedPackageUserNotReachingIt => CONFINED_PACKAGE_USER_NOT_REACHING_IT,
             Self::DuplicatedFunctionBody => DUPLICATED_FUNCTION_BODY,
             Self::FailedMacroExpansion => FAILED_MACRO_EXPANSION,
             Self::FunctionUsedOnlyByTests => FUNCTION_USED_ONLY_BY_TESTS,
@@ -222,8 +249,10 @@ impl IssueType {
             Self::TestOnlyCodeInProduction => TEST_ONLY_CODE_IN_PRODUCTION,
             Self::TestsOnlyPackageWithoutTestLibraries => TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES,
             Self::TupleInSignature => TUPLE_IN_SIGNATURE,
+            Self::UncoveredCode => UNCOVERED_CODE,
             Self::UndestructuredParameter => UNDESTRUCTURED_PARAMETER,
             Self::UnimplementedBuiltinMacro => UNIMPLEMENTED_BUILTIN_MACRO,
+            Self::UnknownConfinedPackage => UNKNOWN_CONFINED_PACKAGE,
             Self::UnmappedItem => UNMAPPED_ITEM,
             Self::UnparsableMacroExpansion => UNPARSABLE_MACRO_EXPANSION,
             Self::UnprefixedTypeParameter => UNPREFIXED_TYPE_PARAMETER,
@@ -331,6 +360,18 @@ impl From<&ViolationKind> for IssueType {
 impl From<&PackageViolation> for IssueType {
     fn from(violation: &PackageViolation) -> Self {
         match violation {
+            PackageViolation::Confinement(ConfinementViolation::UnknownPackage { .. }) => {
+                Self::UnknownConfinedPackage
+            }
+            PackageViolation::Confinement(ConfinementViolation::UserListedTwice { .. }) => {
+                Self::ConfinedPackageUserListedTwice
+            }
+            PackageViolation::Confinement(ConfinementViolation::UserNotAMember { .. }) => {
+                Self::ConfinedPackageUserNotAMember
+            }
+            PackageViolation::Confinement(ConfinementViolation::UserNotReachingIt { .. }) => {
+                Self::ConfinedPackageUserNotReachingIt
+            }
             PackageViolation::ClippyConfigurationAmbiguous { .. } => {
                 Self::ClippyConfigurationAmbiguous
             }
@@ -371,7 +412,12 @@ impl ValueEnum for IssueType {
             Self::ClippyConfigurationAmbiguous,
             Self::ClippyConfigurationMissing,
             Self::CodeActiveInNoConfiguration,
+            Self::CodeWithoutCoverageData,
             Self::ConfigurationSelectionMacro,
+            Self::ConfinedPackageReachedOutsideItsUsers,
+            Self::ConfinedPackageUserListedTwice,
+            Self::ConfinedPackageUserNotAMember,
+            Self::ConfinedPackageUserNotReachingIt,
             Self::DuplicatedFunctionBody,
             Self::FailedMacroExpansion,
             Self::FunctionUsedOnlyByTests,
@@ -415,8 +461,10 @@ impl ValueEnum for IssueType {
             Self::TestOnlyCodeInProduction,
             Self::TestsOnlyPackageWithoutTestLibraries,
             Self::TupleInSignature,
+            Self::UncoveredCode,
             Self::UndestructuredParameter,
             Self::UnimplementedBuiltinMacro,
+            Self::UnknownConfinedPackage,
             Self::UnmappedItem,
             Self::UnparsableMacroExpansion,
             Self::UnprefixedTypeParameter,

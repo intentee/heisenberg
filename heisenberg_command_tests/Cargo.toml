@@ -8,11 +8,15 @@ autotests = false
 [dependencies]
 clap = { workspace = true }
 heisenberg_command = { workspace = true }
+heisenberg_coverage_export = { workspace = true }
 heisenberg_error_context = { workspace = true }
+heisenberg_project_model = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
+humantime = { workspace = true }
 rayon = { workspace = true }
 
 [[test]]

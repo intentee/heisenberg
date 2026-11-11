@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use cargo_metadata::camino::Utf8PathBuf;
-use guppy::platform::Platform;
 use ra_ap_cfg::CfgAtom;
 use ra_ap_cfg::CfgDiff;
 use ra_ap_ide_db::FxHashMap;
@@ -36,6 +35,7 @@ use crate::feature_graph::FeatureGraph;
 use crate::loaded_workspace::LoadedWorkspace;
 use crate::out_dir_file::OutDirFile;
 use crate::project_model_error::ProjectModelError;
+use crate::resolved_build::ResolvedBuild;
 use crate::run_context::RunContext;
 use crate::run_scope::RunScope;
 use crate::supported_target::SupportedTarget;
@@ -50,7 +50,7 @@ pub struct ResolvedProject<'model> {
     pub configurations: BTreeMap<Configuration, BTreeMap<String, BuildScriptOutput>>,
     pub declared_test_crates: DeclaredTestCrates,
     pub(crate) library: FeatureGraph,
-    pub(crate) manifest: ManifestPath,
+    pub manifest: ManifestPath,
     pub packages: WorkspacePackages,
     pub project: FeatureGraph,
     pub(crate) proc_macro_server: OnceLock<Result<Vec<ProcMacroClient>, Arc<ProjectModelError>>>,
@@ -99,42 +99,50 @@ impl ResolvedProject<'_> {
             platform,
             ..
         } = &target.cfg;
+        let Configuration { features, .. } = configuration;
 
-        self.cargo_workspace(configuration, platform)
-            .map(|cargo| {
-                Self::project_workspace(
-                    cargo,
-                    crates.clone(),
-                    data_layout.clone(),
-                    target.sysroot.clone(),
-                )
-            })
-            .and_then(|workspace| {
-                load_workspace(
-                    workspace.clone(),
-                    &FxHashMap::default(),
-                    &LoadCargoConfig {
-                        load_out_dirs_from_check: false,
-                        num_worker_threads: 1,
-                        prefill_caches: false,
-                        proc_macro_processes: 0,
-                        with_proc_macro_server: ProcMacroServerChoice::None,
-                    },
-                )
-                .map_err(Into::into)
-                .map_err(ProjectModelError::WorkspaceLoad)
-                .map(|(database, vfs, _)| LoadedWorkspace {
-                    build_script_contents: &self.build_script_contents,
-                    database,
-                    jobs: self.run.jobs,
-                    packages: &self.packages,
-                    proc_macro_server: &self.proc_macro_server,
-                    source_text_checks: &self.source_text_checks,
-                    target: Arc::clone(target),
-                    vfs,
-                    workspace,
-                    workspace_root: &self.project.resolved.workspace.root,
-                })
+        self.project
+            .build_selected(features, platform)
+            .map_err(Box::new)
+            .map_err(ProjectModelError::ProjectFeatureResolution)
+            .and_then(|build| {
+                self.cargo_workspace(&build)
+                    .map(|cargo| {
+                        Self::project_workspace(
+                            cargo,
+                            crates.clone(),
+                            data_layout.clone(),
+                            target.sysroot.clone(),
+                        )
+                    })
+                    .and_then(|workspace| {
+                        load_workspace(
+                            workspace.clone(),
+                            &FxHashMap::default(),
+                            &LoadCargoConfig {
+                                load_out_dirs_from_check: false,
+                                num_worker_threads: 1,
+                                prefill_caches: false,
+                                proc_macro_processes: 0,
+                                with_proc_macro_server: ProcMacroServerChoice::None,
+                            },
+                        )
+                        .map_err(Into::into)
+                        .map_err(ProjectModelError::WorkspaceLoad)
+                        .map(|(database, vfs, _)| LoadedWorkspace {
+                            build,
+                            build_script_contents: &self.build_script_contents,
+                            database,
+                            jobs: self.run.jobs,
+                            packages: &self.packages,
+                            proc_macro_server: &self.proc_macro_server,
+                            source_text_checks: &self.source_text_checks,
+                            target: Arc::clone(target),
+                            vfs,
+                            workspace,
+                            workspace_root: &self.project.resolved.workspace.root,
+                        })
+                    })
             })
     }
 
@@ -169,20 +177,10 @@ impl ResolvedProject<'_> {
             .map(|models| models.into_iter().flatten().collect())
     }
 
-    fn cargo_workspace(
-        &self,
-        Configuration { features, .. }: &Configuration,
-        platform: &Arc<Platform>,
-    ) -> Result<CargoWorkspace, ProjectModelError> {
+    fn cargo_workspace(&self, build: &ResolvedBuild) -> Result<CargoWorkspace, ProjectModelError> {
         self.project
-            .build_selected(features, platform)
-            .map_err(Box::new)
-            .map_err(ProjectModelError::ProjectFeatureResolution)
-            .and_then(|build| {
-                self.project
-                    .metadata(build)
-                    .map_err(ProjectModelError::ProjectMetadata)
-            })
+            .metadata(build)
+            .map_err(ProjectModelError::ProjectMetadata)
             .map(|metadata| {
                 CargoWorkspace::new(
                     metadata,

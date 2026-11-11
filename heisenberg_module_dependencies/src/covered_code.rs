@@ -8,7 +8,8 @@ use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::WalkEvent;
 use ra_ap_syntax::ast;
 
-use crate::configured_node::ConfiguredNode;
+use heisenberg_configured_code::configured_node::ConfiguredNode;
+
 use crate::token_origin::TokenOrigin;
 
 pub struct CoveredCode<'code, 'database> {

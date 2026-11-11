@@ -1,0 +1,23 @@
+[package]
+name = "coverage_attribute_failing_in_rust_analyzer"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+rust_analyzer_divergent_macros = { path = "../rust_analyzer_divergent_macros" }
+
+[workspace]
+
+[workspace.metadata.heisenberg]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

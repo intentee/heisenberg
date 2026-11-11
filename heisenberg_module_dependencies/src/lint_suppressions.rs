@@ -17,11 +17,11 @@ use ra_ap_syntax::ast;
 use ra_ap_syntax_bridge::DocCommentDesugarMode;
 use ra_ap_syntax_bridge::syntax_node_to_token_tree;
 
+use heisenberg_configured_code::visit_active_metas::visit_active_metas;
 use heisenberg_project_model::constants::PANICKING_LINTS;
 use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 
 use crate::path_resolutions::PathResolutions;
-use crate::visit_active_metas::visit_active_metas;
 
 const LOWERING_ATTRIBUTES: [&str; 1] = ["warn"];
 

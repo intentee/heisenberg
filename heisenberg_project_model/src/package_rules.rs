@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 use heisenberg_graph_cycles::cycle_components::CycleComponents;
 use heisenberg_graph_cycles::graph_edge::GraphEdge;
-use heisenberg_graph_cycles::shortest_cycles::ShortestCycles;
+use heisenberg_graph_cycles::shortest_paths::ShortestPaths;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
 use crate::dependency_document::DependencyDocument;
@@ -114,7 +114,7 @@ impl PackageRules<'_> {
     fn tests_without_test_libraries(&self) -> Vec<PackageViolation> {
         let workspace_path = self.resolved.workspace_path();
         let members: Vec<&PackageDocument> = self.resolved.members().collect();
-        let cycles = ShortestCycles::new(self.package_edges());
+        let paths = ShortestPaths::new(self.package_edges());
         let packages_by_id: BTreeMap<&str, &PackageDocument> = self
             .resolved
             .packages
@@ -144,8 +144,8 @@ impl PackageRules<'_> {
                     .map(|PackageDocument { metadata, .. }| {
                         (
                             metadata.name.as_str(),
-                            cycles
-                                .through(
+                            paths
+                                .cycle_through(
                                     metadata.id.repr.as_str(),
                                     &dependencies
                                         .iter()

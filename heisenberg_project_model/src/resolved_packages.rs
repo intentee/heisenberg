@@ -24,13 +24,18 @@ pub struct ResolvedPackages {
 }
 
 impl ResolvedPackages {
+    pub fn member_named(&self, name: &str) -> Option<&PackageDocument> {
+        self.named(name)
+            .find(|PackageDocument { is_member, .. }| *is_member)
+    }
+
     pub fn members(&self) -> impl Iterator<Item = &PackageDocument> {
         self.packages
             .iter()
             .filter(|PackageDocument { is_member, .. }| *is_member)
     }
 
-    pub fn metadata(&self, selection: &BuildSelection) -> Value {
+    pub fn metadata(&self, selection: &BuildSelection<'_>) -> Value {
         let selected: Vec<&PackageDocument> = self
             .packages
             .iter()
@@ -82,6 +87,15 @@ impl ResolvedPackages {
             "workspace_members": self.workspace.members,
             "workspace_root": self.workspace.root.as_str(),
         })
+    }
+
+    pub fn named<'packages, 'name>(
+        &'packages self,
+        name: &'name str,
+    ) -> impl Iterator<Item = &'packages PackageDocument> + use<'packages, 'name> {
+        self.packages
+            .iter()
+            .filter(move |PackageDocument { metadata, .. }| metadata.name.as_str() == name)
     }
 
     pub fn workspace_path(&self) -> WorkspacePath<'_> {

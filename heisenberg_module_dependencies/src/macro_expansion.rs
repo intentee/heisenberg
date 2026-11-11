@@ -7,7 +7,7 @@ use ra_ap_syntax::SyntaxKind;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::SyntaxToken;
 
-use crate::expansion_syntax_errors::expansion_syntax_errors;
+use heisenberg_expanded_code::expansion_syntax_errors::expansion_syntax_errors;
 
 pub struct MacroExpansion<'expansion> {
     pub call: MacroCallId,

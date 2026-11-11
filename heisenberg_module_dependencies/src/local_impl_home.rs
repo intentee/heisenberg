@@ -6,7 +6,7 @@ use ra_ap_hir::Trait;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_vfs::FileId;
 
-use crate::original_file_id::original_file_id;
+use heisenberg_source_locator::original_file_id::original_file_id;
 
 fn source_file<TOwner: HasSource>(owner: TOwner, database: &RootDatabase) -> Option<FileId> {
     owner

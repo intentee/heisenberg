@@ -147,6 +147,10 @@ mod tests {
             .collect()
     }
 
+    fn node_value() -> impl Fn(&mut (), &usize) -> usize + Sync {
+        |(), node| *node
+    }
+
     #[test]
     fn every_task_runs_exactly_once() {
         let nodes = diamond_lattice();
@@ -264,7 +268,7 @@ mod tests {
 
         assert_eq!(
             pool(1)
-                .install(|| TaskGraph { nodes: &nodes }.run((), |(), node| *node))
+                .install(|| TaskGraph { nodes: &nodes }.run((), node_value()))
                 .map(|outputs| outputs.len()),
             Ok(10_000)
         );
@@ -308,7 +312,7 @@ mod tests {
         }];
 
         assert_eq!(
-            pool(1).install(|| TaskGraph { nodes: &nodes }.run((), |(), node| *node)),
+            pool(1).install(|| TaskGraph { nodes: &nodes }.run((), node_value())),
             Err(TaskGraphError::UnknownDependency {
                 dependency: 1,
                 node: 0,
@@ -338,7 +342,7 @@ mod tests {
         ];
 
         assert_eq!(
-            pool(2).install(|| TaskGraph { nodes: &nodes }.run((), |(), node| *node)),
+            pool(2).install(|| TaskGraph { nodes: &nodes }.run((), node_value())),
             Err(TaskGraphError::DependencyCycle {
                 blocked: vec![1, 2, 3],
             })

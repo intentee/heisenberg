@@ -15,48 +15,29 @@ use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::configuration_list::ConfigurationList;
+use heisenberg_project_model::configuration_reach::ConfigurationReach;
+use heisenberg_project_model::confinement_breach::ConfinementBreach;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::run_scope::RunScope;
 
 use crate::analysis_context::AnalysisContext;
+use crate::analysis_contexts::AnalysisContexts;
 use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::configuration_fingerprint::ConfigurationFingerprint;
 use crate::configuration_function_body::ConfigurationFunctionBody;
 use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
+use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
 use crate::constants::SUPPORTED_RUST_VERSION;
 use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
 use crate::cycle_shape::CycleShape;
-use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::inactive_code::InactiveCode;
 use crate::issue::Issue;
-use crate::issue_section::IssueSection;
-use crate::issue_type::IssueType;
-use crate::located_issue::LocatedIssue;
+use crate::issue_report::IssueReport;
 use crate::module_inclusion::ModuleInclusion;
 use crate::rendered_report::RenderedReport;
 use crate::shared_file::SharedFile;
 use crate::shared_file_tree::SharedFileTree;
 use crate::violation_occurrences::ViolationOccurrences;
-
-const SEPARATOR: &str = "------------------------------";
-
-fn sorted_issues(issues: Vec<Issue>) -> Vec<Issue> {
-    let mut located: Vec<LocatedIssue> = issues
-        .into_iter()
-        .map(|issue| LocatedIssue {
-            location: issue.location(),
-            issue,
-        })
-        .collect();
-
-    located.sort();
-    located.dedup();
-
-    located
-        .into_iter()
-        .map(|LocatedIssue { issue, .. }| issue)
-        .collect()
-}
 
 fn shared_module_file_issues(
     shared_files: &BTreeMap<
@@ -93,75 +74,51 @@ pub struct CheckReport {
 impl CheckReport {
     #[must_use]
     pub fn render(&self) -> RenderedReport {
-        let issues = self.issues();
-        let contexts_by_file = self.contexts_by_file();
-        let mut lines: Vec<String> = Vec::new();
-        let mut sections: BTreeMap<IssueType, NonEmpty<&Issue>> = BTreeMap::new();
+        let mut footer: Vec<String> = self
+            .analyses
+            .iter()
+            .map(
+                |ConfigurationAnalysis {
+                     configuration,
+                     graphs,
+                     ..
+                 }| {
+                    format!(
+                        "Analysed on {}: {} crate targets, {} modules",
+                        configuration.name,
+                        graphs.len(),
+                        graphs
+                            .iter()
+                            .map(|CrateModuleGraph { modules, .. }| modules.len())
+                            .sum::<usize>()
+                    )
+                },
+            )
+            .collect();
 
-        for issue in &issues {
-            NonEmpty::push_into(&mut sections, issue.issue_type(), issue);
-        }
-
-        for (issue_type, issues) in &sections {
-            lines.extend(
-                IssueSection {
-                    issue_type: *issue_type,
-                    issues,
-                }
-                .lines(&contexts_by_file),
-            );
-            lines.push(String::new());
-        }
-
-        lines.push(SEPARATOR.to_owned());
-        lines.push(if issues.is_empty() {
-            "No errors found!".to_owned()
-        } else {
-            format!("{} errors found", issues.len())
-        });
-        lines.push(SEPARATOR.to_owned());
-        lines.extend(self.analyses.iter().map(
-            |ConfigurationAnalysis {
-                 configuration,
-                 graphs,
-                 ..
-             }| {
-                format!(
-                    "Analysed on {}: {} crate targets, {} modules",
-                    configuration.name,
-                    graphs.len(),
-                    graphs
-                        .iter()
-                        .map(|CrateModuleGraph { modules, .. }| modules.len())
-                        .sum::<usize>()
-                )
-            },
-        ));
         if self.scope.is_partial() {
-            lines.extend(self.partial_run_lines());
+            footer.extend(self.partial_run_lines());
         } else {
-            lines.push(format!(
+            footer.push(format!(
                 "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in every declared configuration"
             ));
         }
 
-        RenderedReport {
-            status: if issues.is_empty() {
-                HeisenbergExitStatus::Compliant
-            } else {
-                HeisenbergExitStatus::Violations
-            },
-            text: lines.join("\n") + "\n",
+        IssueReport {
+            contexts: &self.analysis_contexts(),
+            footer,
+            issues: self.issues(),
         }
+        .render()
     }
 
-    fn contexts_by_file(&self) -> BTreeMap<String, BTreeSet<AnalysisContext>> {
-        let mut contexts_by_file: BTreeMap<String, BTreeSet<AnalysisContext>> = BTreeMap::new();
+    fn analysis_contexts(&self) -> AnalysisContexts {
+        let mut files: BTreeMap<String, BTreeSet<AnalysisContext>> = BTreeMap::new();
 
         for analysis in &self.analyses {
             for graph in &analysis.graphs {
                 for file in &graph.findings.walked_code.files {
-                    contexts_by_file
+                    files
                         .entry(file.clone())
                         .or_default()
                         .insert(AnalysisContext {
@@ -172,7 +129,30 @@ impl CheckReport {
             }
         }
 
-        contexts_by_file
+        AnalysisContexts {
+            configurations: self
+                .analyses
+                .iter()
+                .map(|ConfigurationAnalysis { configuration, .. }| configuration.clone())
+                .collect(),
+            files,
+        }
+    }
+
+    fn confinement_breach_issues(&self) -> Vec<Issue> {
+        ConfinementBreach::grouped(self.analyses.iter().map(
+            |ConfigurationAnalysis {
+                 configuration,
+                 confinement,
+                 ..
+             }| ConfigurationReach {
+                configuration,
+                reach: confinement,
+            },
+        ))
+        .into_iter()
+        .map(|breach| Issue::ConfinedPackageReached { breach })
+        .collect()
     }
 
     fn duplicated_function_body_issues(&self) -> Vec<Issue> {
@@ -381,13 +361,14 @@ impl CheckReport {
         );
 
         issues.extend(shared_module_file_issues(&shared_files));
+        issues.extend(self.confinement_breach_issues());
         issues.extend(self.duplicated_function_body_issues());
 
         for violation in &self.package_violations {
             issues.push(Issue::new_package(violation));
         }
 
-        sorted_issues(issues)
+        issues
     }
 
     fn partial_run_lines(&self) -> Vec<String> {
@@ -403,8 +384,10 @@ impl CheckReport {
                 }
             ),
             format!(
-                "Not evaluated in a partial run: {}, the empty-library check of {}",
-                CODE_ACTIVE_IN_NO_CONFIGURATION.name, TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name
+                "Not evaluated in a partial run: {}, {}, the empty-library check of {}",
+                CODE_ACTIVE_IN_NO_CONFIGURATION.name,
+                CONFINED_PACKAGE_USER_NOT_REACHING_IT.name,
+                TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name
             ),
             format!(
                 "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in every analysed configuration"

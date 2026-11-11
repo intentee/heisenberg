@@ -52,10 +52,7 @@ pub fn parse(input: TokenStream) -> TokenStream {
                 .into_iter()
                 .chain([TokenTree::Group(Group::new(
                     Delimiter::Brace,
-                    port.clone()
-                        .into_iter()
-                        .chain(tokens("()"))
-                        .collect(),
+                    port.clone().into_iter().chain(tokens("()")).collect(),
                 ))])
                 .collect();
             let body: TokenStream = constructor.into_iter().chain(configured).collect();

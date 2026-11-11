@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use ra_ap_paths::AbsPathBuf;
 
 #[derive(Clone)]
 pub struct OutDirFile {
-    pub path: PathBuf,
+    pub path: AbsPathBuf,
     pub text: String,
 }

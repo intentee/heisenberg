@@ -5,7 +5,8 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
-use crate::configured_node::ConfiguredNode;
+use heisenberg_configured_code::configured_node::ConfiguredNode;
+
 use crate::item_expansion::ItemExpansion;
 
 pub struct DefinedItems<'items, 'database> {

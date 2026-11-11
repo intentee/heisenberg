@@ -1,0 +1,27 @@
+[package]
+name = "scriptor"
+edition = "2024"
+version = "0.1.0"
+publish = false
+
+[build-dependencies]
+d = { path = "../vendor/d", features = ["f"] }
+tool = { path = "../tool" }
+
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+arithmetic_side_effects = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+panic_in_result_fn = "deny"
+string_slice = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+unwrap_used = "deny"

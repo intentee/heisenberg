@@ -1,0 +1,18 @@
+[package]
+name = "heisenberg_expanded_code"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+ra_ap_hir = { workspace = true }
+ra_ap_hir_expand = { workspace = true }
+ra_ap_ide_db = { workspace = true }
+ra_ap_intern = { workspace = true }
+ra_ap_parser = { workspace = true }
+ra_ap_syntax = { workspace = true }
+ra_ap_syntax-bridge = { workspace = true }
+ra_ap_vfs = { workspace = true }
+salsa = { workspace = true }
+
+[lints]
+workspace = true

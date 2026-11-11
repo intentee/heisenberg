@@ -19,6 +19,7 @@ use crate::cargo_packages::CargoPackages;
 use crate::cargo_workspace_role::CargoWorkspaceRole;
 use crate::configuration_selection::ConfigurationSelection;
 use crate::declared_configurations::DeclaredConfigurations;
+use crate::declared_confined_packages::DeclaredConfinedPackages;
 use crate::declared_out_dirs::DeclaredOutDirs;
 use crate::declared_test_crates::DeclaredTestCrates;
 use crate::feature_graph::FeatureGraph;
@@ -125,6 +126,7 @@ impl ProjectModel {
             let manifest_path = workspace_manifest(run.workspace_directory);
             let HeisenbergSettings {
                 configurations: declared_configurations,
+                confined_packages,
                 out_dirs,
                 test_crates,
             } = HeisenbergSettings::of_workspace(&project.workspace.metadata, &manifest_path)?;
@@ -175,6 +177,9 @@ impl ProjectModel {
                                                 .collect(),
                                             packages: WorkspacePackages::new(
                                                 &project.resolved,
+                                                &DeclaredConfinedPackages {
+                                                    packages: confined_packages,
+                                                },
                                                 &declared_test_crates,
                                             ),
                                             declared_test_crates,

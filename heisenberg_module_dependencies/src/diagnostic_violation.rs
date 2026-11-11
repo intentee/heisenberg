@@ -8,9 +8,9 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::AstPtr;
 use ra_ap_vfs::FileId;
 
+use heisenberg_expanded_code::covering_ancestors::CoveringAncestors;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
-use crate::covering_ancestors::CoveringAncestors;
 use crate::diagnostic_site::DiagnosticSite;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;

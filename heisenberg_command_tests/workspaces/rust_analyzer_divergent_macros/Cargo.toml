@@ -1,0 +1,9 @@
+[package]
+name = "rust_analyzer_divergent_macros"
+edition = "2024"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[workspace]

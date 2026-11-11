@@ -1,20 +1,64 @@
 .DEFAULT_GOAL := target/release/heisenberg
 
 CARGO_HOME ?= $(HOME)/.cargo
+COVERAGE_DIVERGENT_MACRO_FIXTURES := \
+	coverage_attribute_failing_in_rust_analyzer \
+	coverage_attribute_hidden_from_rust_analyzer \
+	coverage_attribute_hidden_in_test_code \
+	coverage_attribute_unparsable_in_rust_analyzer \
+	coverage_macro_failing_in_rust_analyzer \
+	coverage_macro_hidden_from_rust_analyzer \
+	coverage_macro_unparsable_in_rust_analyzer
+COVERAGE_IDENTITY_MACRO_FIXTURES := \
+	coverage_attribute_hidden_from_rust_analyzer \
+	coverage_attribute_hidden_in_test_code \
+	coverage_attribute_macro_item
+COVERAGE_FIXTURES := $(sort $(COVERAGE_DIVERGENT_MACRO_FIXTURES) $(COVERAGE_IDENTITY_MACRO_FIXTURES) \
+	coverage_code_outside_functions \
+	coverage_fully_covered \
+	coverage_inactive_module_file \
+	coverage_inactive_region \
+	coverage_macro_in_an_inactive_attribute \
+	coverage_macro_text_shared_by_functions \
+	coverage_macro_written_function \
+	coverage_path_module \
+	coverage_production_only_attribute \
+	coverage_production_only_code \
+	coverage_shared_module_file \
+	coverage_uncovered_code \
+	coverage_unexecuted_example \
+	coverage_unexecuted_inline_test_module \
+	coverage_unexecuted_integration_test \
+	coverage_unexecuted_test_crate \
+	coverage_unexecuted_test_module_file \
+	coverage_without_coverage_data)
+COVERAGE_FIXTURE_DIRECTORY := heisenberg_command_tests/workspaces
+COVERAGE_DIVERGENT_MACRO_EXPORTS := $(addprefix $(COVERAGE_FIXTURE_DIRECTORY)/,$(addsuffix /target/llvm-cov.json,$(COVERAGE_DIVERGENT_MACRO_FIXTURES)))
+COVERAGE_FIXTURE_EXPORTS := $(addprefix $(COVERAGE_FIXTURE_DIRECTORY)/,$(addsuffix /target/llvm-cov.json,$(COVERAGE_FIXTURES)))
+COVERAGE_IDENTITY_MACRO_EXPORTS := $(addprefix $(COVERAGE_FIXTURE_DIRECTORY)/,$(addsuffix /target/llvm-cov.json,$(COVERAGE_IDENTITY_MACRO_FIXTURES)))
 HEISENBERG_CRATES := \
 	heisenberg \
 	heisenberg_absolute_path \
 	heisenberg_analysis_threads \
+	heisenberg_attached_work \
 	heisenberg_command \
+	heisenberg_configured_code \
+	heisenberg_coverage_export \
+	heisenberg_coverage_measurement \
 	heisenberg_error_context \
+	heisenberg_expanded_code \
 	heisenberg_graph_cycles \
+	heisenberg_member_crates \
 	heisenberg_module_cycles \
 	heisenberg_module_dependencies \
 	heisenberg_module_graph \
 	heisenberg_project_model \
+	heisenberg_source_locator \
 	heisenberg_task_graph \
 	heisenberg_workspace_build
 HOST_TUPLE := $(shell rustc --print host-tuple)
+IDENTITY_MARKER_MACROS := $(COVERAGE_FIXTURE_DIRECTORY)/identity_marker_macros
+RUST_ANALYZER_DIVERGENT_MACROS := $(COVERAGE_FIXTURE_DIRECTORY)/rust_analyzer_divergent_macros
 RUST_SYSROOT := $(shell rustc --print sysroot)
 SUPPORTED_TARGETS := \
 	aarch64-apple-darwin \
@@ -31,10 +75,21 @@ HEISENBERG_SOURCES := \
 	Cargo.toml \
 	Cargo.lock
 
-HEISENBERG_CHECK := target/release/heisenberg check --cargo-home "$(CARGO_HOME)" --sysroot "$(RUST_SYSROOT)" --configuration $(HOST_TUPLE) --workspace
+HEISENBERG_ARGUMENTS := --cargo-home "$(CARGO_HOME)" --sysroot "$(RUST_SYSROOT)" --configuration $(HOST_TUPLE) --workspace "$(CURDIR)"
 
 export HEISENBERG_CARGO_HOME := $(CARGO_HOME)
 export HEISENBERG_SYSROOT := $(RUST_SYSROOT)
+
+.SECONDEXPANSION:
+
+$(COVERAGE_FIXTURE_DIRECTORY)/%/target/llvm-cov.json: $(COVERAGE_FIXTURE_DIRECTORY)/%/Cargo.toml $(COVERAGE_FIXTURE_DIRECTORY)/%/Cargo.lock rust-toolchain.toml $$(wildcard $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*.rs $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*/*.rs $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*/*/*.rs $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*/Cargo.toml)
+	cargo llvm-cov clean --manifest-path $< --workspace
+	cargo llvm-cov test --manifest-path $< --no-report --workspace --all-targets
+	cargo llvm-cov report --manifest-path $< --json --include-build-script --output-path $@
+
+$(COVERAGE_DIVERGENT_MACRO_EXPORTS): $(RUST_ANALYZER_DIVERGENT_MACROS)/Cargo.toml $(RUST_ANALYZER_DIVERGENT_MACROS)/src/lib.rs
+
+$(COVERAGE_IDENTITY_MACRO_EXPORTS): $(IDENTITY_MARKER_MACROS)/Cargo.toml $(IDENTITY_MARKER_MACROS)/src/lib.rs
 
 heisenberg_project_model/targets/%/crates.cfg: rust-toolchain.toml
 	rustc --print cfg --target $* > $@
@@ -46,9 +101,6 @@ heisenberg_project_model/targets/%/library.cfg: rust-toolchain.toml
 heisenberg_project_model/targets/%/target-spec.json: export RUSTC_BOOTSTRAP := 1
 heisenberg_project_model/targets/%/target-spec.json: rust-toolchain.toml
 	rustc -Z unstable-options --print target-spec-json --target $* > $@
-
-node_modules/.package-lock.json: package.json package-lock.json
-	npm ci
 
 target/release/heisenberg: $(HEISENBERG_SOURCES)
 	cargo build --release -p heisenberg
@@ -71,30 +123,16 @@ fmt:
 
 .PHONY: heisenberg.check
 heisenberg.check: fetch target/release/heisenberg
-	$(HEISENBERG_CHECK) "$(CURDIR)"
+	target/release/heisenberg check $(HEISENBERG_ARGUMENTS)
 
 .PHONY: test
-test: fetch $(TARGET_CFG_TABLES)
+test: fetch $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_CFG_TABLES)
 	cargo nextest run --workspace
 
 .PHONY: test.coverage
-test.coverage: fetch node_modules/.package-lock.json $(TARGET_CFG_TABLES)
+test.coverage: fetch target/release/heisenberg $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_CFG_TABLES)
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest --no-report --workspace
-	cargo llvm-cov report --json --output-path target/llvm-cov.json
-	cargo llvm-cov report
-	npx rust-coverage-check target/llvm-cov.json \
-		--workspace-root "$(CURDIR)" \
-		--gated heisenberg=100 \
-		--gated heisenberg_absolute_path=100 \
-		--gated heisenberg_analysis_threads=100 \
-		--gated heisenberg_command=100 \
-		--gated heisenberg_command_tests=100 \
-		--gated heisenberg_error_context=100 \
-		--gated heisenberg_graph_cycles=100 \
-		--gated heisenberg_module_cycles=100 \
-		--gated heisenberg_module_dependencies=100 \
-		--gated heisenberg_module_graph=100 \
-		--gated heisenberg_project_model=100 \
-		--gated heisenberg_task_graph=100 \
-		--gated heisenberg_workspace_build=100
+	cargo llvm-cov nextest --no-report --workspace --all-targets
+	cargo llvm-cov report --json --include-build-script --output-path target/llvm-cov.json
+	cargo llvm-cov report --include-build-script
+	target/release/heisenberg coverage-check $(HEISENBERG_ARGUMENTS) --coverage-export "$(CURDIR)/target/llvm-cov.json"

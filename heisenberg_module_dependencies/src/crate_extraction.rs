@@ -12,27 +12,24 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::ast;
 use ra_ap_vfs::FileId;
 
+use heisenberg_expanded_code::covering_ancestors::CoveringAncestors;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
 use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
-use heisenberg_module_graph::function_body::FunctionBody;
 use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
+use heisenberg_source_locator::source_locator::SourceLocator;
 
-use crate::covering_ancestors::CoveringAncestors;
 use crate::crate_findings::CrateFindings;
 use crate::diagnostic_site::DiagnosticSite;
-use crate::function_fingerprint::FunctionFingerprint;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
-use crate::main_function::MainFunction;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
 use crate::module_paths::ModulePaths;
-use crate::source_locator::SourceLocator;
 use crate::token_origin::TokenOrigin;
 use crate::walked_module::WalkedModule;
 
@@ -61,145 +58,85 @@ impl CrateExtraction<'_, '_> {
         };
         let root = self.krate.root_module(database);
 
-        self.function_bodies(self.modules)
-            .and_then(|function_bodies| {
-                let mut crate_findings = CrateFindings::default();
-                let mut findings = ModuleFindings::default();
+        let mut crate_findings = CrateFindings::default();
+        let mut findings = ModuleFindings::default();
+        let mut function_bodies = BTreeSet::new();
 
-                walked
-                    .into_iter()
-                    .try_for_each(|module| {
-                        module.map(
-                            |WalkedModule {
-                                 crate_findings: module_crate_findings,
-                                 findings: module_findings,
-                             }| {
-                                crate_findings.merge(module_crate_findings);
-                                findings.merge(module_findings);
-                            },
-                        )
+        walked
+            .into_iter()
+            .try_for_each(|module| {
+                module.map(
+                    |WalkedModule {
+                         crate_findings: module_crate_findings,
+                         findings: module_findings,
+                         function_bodies: module_function_bodies,
+                     }| {
+                        crate_findings.merge(module_crate_findings);
+                        findings.merge(module_findings);
+                        function_bodies.extend(module_function_bodies);
+                    },
+                )
+            })
+            .and_then(|()| {
+                crate_findings.fold(&mut findings);
+
+                self.diagnostics
+                    .iter()
+                    .flat_map(|ModuleDiagnostics { sites, .. }| sites)
+                    .filter(|DiagnosticSite { origin, .. }| {
+                        token_origin.is_own_text(origin.file_id, origin.value)
                     })
-                    .and_then(|()| {
-                        crate_findings.fold(&mut findings);
+                    .try_for_each(
+                        |DiagnosticSite {
+                             violation: LocatedViolation { display, kind },
+                             ..
+                         }| {
+                            self.locator.locate(*display).and_then(|location| {
+                                if *kind == ViolationKind::FailedMacroExpansion {
+                                    self.written_call(*display).map(|written| {
+                                        let violation = Violation {
+                                            kind: ViolationKind::FailedMacroExpansion,
+                                            location: written,
+                                        };
 
-                        self.diagnostics
-                            .iter()
-                            .flat_map(|ModuleDiagnostics { sites, .. }| sites)
-                            .filter(|DiagnosticSite { origin, .. }| {
-                                token_origin.is_own_text(origin.file_id, origin.value)
-                            })
-                            .try_for_each(
-                                |DiagnosticSite {
-                                     violation: LocatedViolation { display, kind },
-                                     ..
-                                 }| {
-                                    self.locator.locate(*display).and_then(|location| {
-                                        if *kind == ViolationKind::FailedMacroExpansion {
-                                            self.written_call(*display).map(|written| {
-                                                let violation = Violation {
-                                                    kind: ViolationKind::FailedMacroExpansion,
-                                                    location: written,
-                                                };
-
-                                                if violation.location == location {
-                                                    findings.violations.insert(violation);
-                                                } else {
-                                                    findings.violations.fold(
-                                                        violation,
-                                                        FoldedFinding {
-                                                            kind:
-                                                                FoldedFindingKind::FailingExpansion,
-                                                            location,
-                                                        },
-                                                    );
-                                                }
-                                            })
+                                        if violation.location == location {
+                                            findings.violations.insert(violation);
                                         } else {
-                                            findings.violations.insert(Violation {
-                                                kind: kind.clone(),
-                                                location,
-                                            });
-
-                                            Ok(())
+                                            findings.violations.fold(
+                                                violation,
+                                                FoldedFinding {
+                                                    kind: FoldedFindingKind::FailingExpansion,
+                                                    location,
+                                                },
+                                            );
                                         }
                                     })
-                                },
-                            )
-                    })
-                    .map(|()| CrateModuleGraph {
-                        crate_target: self.crate_target.clone(),
-                        findings,
-                        function_bodies,
-                        modules: self
-                            .modules
-                            .iter()
-                            .map(|module| self.module_paths.path(database, *module))
-                            .collect(),
-                        root_module_is_empty: root.declarations(database).is_empty()
-                            && root.impl_defs(database).is_empty()
-                            && root.legacy_macros(database).is_empty()
-                            && root.scope(database, None).is_empty(),
-                    })
-            })
-    }
+                                } else {
+                                    findings.violations.insert(Violation {
+                                        kind: kind.clone(),
+                                        location,
+                                    });
 
-    fn function_bodies(
-        &self,
-        modules: &[Module],
-    ) -> Result<BTreeSet<FunctionBody>, ModuleDependenciesError> {
-        let database = self.semantics.db;
-
-        modules
-            .iter()
-            .filter_map(|module| module.as_source_file_id(database))
-            .flat_map(|source_file_id| {
-                self.semantics
-                    .parse(source_file_id)
-                    .syntax()
-                    .descendants()
-                    .filter_map(ast::Fn::cast)
-                    .collect::<Vec<ast::Fn>>()
+                                    Ok(())
+                                }
+                            })
+                        },
+                    )
             })
-            .filter(|function| {
-                function
-                    .body()
-                    .and_then(|body| body.stmt_list())
-                    .is_some_and(|statements| {
-                        statements.statements().next().is_some() || statements.tail_expr().is_some()
-                    })
-                    && self.semantics.to_def(function).is_some_and(|definition| {
-                        !MainFunction {
-                            crate_target: self.crate_target,
-                            database,
-                            function: definition,
-                        }
-                        .enters_its_target()
-                            && definition.as_proc_macro(database).is_none()
-                    })
+            .map(|()| CrateModuleGraph {
+                crate_target: self.crate_target.clone(),
+                findings,
+                function_bodies,
+                modules: self
+                    .modules
+                    .iter()
+                    .map(|module| self.module_paths.path(database, *module))
+                    .collect(),
+                root_module_is_empty: root.declarations(database).is_empty()
+                    && root.impl_defs(database).is_empty()
+                    && root.legacy_macros(database).is_empty()
+                    && root.scope(database, None).is_empty(),
             })
-            .map(|function| {
-                FunctionFingerprint {
-                    function: &function,
-                    locator: self.locator,
-                    semantics: self.semantics,
-                }
-                .tokens()
-                .and_then(|fingerprint| {
-                    self.locator
-                        .locate(
-                            ItemFocus {
-                                node: function.syntax(),
-                                semantics: self.semantics,
-                            }
-                            .original_range(),
-                        )
-                        .map(|location| FunctionBody {
-                            fingerprint,
-                            location,
-                        })
-                })
-            })
-            .collect()
     }
 
     fn written_call(

@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use humantime::format_duration;
 
+use crate::confinement_violation::ConfinementViolation;
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
 use crate::constants::MAXIMUM_SLOW_TEST_PERIOD;
@@ -24,6 +25,7 @@ pub enum PackageViolation {
         manifest: String,
         package: String,
     },
+    Confinement(ConfinementViolation),
     LintAllowedInManifest {
         lint: String,
         table: LintTable,
@@ -119,6 +121,7 @@ impl PackageViolation {
                 .collect(),
             Self::ClippyConfigurationAmbiguous { .. }
             | Self::ClippyConfigurationMissing { .. }
+            | Self::Confinement(_)
             | Self::LintAllowedInManifest { .. }
             | Self::NextestConfigurationMissing { .. }
             | Self::NextestOverride { .. }
@@ -162,6 +165,7 @@ impl PackageViolation {
             | Self::TestCrateNotAMember { manifest: file, .. }
             | Self::TestCrateUsedByProduction { manifest: file, .. }
             | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. } => file,
+            Self::Confinement(violation) => violation.manifest(),
             Self::LintAllowedInManifest { table, .. }
             | Self::RequiredLintNotDenied { table, .. } => table.manifest(),
         }
@@ -179,6 +183,7 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {package} has no {CLIPPY_CONFIGURATION_FILE} or {CLIPPY_HIDDEN_CONFIGURATION_FILE} within the workspace"
             ),
+            Self::Confinement(violation) => violation.fmt(formatter),
             Self::LintAllowedInManifest { lint, table, tool } => {
                 write!(formatter, "{table} allows {lint} in its {tool} lints")
             }

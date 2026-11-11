@@ -13,9 +13,12 @@ use heisenberg_module_graph::module_path::ModulePath;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_project_model::configuration::Configuration;
+use heisenberg_project_model::confined_reach::ConfinedReach;
+use heisenberg_project_model::confinement_breach::ConfinementBreach;
 use heisenberg_project_model::package_violation::PackageViolation;
 
 use crate::analysis_context::AnalysisContext;
+use crate::analysis_contexts::AnalysisContexts;
 use crate::configuration_narrowing::ConfigurationNarrowing;
 use crate::cycle_shape::CycleShape;
 use crate::issue_location::IssueLocation;
@@ -56,9 +59,15 @@ pub enum Issue {
     CodeActiveInNoConfiguration {
         focus: SourceLocation,
     },
+    ConfinedPackageReached {
+        breach: ConfinementBreach,
+    },
     DuplicatedFunctionBody {
         configurations: BTreeSet<Configuration>,
         copies: NonEmpty<SourceLocation>,
+    },
+    FunctionWithoutCoverageData {
+        function: SourceLocation,
     },
     ModuleCycle {
         container: ModulePath,
@@ -66,9 +75,19 @@ pub enum Issue {
         witnesses: NonEmpty<CycleWitness>,
     },
     Package(PackageViolation),
+    PartiallyExecutedFunction {
+        function: SourceLocation,
+        unexecuted: NonEmpty<SourceLocation>,
+    },
     SharedModuleFile {
         file: String,
         inclusions: SharedFileInclusions,
+    },
+    UnexecutedFunction {
+        function: SourceLocation,
+    },
+    UnexecutedRegion {
+        region: SourceLocation,
     },
     UnresolvedForeignReferences {
         configurations: BTreeSet<Configuration>,
@@ -180,10 +199,18 @@ impl Issue {
                     },
                 )
                 .collect(),
+            Self::ConfinedPackageReached {
+                breach: ConfinementBreach { path, .. },
+                ..
+            } => vec![format!("  {}", path.join(" -> "))],
             Self::DuplicatedFunctionBody { copies, .. } => copies
                 .others
                 .iter()
                 .map(|copy| format!("  duplicate at {copy}"))
+                .collect(),
+            Self::PartiallyExecutedFunction { unexecuted, .. } => unexecuted
+                .iter()
+                .map(|region| format!("  not executed at {region}"))
                 .collect(),
             Self::SharedModuleFile { inclusions, .. } => inclusions.lines(),
             Self::UnresolvedForeignReferences { sites, .. } => sites
@@ -203,7 +230,10 @@ impl Issue {
                 .iter()
                 .map(|line| format!("  {line}"))
                 .collect(),
-            Self::CodeActiveInNoConfiguration { .. } => Vec::new(),
+            Self::CodeActiveInNoConfiguration { .. }
+            | Self::FunctionWithoutCoverageData { .. }
+            | Self::UnexecutedFunction { .. }
+            | Self::UnexecutedRegion { .. } => Vec::new(),
         }
     }
 
@@ -211,9 +241,14 @@ impl Issue {
     pub fn issue_type(&self) -> IssueType {
         match self {
             Self::CodeActiveInNoConfiguration { .. } => IssueType::CodeActiveInNoConfiguration,
+            Self::ConfinedPackageReached { .. } => IssueType::ConfinedPackageReachedOutsideItsUsers,
             Self::DuplicatedFunctionBody { .. } => IssueType::DuplicatedFunctionBody,
+            Self::FunctionWithoutCoverageData { .. } => IssueType::CodeWithoutCoverageData,
             Self::ModuleCycle { .. } => IssueType::ModuleCycle,
             Self::Package(violation) => IssueType::from(violation),
+            Self::PartiallyExecutedFunction { .. }
+            | Self::UnexecutedFunction { .. }
+            | Self::UnexecutedRegion { .. } => IssueType::UncoveredCode,
             Self::SharedModuleFile { .. } => IssueType::SharedModuleFile,
             Self::UnresolvedForeignReferences { .. } => IssueType::UnresolvedPath,
             Self::Violation { violation, .. } => IssueType::from(&violation.kind),
@@ -223,10 +258,13 @@ impl Issue {
     #[must_use]
     pub fn lines(
         &self,
-        contexts_by_file: &BTreeMap<String, BTreeSet<AnalysisContext>>,
+        AnalysisContexts {
+            configurations: analysed_configurations,
+            files,
+        }: &AnalysisContexts,
     ) -> Vec<String> {
         let location = self.location();
-        let analysed = contexts_by_file.get(&location.file).into_iter().flatten();
+        let analysed = files.get(&location.file).into_iter().flatten();
         let narrowing = match self {
             Self::ModuleCycle { reported, .. }
             | Self::Violation {
@@ -237,6 +275,13 @@ impl Issue {
                 reported,
             }
             .to_string(),
+            Self::ConfinedPackageReached {
+                breach: ConfinementBreach { configurations, .. },
+            } => ConfigurationNarrowing {
+                all: analysed_configurations,
+                configurations,
+            }
+            .to_string(),
             Self::SharedModuleFile { inclusions, .. } => {
                 configuration_narrowing(analysed, &inclusions.configurations())
             }
@@ -244,7 +289,12 @@ impl Issue {
             | Self::UnresolvedForeignReferences { configurations, .. } => {
                 configuration_narrowing(analysed, configurations)
             }
-            Self::CodeActiveInNoConfiguration { .. } | Self::Package(_) => String::new(),
+            Self::CodeActiveInNoConfiguration { .. }
+            | Self::FunctionWithoutCoverageData { .. }
+            | Self::Package(_)
+            | Self::PartiallyExecutedFunction { .. }
+            | Self::UnexecutedFunction { .. }
+            | Self::UnexecutedRegion { .. } => String::new(),
         };
 
         iter::once(format!("- {location}: {}{narrowing}", self.message()))
@@ -266,14 +316,25 @@ impl Issue {
     pub fn location(&self) -> IssueLocation {
         match self {
             Self::CodeActiveInNoConfiguration { focus } => IssueLocation::new_position(focus),
+            Self::ConfinedPackageReached {
+                breach:
+                    ConfinementBreach {
+                        reach: ConfinedReach { manifest, .. },
+                        ..
+                    },
+            } => IssueLocation::new_whole_file(manifest),
             Self::DuplicatedFunctionBody { copies, .. } => {
                 IssueLocation::new_position(&copies.first)
             }
+            Self::FunctionWithoutCoverageData { function }
+            | Self::PartiallyExecutedFunction { function, .. }
+            | Self::UnexecutedFunction { function } => IssueLocation::new_position(function),
             Self::ModuleCycle { witnesses, .. } => {
                 IssueLocation::new_position(cycle_site(witnesses))
             }
             Self::Package(violation) => IssueLocation::new_whole_file(violation.file()),
             Self::SharedModuleFile { file, .. } => IssueLocation::new_whole_file(file),
+            Self::UnexecutedRegion { region } => IssueLocation::new_position(region),
             Self::UnresolvedForeignReferences { sites, .. } => {
                 IssueLocation::new_position(&sites.first)
             }
@@ -287,17 +348,37 @@ impl Issue {
             Self::CodeActiveInNoConfiguration { .. } => {
                 "Code is active in no declared configuration".to_owned()
             }
+            Self::ConfinedPackageReached {
+                breach:
+                    ConfinementBreach {
+                        reach:
+                            ConfinedReach {
+                                member, package, ..
+                            },
+                        ..
+                    },
+            } => format!(
+                "Package {member} depends on confined package {package} without being one of its users"
+            ),
             Self::DuplicatedFunctionBody { .. } => "Function body is duplicated".to_owned(),
+            Self::FunctionWithoutCoverageData { .. } => {
+                "The coverage export holds no data for the function".to_owned()
+            }
             Self::ModuleCycle { container, .. } => {
                 format!("Parts of {container} depend on each other")
             }
             Self::Package(violation) => violation.to_string(),
+            Self::PartiallyExecutedFunction { .. } => {
+                "No test executes parts of the function".to_owned()
+            }
             Self::SharedModuleFile {
                 inclusions: SharedFileInclusions { inclusions, .. },
                 ..
             } => {
                 format!("Module file belongs to {} modules", inclusions.len())
             }
+            Self::UnexecutedFunction { .. } => "No test executes the function".to_owned(),
+            Self::UnexecutedRegion { .. } => "No test executes the code".to_owned(),
             Self::UnresolvedForeignReferences { module, .. } => {
                 format!("Path into {module} compiles, but rust-analyzer cannot resolve it")
             }

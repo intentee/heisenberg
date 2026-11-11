@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use crate::package_edge::PackageEdge;
+use crate::build_link::BuildLink;
 
 pub struct ResolvedBuild {
-    pub edges: BTreeSet<PackageEdge>,
     pub features: BTreeMap<String, BTreeSet<String>>,
+    pub links: BTreeSet<BuildLink>,
 }

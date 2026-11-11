@@ -37,9 +37,7 @@ impl DeclaredOutDirs<'_> {
         for (package, DeclaredOutDir { mut configurations }) in out_dirs {
             let PackageDocument { metadata, .. } = match self
                 .resolved
-                .packages
-                .iter()
-                .filter(|PackageDocument { metadata, .. }| metadata.name.as_str() == package)
+                .named(&package)
                 .collect::<Vec<&PackageDocument>>()
                 .as_slice()
             {
