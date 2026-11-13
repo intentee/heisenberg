@@ -2,6 +2,7 @@
 name = "non_test_item_in_test_target"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dev-dependencies]
 runtime = { path = "runtime" }
@@ -40,3 +41,7 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "mixed"
+path = "tests/mixed.rs"

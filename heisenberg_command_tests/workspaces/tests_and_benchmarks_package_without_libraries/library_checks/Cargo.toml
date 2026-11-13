@@ -2,6 +2,7 @@
 name = "library_checks"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false }
@@ -28,3 +29,7 @@ unwrap_used = "deny"
 [[bench]]
 name = "construction"
 harness = false
+
+[[test]]
+name = "library_is_constructible"
+path = "tests/library_is_constructible.rs"

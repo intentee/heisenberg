@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn declared_out_dir_stands_in_for_the_build_script_output() {
@@ -22,7 +22,9 @@ fn declared_out_dir_stands_in_for_the_build_script_output() {
             "------------------------------\n\
             No errors found!\n\
             ------------------------------\n",
-            host_footer(3, 5).as_str()
+            NextestPresenceEvaluation::NotEvaluated
+                .host_footer(3, 5)
+                .as_str()
         ]
         .concat()
         .as_str())

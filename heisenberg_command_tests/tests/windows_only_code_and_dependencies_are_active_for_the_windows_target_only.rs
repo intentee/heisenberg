@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const WINDOWS_ONLY_CYCLE: &str = "";
@@ -52,7 +52,7 @@ fn windows_only_code_and_dependencies_are_active_for_the_windows_target_only() {
              {ERRORS}\
              ------------------------------\n\
              {}",
-            host_footer(2, 4)
+            NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4)
         )
         .as_str())
     );

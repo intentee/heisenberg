@@ -24,6 +24,7 @@ use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::test_harness::TestHarness;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
+use heisenberg_project_model::source_file::SourceFile;
 use heisenberg_source_locator::source_locator::SourceLocator;
 
 use crate::constants::UNRESOLVED_CODE_KINDS;
@@ -64,6 +65,7 @@ impl CrateExtraction<'_, '_> {
         let mut crate_findings = CrateFindings::default();
         let mut findings = ModuleFindings::default();
         let mut function_bodies = BTreeSet::new();
+        let mut runs_libtest_tests = false;
 
         walked
             .into_iter()
@@ -82,6 +84,8 @@ impl CrateExtraction<'_, '_> {
             })
             .and_then(|()| {
                 let registers_benchmark = crate_findings.registers_benchmark;
+
+                runs_libtest_tests = crate_findings.runs_libtest_tests;
 
                 crate_findings.fold(&mut findings);
 
@@ -133,11 +137,23 @@ impl CrateExtraction<'_, '_> {
                 self.benchmark_without_harness(registers_benchmark, &findings)
                     .map(|unregistered| findings.violations.extend(unregistered))
             })
-            .map(|()| CrateModuleGraph {
+            .and_then(|()| {
+                self.files
+                    .iter()
+                    .map(|file| {
+                        self.locator
+                            .source_file::<ModuleDependenciesError>(*file)
+                            .map(|SourceFile { relative_path, .. }| relative_path.clone())
+                    })
+                    .collect::<Result<BTreeSet<String>, ModuleDependenciesError>>()
+            })
+            .map(|module_files| CrateModuleGraph {
                 crate_target: self.crate_target.clone(),
                 findings,
                 function_bodies,
                 module_count: self.modules.len(),
+                module_files,
+                runs_libtest_tests,
                 root_module_is_empty: root.declarations(database).is_empty()
                     && root.impl_defs(database).is_empty()
                     && root.legacy_macros(database).is_empty()

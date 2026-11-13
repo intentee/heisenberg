@@ -5,8 +5,6 @@ use cargo::context::EnvConfig;
 use cargo::context::EnvConfigValue;
 use cargo::util::data_structures::HashMap;
 
-use heisenberg_error_context::error_context::error_context;
-
 use crate::constants::CARGO_ENVIRONMENT_TABLE;
 use crate::project_model_error::ProjectModelError;
 
@@ -16,6 +14,12 @@ pub struct ConfiguredEnvironment<'environment> {
 }
 
 impl ConfiguredEnvironment<'_> {
+    /// # Errors
+    ///
+    /// Returns [`ProjectModelError::CargoEnvironmentTable`] when the [env] table of the cargo
+    /// configuration cannot be read, and
+    /// [`ProjectModelError::NonUtf8ConfiguredEnvironmentValue`] when a value resolves to text
+    /// that is not UTF-8.
     pub fn variables(&self) -> Result<BTreeMap<String, String>, ProjectModelError> {
         self.context
             .get::<EnvConfig>(CARGO_ENVIRONMENT_TABLE)
@@ -42,10 +46,12 @@ impl ConfiguredEnvironment<'_> {
                 .resolve(self.context.cwd())
                 .into_owned()
                 .into_string()
-                .map_err(error_context(
-                    name.to_owned(),
-                    ProjectModelError::NonUtf8ConfiguredEnvironmentValue,
-                )),
+                .map_err(
+                    |value| ProjectModelError::NonUtf8ConfiguredEnvironmentValue {
+                        variable: name.to_owned(),
+                        value,
+                    },
+                ),
         }
     }
 }

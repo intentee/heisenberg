@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn warned_clippy_lint_is_denied_only_under_denied_warnings() {
@@ -30,7 +30,9 @@ fn warned_clippy_lint_is_denied_only_under_denied_warnings() {
             "------------------------------\n\
             No errors found!\n\
             ------------------------------\n",
-            host_footer(1, 1).as_str()
+            NextestPresenceEvaluation::NotEvaluated
+                .host_footer(1, 1)
+                .as_str()
         ]
         .concat()
         .as_str())
@@ -46,7 +48,7 @@ fn warned_clippy_lint_is_denied_only_under_denied_warnings() {
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n", host_footer(1, 1).as_str()].concat().as_str())
+            ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(warned.status, HeisenbergExitStatus::Violations);
 }

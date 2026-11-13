@@ -5,7 +5,7 @@ use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn empty_library_is_not_judged_in_a_partial_run() {
@@ -25,7 +25,7 @@ fn empty_library_is_not_judged_in_a_partial_run() {
             No errors found!\n\
             ------------------------------\n\
             {footer}",
-            footer = host_footer(3, 3)
+            footer = NextestPresenceEvaluation::Evaluated.host_footer(3, 3)
         )
         .as_str())
     );

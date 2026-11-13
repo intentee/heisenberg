@@ -6,4 +6,4 @@ impl Recorder {
 }
 
 #[test]
-fn records() {}
+fn records() { assert!(!"records".is_empty()); }

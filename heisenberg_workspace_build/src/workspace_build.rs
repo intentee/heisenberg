@@ -44,6 +44,12 @@ const fn build_script(message: &Message) -> Option<&BuildScript> {
     }
 }
 
+fn build_output(captured: &[u8]) -> Result<String, io::Error> {
+    Message::parse_stream(captured)
+        .collect::<Result<Vec<Message>, io::Error>>()
+        .map(|messages| messages.into_iter().filter_map(diagnostic).collect())
+}
+
 fn build_scripts(host: &[Message], target: &[Message]) -> BTreeMap<String, BuildScriptOutput> {
     let host_runs: BTreeSet<&Utf8PathBuf> = host
         .iter()
@@ -190,10 +196,7 @@ impl WorkspaceBuild<'_> {
             BuildRunner::new(plan)
                 .and_then(|runner| runner.compile(&executor))
                 .map_err(|source| WorkspaceBuildError::Build {
-                    output: Message::parse_stream(captured.take().as_slice())
-                        .map_while(Result::ok)
-                        .filter_map(diagnostic)
-                        .collect(),
+                    output: build_output(captured.take().as_slice()),
                     source: source.into(),
                 })
                 .and_then(|_| {
@@ -292,26 +295,29 @@ impl WorkspaceBuild<'_> {
 mod tests {
     use std::collections::BTreeMap;
     use std::io;
+    use std::io::BufRead;
 
     use cargo_metadata::Message;
     use cargo_metadata::camino::Utf8PathBuf;
 
+    use super::build_output;
     use super::build_scripts;
     use crate::build_script_output::BuildScriptOutput;
+    use crate::workspace_build_error::WorkspaceBuildError;
 
     const HOST_RUN: &str = r#"{"reason":"build-script-executed","package_id":"path+file:///workspace/generated#0.1.0","linked_libs":[],"linked_paths":[],"cfgs":["host"],"env":[["GENERATED","host"]],"out_dir":"/workspace/target/debug/build/generated-host/out"}"#;
     const HOST_RUN_REPEATED_WITH_A_NEW_OUTPUT: &str = r#"{"reason":"build-script-executed","package_id":"path+file:///workspace/generated#0.1.0","linked_libs":[],"linked_paths":[],"cfgs":["host"],"env":[["GENERATED","repeated"]],"out_dir":"/workspace/target/debug/build/generated-host/out"}"#;
     const PACKAGE: &str = "path+file:///workspace/generated#0.1.0";
     const TARGET_RUN: &str = r#"{"reason":"build-script-executed","package_id":"path+file:///workspace/generated#0.1.0","linked_libs":[],"linked_paths":[],"cfgs":["target"],"env":[["GENERATED","target"]],"out_dir":"/workspace/target/x86_64-unknown-linux-gnu/debug/build/generated-target/out"}"#;
 
-    fn attributed(host: &[&str], target: &[&str]) -> Option<BTreeMap<String, BuildScriptOutput>> {
-        messages(host)
-            .and_then(|host| messages(target).map(|target| build_scripts(&host, &target)))
-            .ok()
+    fn attributed(host: &[&str], target: &[&str]) -> BTreeMap<String, BuildScriptOutput> {
+        build_scripts(&messages(host), &messages(target))
     }
 
-    fn messages(lines: &[&str]) -> Result<Vec<Message>, io::Error> {
-        Message::parse_stream(lines.join("\n").as_bytes()).collect()
+    fn messages(lines: &[&str]) -> Vec<Message> {
+        Message::parse_stream(lines.join("\n").as_bytes())
+            .collect::<Result<Vec<Message>, io::Error>>()
+            .expect("the build messages of a test are cargo's own JSON lines")
     }
 
     fn output(cfg: &str, generated: &str, out_dir: &str) -> BTreeMap<String, BuildScriptOutput> {
@@ -326,14 +332,38 @@ mod tests {
     }
 
     #[test]
+    fn failed_build_whose_messages_cannot_be_read_reports_why() {
+        let unreadable: &[u8] = b"\xff\n";
+        let mut reader = unreadable;
+        let mut line = String::new();
+        let expected = reader.read_line(&mut line).map_or_else(
+            |error| {
+                format!(
+                    "the build scripts and procedural macros cannot be built or run; a package whose build script cannot run on every host can declare its output in [workspace.metadata.heisenberg.out_dirs.<package>] instead:\nthe messages of the build cannot be read: {error}"
+                )
+            },
+            |_| String::new(),
+        );
+
+        assert_eq!(
+            WorkspaceBuildError::Build {
+                output: build_output(unreadable),
+                source: Box::from("the build failed"),
+            }
+            .to_string(),
+            expected
+        );
+    }
+
+    #[test]
     fn target_run_of_a_build_script_wins_over_its_host_run_reported_after_it() {
         assert_eq!(
             attributed(&[HOST_RUN], &[TARGET_RUN, HOST_RUN]),
-            Some(output(
+            output(
                 "target",
                 "target",
                 "/workspace/target/x86_64-unknown-linux-gnu/debug/build/generated-target/out"
-            ))
+            )
         );
     }
 
@@ -344,11 +374,11 @@ mod tests {
                 &[HOST_RUN],
                 &[TARGET_RUN, HOST_RUN_REPEATED_WITH_A_NEW_OUTPUT]
             ),
-            Some(output(
+            output(
                 "target",
                 "target",
                 "/workspace/target/x86_64-unknown-linux-gnu/debug/build/generated-target/out"
-            ))
+            )
         );
     }
 
@@ -356,11 +386,11 @@ mod tests {
     fn host_run_repeated_with_a_new_output_replaces_its_earlier_output() {
         assert_eq!(
             attributed(&[HOST_RUN], &[HOST_RUN_REPEATED_WITH_A_NEW_OUTPUT]),
-            Some(output(
+            output(
                 "host",
                 "repeated",
                 "/workspace/target/debug/build/generated-host/out"
-            ))
+            )
         );
     }
 }

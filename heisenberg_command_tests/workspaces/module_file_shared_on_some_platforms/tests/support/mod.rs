@@ -1,2 +1,2 @@
 #[test]
-fn support() {}
+fn support() { assert!(!"support".is_empty()); }

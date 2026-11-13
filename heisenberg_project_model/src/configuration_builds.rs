@@ -7,7 +7,6 @@ use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPath;
 use ra_ap_toolchain::Tool;
 
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_workspace_build::build_outputs::BuildOutputs;
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 use heisenberg_workspace_build::cargo_session::CargoSession;
@@ -87,10 +86,10 @@ impl ConfigurationBuilds<'_> {
                                     }
                                     .outputs()
                                     .map_err(Box::new)
-                                    .map_err(error_context(
-                                        configuration.clone(),
-                                        ProjectModelError::WorkspaceBuild,
-                                    ))
+                                    .map_err(|source| ProjectModelError::WorkspaceBuild {
+                                        configuration: configuration.clone(),
+                                        source,
+                                    })
                                     .map(|outputs| {
                                         (
                                             configuration.clone(),

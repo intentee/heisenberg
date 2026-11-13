@@ -5,7 +5,7 @@ use heisenberg_command_tests::constants::HOST_SELECTION;
 use heisenberg_command_tests::constants::JOBS_ARGUMENT;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn build_script_sees_the_job_count_of_the_check() {
@@ -35,7 +35,7 @@ fn build_script_sees_the_job_count_of_the_check() {
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
-            {footer}", footer = host_footer(2, 4)).as_str())
+            {footer}", footer = NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4)).as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

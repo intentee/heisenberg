@@ -3,6 +3,7 @@ name = "checks"
 edition = "2024"
 version = "0.1.0"
 publish = false
+autotests = false
 
 [dependencies]
 library = { path = "../library" }
@@ -15,3 +16,7 @@ all = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 dbg_macro = "deny"
+
+[[test]]
+name = "library_is_constructible"
+path = "tests/library_is_constructible.rs"

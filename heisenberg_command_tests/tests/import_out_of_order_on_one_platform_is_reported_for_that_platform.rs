@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const PLATFORM_IMPORT: &str = "- src/report.rs:7:5: Item belongs before Report: imports from vendor crates precede public items\n    \
@@ -36,7 +36,7 @@ fn import_out_of_order_on_one_platform_is_reported_for_that_platform() {
              1 errors found\n\
              ------------------------------\n\
              {}",
-            host_footer(1, 2)
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2)
         )
         .as_str())
     );

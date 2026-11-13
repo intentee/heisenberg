@@ -4,8 +4,8 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
+filetime = { workspace = true }
 heisenberg_absolute_path = { workspace = true }
-heisenberg_error_context = { workspace = true }
 ra_ap_paths = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

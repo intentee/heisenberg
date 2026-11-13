@@ -4,9 +4,9 @@ use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::constants::LEFT_OUT_CONFIGURATION;
-use heisenberg_command_tests::constants::PARTIAL_RUN_FOOTER_END;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn cycle_found_in_some_configurations_names_them() {
@@ -44,7 +44,7 @@ fn cycle_found_in_some_configurations_names_them() {
             Analysed on {HOST_CONFIGURATION}: 1 crate targets, 3 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 1 crate targets, 3 modules\n\
             Not analysed: {LEFT_OUT_CONFIGURATION}, {LEFT_OUT_CONFIGURATION}-without-features\n\
-            {PARTIAL_RUN_FOOTER_END}").as_str())
+            {}", NextestPresenceEvaluation::NotEvaluated.partial_run_footer_end()).as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

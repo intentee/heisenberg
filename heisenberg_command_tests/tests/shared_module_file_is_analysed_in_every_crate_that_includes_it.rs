@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
@@ -18,7 +18,8 @@ fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["ModuleCycle: 1 violation\n\
+        Ok([
+            "ModuleCycle: 1 violation\n\
             Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
             - tests/support/first_part.rs:5:9: Parts of crate::support depend on each other\n            \
@@ -48,9 +49,20 @@ fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
             tests/support/first_part.rs\n        \
             tests/support/second_part.rs\n\
             \n\
+            SplitIntegrationTests: 1 violation\n\
+            Every integration test target is its own binary, linked and started separately, which slows every test run and multiplies the long paths of build artifacts, and automatic discovery builds every file in tests/ as a target, including files that are meant to be modules. Set autotests = false, declare one [[test]] target, and include the other test files as its modules.\n\
+            \n\
+            - Cargo.toml: Package builds 2 integration test targets with libtest's harness instead of one\n      \
+            test \"first\"\n      \
+            test \"second\"\n\
+            \n\
             ------------------------------\n\
-            4 errors found\n\
-            ------------------------------\n", host_footer(3, 9).as_str()].concat().as_str())
+            5 errors found\n\
+            ------------------------------\n",
+            NextestPresenceEvaluation::Evaluated.host_footer(3, 9).as_str()
+        ]
+        .concat()
+        .as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

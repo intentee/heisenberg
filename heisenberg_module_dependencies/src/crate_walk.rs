@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_hir::Crate;
@@ -27,12 +26,15 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
 use crate::path_resolutions::PathResolutions;
+use crate::serialization_traits::SerializationTraits;
+use crate::standard_items::StandardItems;
 use crate::template_captures::TemplateCaptures;
+use crate::test_assertions::TestAssertions;
 use crate::token_origin::TokenOrigin;
+use crate::vetted_crates::VettedCrates;
 use crate::walked_module::WalkedModule;
 
 pub struct CrateWalk<'walk> {
-    pub benchmark_harness_crates: &'walk HashSet<Crate>,
     pub build_script_output_files: &'walk BTreeSet<FileId>,
     pub crate_target: &'walk CrateTarget,
     pub file_modules: &'walk HashMap<FileId, Vec<Module>>,
@@ -41,10 +43,13 @@ pub struct CrateWalk<'walk> {
     pub krate: Crate,
     pub module_paths: &'walk ModulePaths,
     pub non_production_files: &'walk NonProductionFiles,
+    pub serialization_traits: &'walk SerializationTraits,
     pub source_files: &'walk SourceFiles,
+    pub standard_items: &'walk StandardItems,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub test_modules: &'walk TestModules,
     pub unpublished_packages: &'walk BTreeSet<String>,
+    pub vetted_crates: &'walk VettedCrates,
     pub workspace_files: &'walk BTreeSet<FileId>,
 }
 
@@ -61,11 +66,12 @@ impl CrateWalk<'_> {
         let production_options = self.test_modules.production_options(database, self.krate);
         let template_captures = TemplateCaptures::new(&semantics);
         let usages = DefinitionUsages::new(&semantics);
+        let test_assertions = TestAssertions::default();
         let mut walked = WalkedModule::default();
 
         ModuleWalk {
             benchmark_harness: &BenchmarkHarness {
-                crates: self.benchmark_harness_crates,
+                crates: &self.vetted_crates.benchmark_harness,
                 semantics: &semantics,
             },
             build_script_output_files: self.build_script_output_files,
@@ -90,6 +96,7 @@ impl CrateWalk<'_> {
             paths: &paths,
             production_options: &production_options,
             semantics: &semantics,
+            serialization_traits: self.serialization_traits,
             template_captures: &template_captures,
             test_gated_code: self.test_gated_code,
             token_origin: &TokenOrigin {
@@ -97,7 +104,11 @@ impl CrateWalk<'_> {
                 semantics: &semantics,
                 workspace_files: self.workspace_files,
             },
+            standard_items: self.standard_items,
             unpublished_packages: self.unpublished_packages,
+            test_assertions: &test_assertions,
+            error_derive_crates: &self.vetted_crates.error_derive,
+            error_runtime_crates: &self.vetted_crates.error_runtime,
             usages: &usages,
         }
         .module(module, &mut walked)

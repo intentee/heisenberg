@@ -1,9 +1,10 @@
 use std::path::Path;
 
-use cargo::CargoResult;
 use cargo::GlobalContext;
 use cargo::util::data_structures::HashMap;
 use cargo_util_terminal::Shell;
+
+use crate::workspace_build_error::WorkspaceBuildError;
 
 pub struct ConfiguredContext<'context> {
     pub cargo_home: &'context Path,
@@ -15,8 +16,8 @@ pub struct ConfiguredContext<'context> {
 impl ConfiguredContext<'_> {
     /// # Errors
     ///
-    /// Returns the cargo error when the cargo configuration cannot be read.
-    pub fn with_shell(&self, shell: Shell) -> CargoResult<GlobalContext> {
+    /// Returns [`WorkspaceBuildError::CargoContext`] when the cargo configuration cannot be read.
+    pub fn with_shell(&self, shell: Shell) -> Result<GlobalContext, WorkspaceBuildError> {
         let mut context = GlobalContext::new(
             shell,
             self.workspace_directory.to_path_buf(),
@@ -28,5 +29,7 @@ impl ConfiguredContext<'_> {
         context
             .configure(0, true, None, true, true, true, &None, &[], &[])
             .map(|()| context)
+            .map_err(Into::into)
+            .map_err(WorkspaceBuildError::CargoContext)
     }
 }

@@ -23,7 +23,8 @@ fn build_with_a_sysroot_without_rustc_fails_to_load_the_project() {
         .command(&sysroot)
         .expect("the arguments must parse"),
         &BTreeMap::new(),
-    );
+    )
+    .expect("the errors of the run must be reported");
 
     assert_eq!(
         str::from_utf8(&outcome.errors),

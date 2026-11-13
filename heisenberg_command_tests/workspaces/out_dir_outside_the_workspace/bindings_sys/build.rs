@@ -1,9 +1,12 @@
 use std::env;
 use std::fs;
+use std::io;
 use std::path::Path;
 
-fn main() {
+fn main() -> Result<(), io::Error> {
     if let Some(out_dir) = env::var_os("OUT_DIR") {
-        fs::write(Path::new(&out_dir).join("bindings.rs"), "pub struct Binding;\n").ok();
+        fs::write(Path::new(&out_dir).join("bindings.rs"), "pub struct Binding;\n")?;
     }
+
+    Ok(())
 }

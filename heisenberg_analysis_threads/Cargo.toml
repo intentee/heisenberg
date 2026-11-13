@@ -2,6 +2,7 @@
 name = "heisenberg_analysis_threads"
 edition.workspace = true
 version.workspace = true
+autotests = false
 
 [dependencies]
 ra_ap_stdx = { workspace = true }
@@ -10,3 +11,7 @@ thiserror = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "heisenberg_analysis_threads"
+path = "tests/main.rs"

@@ -5,7 +5,6 @@ use serde_json::error;
 use thiserror::Error;
 
 use heisenberg_absolute_path::absolute_path_error::AbsolutePathError;
-use heisenberg_error_context::contextual_error::ContextualError;
 
 use crate::constants::EXPORT_FORMAT_VERSION;
 use crate::constants::EXPORT_TYPE;
@@ -33,8 +32,12 @@ pub enum CoverageExportError {
         function: String,
         start: RegionPosition,
     },
-    #[error("the coverage export `{}` is not valid JSON", .0.context)]
-    MalformedJson(#[source] ContextualError<AbsPathBuf, error::Error>),
+    #[error("the coverage export `{}` is not valid JSON", .path)]
+    MalformedJson {
+        path: AbsPathBuf,
+        #[source]
+        source: error::Error,
+    },
     #[error(
         "the function `{function}` of the coverage export `{export}` records MC/DC coverage, which Heisenberg does not measure; export the coverage of a run without MC/DC coverage"
     )]
@@ -42,15 +45,21 @@ pub enum CoverageExportError {
         export: AbsPathBuf,
         function: String,
     },
-    #[error("the metadata of the coverage export `{}` cannot be read", .0.context)]
-    MetadataUnreadable(#[source] ContextualError<AbsPathBuf, io::Error>),
-    #[error("the modification time of the coverage export `{}` is not available", .0.context)]
-    ModificationTimeUnavailable(#[source] ContextualError<AbsPathBuf, io::Error>),
+    #[error("the metadata of the coverage export `{}` cannot be read", .path)]
+    MetadataUnreadable {
+        path: AbsPathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error(
         "the coverage export `{}` does not name the type and version of an llvm-cov JSON export",
-        .0.context
+        .path
     )]
-    NotAnExport(#[source] ContextualError<AbsPathBuf, error::Error>),
+    NotAnExport {
+        path: AbsPathBuf,
+        #[source]
+        source: error::Error,
+    },
     #[error(
         "the coverage export `{export}` covers the workspace of `{manifest_path}`, not the workspace of `{workspace_manifest}`"
     )]
@@ -100,13 +109,19 @@ pub enum CoverageExportError {
     },
     #[error(
         "the coverage export `{}` does not hold the functions and regions of a `cargo llvm-cov report --json` export made without --summary-only and --skip-functions",
-        .0.context
+        .path
     )]
-    SchemaMismatch(#[source] ContextualError<AbsPathBuf, error::Error>),
-    #[error("the coverage export `{}` cannot be opened", .0.context)]
-    Unopenable(#[source] ContextualError<AbsPathBuf, io::Error>),
-    #[error("the coverage export `{}` cannot be read", .0.context)]
-    Unreadable(#[source] ContextualError<AbsPathBuf, io::Error>),
+    SchemaMismatch {
+        path: AbsPathBuf,
+        #[source]
+        source: error::Error,
+    },
+    #[error("the coverage export `{}` cannot be read", .path)]
+    Unreadable {
+        path: AbsPathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error(
         "the coverage export `{export}` is of type `{export_type}` in version {version}; Heisenberg reads `{}` in version {}",
         EXPORT_TYPE,

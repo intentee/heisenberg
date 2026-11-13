@@ -2,9 +2,9 @@ use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
-use heisenberg_command_tests::constants::PARTIAL_RUN_FOOTER_END;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const LEFT_OUT_CONFIGURATIONS: &str =
@@ -35,7 +35,8 @@ fn code_behind_an_unselected_feature_is_not_analysed() {
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 1 crate targets, 3 modules\n\
             Not analysed: {LEFT_OUT_CONFIGURATIONS}\n\
-            {PARTIAL_RUN_FOOTER_END}"
+            {}",
+            NextestPresenceEvaluation::NotEvaluated.partial_run_footer_end()
         )
         .as_str())
     );

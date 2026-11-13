@@ -2,6 +2,7 @@
 name = "justified_tests"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dependencies]
 base = { path = "../base" }
@@ -27,3 +28,7 @@ todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
 unwrap_used = "deny"
+
+[[test]]
+name = "library_is_constructible_with_an_extra_harness"
+path = "tests/library_is_constructible_with_an_extra_harness.rs"

@@ -1,2 +1,2 @@
 #[test]
-fn gated() {}
+fn gated() { assert!(!"gated".is_empty()); }

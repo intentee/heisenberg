@@ -2,6 +2,7 @@
 name = "library_tests"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dev-dependencies]
 base = { path = "../base" }
@@ -25,3 +26,7 @@ todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
 unwrap_used = "deny"
+
+[[test]]
+name = "library_is_constructible"
+path = "tests/library_is_constructible.rs"

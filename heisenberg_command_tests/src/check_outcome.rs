@@ -4,6 +4,8 @@ use std::ffi::OsString;
 use heisenberg_command::heisenberg_command::HeisenbergCommand;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 
+use crate::heisenberg_check_error::HeisenbergCheckError;
+
 pub struct CheckOutcome {
     pub errors: Vec<u8>,
     pub output: Vec<u8>,
@@ -11,16 +13,24 @@ pub struct CheckOutcome {
 }
 
 impl CheckOutcome {
-    #[must_use]
-    pub fn of(command: &HeisenbergCommand, environment: &BTreeMap<OsString, OsString>) -> Self {
+    /// # Errors
+    ///
+    /// Returns [`HeisenbergCheckError::ErrorReport`] when the command cannot report the errors
+    /// of its run.
+    pub fn of(
+        command: &HeisenbergCommand,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, HeisenbergCheckError> {
         let mut errors = Vec::new();
         let mut output = Vec::new();
-        let status = command.run(environment, &mut output, &mut errors);
 
-        Self {
-            errors,
-            output,
-            status,
-        }
+        command
+            .run(environment, &mut output, &mut errors)
+            .map_err(HeisenbergCheckError::ErrorReport)
+            .map(|status| Self {
+                errors,
+                output,
+                status,
+            })
     }
 }

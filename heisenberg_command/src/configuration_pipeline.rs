@@ -5,7 +5,6 @@ use heisenberg_analysis_threads::analysis_thread::AnalysisThread;
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use heisenberg_analysis_threads::joined::joined;
 use heisenberg_analysis_threads::worker_pool::WorkerPool;
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::loaded_workspace::LoadedWorkspace;
@@ -19,16 +18,12 @@ use crate::heisenberg_command_error::HeisenbergCommandError;
 fn configuration_failure(
     configuration: &Configuration,
 ) -> impl FnOnce(ProjectModelError) -> HeisenbergCommandError {
-    let failure = error_context(
-        configuration.clone(),
-        HeisenbergCommandError::ConfigurationProjectModel,
-    );
+    let configuration = configuration.clone();
 
-    |error| failure(Box::new(error))
-}
-
-fn project_model_failure(error: ProjectModelError) -> Vec<HeisenbergCommandError> {
-    vec![HeisenbergCommandError::ProjectModel(error)]
+    move |source| HeisenbergCommandError::ConfigurationProjectModel {
+        configuration,
+        source: Box::new(source),
+    }
 }
 
 fn loaded<'resolved>(
@@ -66,19 +61,31 @@ fn configuration_thread<'scope, TResult: Send + 'scope>(
     work: impl FnOnce() -> Result<TResult, HeisenbergCommandError> + Send + 'scope,
 ) -> Result<AnalysisThread<'scope, Result<TResult, HeisenbergCommandError>>, HeisenbergCommandError>
 {
-    threads.spawn(work).map_err(error_context(
-        configuration.clone(),
-        HeisenbergCommandError::AnalysisThread,
-    ))
+    threads
+        .spawn(work)
+        .map_err(|source| HeisenbergCommandError::AnalysisThread {
+            configuration: configuration.clone(),
+            source,
+        })
 }
 
 fn every_analysis<TAnalysis>(
     outcomes: Vec<Result<TAnalysis, HeisenbergCommandError>>,
-) -> Result<Vec<TAnalysis>, Vec<HeisenbergCommandError>> {
-    if outcomes.iter().all(Result::is_ok) {
-        Ok(outcomes.into_iter().flatten().collect())
+) -> Result<Vec<TAnalysis>, HeisenbergCommandError> {
+    let mut analyses = Vec::new();
+    let mut failures = Vec::new();
+
+    for outcome in outcomes {
+        match outcome {
+            Ok(completed) => analyses.push(completed),
+            Err(failure) => failures.push(failure),
+        }
+    }
+
+    if failures.is_empty() {
+        Ok(analyses)
     } else {
-        Err(outcomes.into_iter().filter_map(Result::err).collect())
+        Err(HeisenbergCommandError::Failures(failures))
     }
 }
 
@@ -106,15 +113,16 @@ pub trait ConfigurationPipeline: Sync {
         prerequisite: &Self::Prerequisite,
     ) -> Self::Report;
 
-    fn run(&self, model: &ProjectModel) -> Result<Self::Report, Vec<HeisenbergCommandError>> {
-        WorkerPool::start(model.jobs)
-            .map_err(|error| vec![HeisenbergCommandError::WorkerPool(error)])?;
+    fn run(&self, model: &ProjectModel) -> Result<Self::Report, HeisenbergCommandError> {
+        WorkerPool::start(model.jobs).map_err(HeisenbergCommandError::WorkerPool)?;
 
-        let project = model.resolve().map_err(project_model_failure)?;
+        let project = model
+            .resolve()
+            .map_err(HeisenbergCommandError::ProjectModel)?;
         let project = &project;
 
         scope(|scope| {
-            let threads = AnalysisThreads { scope };
+            let threads = AnalysisThreads::new(scope);
             let loading = project
                 .configurations
                 .keys()
@@ -135,41 +143,101 @@ pub trait ConfigurationPipeline: Sync {
 
             builds
                 .and_then(|outputs| project.resolve_standard_libraries().map(|()| outputs))
-                .map_err(project_model_failure)
+                .map_err(HeisenbergCommandError::ProjectModel)
                 .and_then(|outputs| {
-                    prerequisite
-                        .map_err(|error| vec![error])
-                        .and_then(|prerequisite| {
-                            let shared = Arc::new(prerequisite);
+                    prerequisite.and_then(|prerequisite| {
+                        let shared = Arc::new(prerequisite);
 
-                            every_analysis(joined(
-                                outputs
-                                    .into_iter()
-                                    .zip(loads)
-                                    .map(|((configuration, build), load)| {
-                                        let shared = Arc::clone(&shared);
+                        every_analysis(joined(
+                            outputs
+                                .into_iter()
+                                .zip(loads)
+                                .map(|((configuration, build), load)| {
+                                    let shared = Arc::clone(&shared);
 
-                                        load.and_then(|workspace| {
-                                            configuration_thread(
-                                                &threads,
-                                                &configuration.clone(),
-                                                move || {
-                                                    analysed(
-                                                        self,
-                                                        &configuration,
-                                                        workspace,
-                                                        &build,
-                                                        &shared,
-                                                    )
-                                                },
-                                            )
-                                        })
+                                    load.and_then(|workspace| {
+                                        configuration_thread(
+                                            &threads,
+                                            &configuration.clone(),
+                                            move || {
+                                                analysed(
+                                                    self,
+                                                    &configuration,
+                                                    workspace,
+                                                    &build,
+                                                    &shared,
+                                                )
+                                            },
+                                        )
                                     })
-                                    .collect(),
-                            ))
-                            .map(|analyses| self.report(project, analyses, &shared))
-                        })
+                                })
+                                .collect(),
+                        ))
+                        .map(|analyses| self.report(project, analyses, &shared))
+                    })
                 })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::error::Error;
+    use std::iter;
+    use std::thread;
+    use std::thread::Builder;
+
+    use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
+    use heisenberg_analysis_threads::constants::UNRESERVABLE_STACK_SIZE;
+    use heisenberg_project_model::configuration::Configuration;
+    use heisenberg_project_model::feature_selection::FeatureSelection;
+    use heisenberg_project_model::supported_target::SupportedTarget;
+
+    use super::configuration_thread;
+    use crate::heisenberg_command_error::HeisenbergCommandError;
+
+    #[test]
+    fn configuration_whose_thread_cannot_start_fails_with_its_name() {
+        let configuration = Configuration {
+            name: "unstartable".to_owned(),
+            target: SupportedTarget::X86_64UnknownLinuxGnu,
+            features: FeatureSelection {
+                default_features: true,
+                features: BTreeSet::new(),
+            },
+        };
+
+        thread::scope(|scope| {
+            let refused = Builder::new()
+                .stack_size(UNRESERVABLE_STACK_SIZE)
+                .spawn_scoped(scope, || ())
+                .err()
+                .map(|error| error.to_string());
+            let failure = configuration_thread(
+                &AnalysisThreads {
+                    scope,
+                    stack_size: UNRESERVABLE_STACK_SIZE,
+                },
+                &configuration,
+                || Ok::<(), HeisenbergCommandError>(()),
+            )
+            .err()
+            .map(|error| {
+                iter::successors(Some(&error as &dyn Error), |cause| (*cause).source())
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+            });
+
+            assert_eq!(
+                failure,
+                refused.map(|reason| vec![
+                    "the analysis thread for the configuration `unstartable` cannot be started"
+                        .to_owned(),
+                    "the operating system cannot start a thread".to_owned(),
+                    reason,
+                ])
+            );
+        });
     }
 }

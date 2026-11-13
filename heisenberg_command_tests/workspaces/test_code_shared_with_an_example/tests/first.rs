@@ -1,4 +1,4 @@
 mod support;
 
 #[test]
-fn first() {}
+fn first() { assert!(!"first".is_empty()); }

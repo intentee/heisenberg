@@ -23,7 +23,7 @@ impl CargoSession {
 
         context
             .with_shell(Shell::from_write(Box::new(captured.clone())))
-            .map_err(Into::into)
+            .map_err(Box::new)
             .map_err(WorkspaceBuildError::CargoConfiguration)
             .map(|context| Self { captured, context })
     }

@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const UNIX_IMPL_BLOCK: &str = "      impl block at tests/recording.rs:4:6\n";
@@ -36,7 +36,7 @@ fn impl_block_on_one_platform_is_part_of_its_type_issue() {
              1 errors found\n\
              ------------------------------\n\
              {}",
-            host_footer(2, 2)
+            NextestPresenceEvaluation::Evaluated.host_footer(2, 2)
         )
         .as_str())
     );

@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn build_script_and_analysis_see_the_same_selected_features() {
@@ -33,7 +33,7 @@ fn build_script_and_analysis_see_the_same_selected_features() {
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n\
-            {footer}", footer = host_footer(2, 4)).as_str())
+            {footer}", footer = NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4)).as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn field_shorthand_is_compared_by_the_value_it_reads() {
@@ -37,7 +37,7 @@ fn field_shorthand_is_compared_by_the_value_it_reads() {
             ------------------------------\n\
             3 errors found\n\
             ------------------------------\n",
-            host_footer(1, 9).as_str()
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 9).as_str()
         ]
         .concat()
         .as_str())

@@ -3,16 +3,20 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use crate::constants::CONSTANTS_MODULE_NAME;
+use crate::error_violation::ErrorViolation;
 use crate::harness_violation::HarnessViolation;
+use crate::impl_placement::ImplPlacement;
 use crate::item_placement::ItemPlacement;
 use crate::method_placement::MethodPlacement;
 use crate::non_production_users::NonProductionUsers;
+use crate::test_violation::TestViolation;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ViolationKind {
     AdditionalPublicItem,
     BenchmarkHarness(HarnessViolation),
     ConfigurationSelectionMacro,
+    Error(ErrorViolation),
     FailedMacroExpansion,
     FunctionUsedOnlyBy(NonProductionUsers),
     GlobImport,
@@ -34,19 +38,7 @@ pub enum ViolationKind {
         item: String,
         module: String,
     },
-    MisplacedBlanketImpl {
-        trait_file: String,
-    },
-    MisplacedForeignTypeImpl {
-        trait_file: String,
-        trait_name: String,
-    },
-    MisplacedImpl {
-        type_file: String,
-    },
-    MisplacedTraitObjectImpl {
-        trait_file: String,
-    },
+    MisplacedImpl(ImplPlacement),
     NegatedConfiguration,
     NonBenchmarkItemInBenchmarkTarget,
     NonConstantInConstantsModule,
@@ -60,6 +52,7 @@ pub enum ViolationKind {
     ReferencedTest,
     Reexport,
     SingleLetterName,
+    Test(TestViolation),
     TestOnlyCodeInProduction,
     TupleInSignature,
     UndestructuredParameter {
@@ -87,6 +80,7 @@ impl Display for ViolationKind {
             Self::ConfigurationSelectionMacro => formatter.write_str(
                 "Configuration selection macro keeps the arms it does not select out of the analysis",
             ),
+            Self::Error(violation) => violation.fmt(formatter),
             Self::FailedMacroExpansion => formatter.write_str("Macro expansion failed"),
             Self::FunctionUsedOnlyBy(users) => users.fmt(formatter),
             Self::GlobImport => formatter.write_str("Glob import"),
@@ -110,22 +104,7 @@ impl Display for ViolationKind {
                 formatter,
                 "Module is named {module}, but its public item {item} names it {expected}"
             ),
-            Self::MisplacedBlanketImpl { trait_file } => {
-                write!(formatter, "Blanket impl belongs in {trait_file}")
-            }
-            Self::MisplacedForeignTypeImpl {
-                trait_file,
-                trait_name,
-            } => write!(
-                formatter,
-                "Impl block of {trait_name} for a foreign type belongs in {trait_file}"
-            ),
-            Self::MisplacedImpl { type_file } => {
-                write!(formatter, "Impl block belongs in {type_file}")
-            }
-            Self::MisplacedTraitObjectImpl { trait_file } => {
-                write!(formatter, "Impl block on a trait object belongs in {trait_file}")
-            }
+            Self::MisplacedImpl(placement) => placement.fmt(formatter),
             Self::NegatedConfiguration => formatter.write_str(
                 "Configuration predicate negates a feature, test or debug_assertions",
             ),
@@ -155,6 +134,7 @@ impl Display for ViolationKind {
             Self::SingleLetterName => formatter.write_str("Name is a single character"),
             Self::TestOnlyCodeInProduction => formatter
                 .write_str("Code exists only under cfg(test) outside a test module"),
+            Self::Test(violation) => violation.fmt(formatter),
             Self::TupleInSignature => formatter.write_str("Tuple type in a signature"),
             Self::UndestructuredParameter { type_name } => write!(
                 formatter,

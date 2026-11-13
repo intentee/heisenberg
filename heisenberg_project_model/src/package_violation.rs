@@ -12,10 +12,10 @@ use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
 use crate::constants::MAXIMUM_SLOW_TEST_PERIOD;
 use crate::constants::MAXIMUM_TEST_DURATION;
-use crate::constants::NEXTEST_CONFIGURATION_DIRECTORY;
-use crate::constants::NEXTEST_CONFIGURATION_FILE;
+use crate::integration_test_violation::IntegrationTestViolation;
 use crate::libraryless_package::LibrarylessPackage;
 use crate::lint_table::LintTable;
+use crate::nextest_presence_violation::NextestPresenceViolation;
 use crate::potential_owner::PotentialOwner;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -29,18 +29,17 @@ pub enum PackageViolation {
         package: String,
     },
     Confinement(ConfinementViolation),
+    IntegrationTests(IntegrationTestViolation),
     LintAllowedInManifest {
         lint: String,
         table: LintTable,
         tool: String,
     },
-    NextestConfigurationMissing {
-        manifest: String,
-    },
     NextestOverride {
         file: String,
         profile: String,
     },
+    NextestPresence(NextestPresenceViolation),
     NextestSlowPeriodTooLong {
         file: String,
         period: Duration,
@@ -97,6 +96,9 @@ pub enum PackageViolation {
         manifest: String,
         package: String,
     },
+    UnreachableTestFile {
+        file: String,
+    },
     UnvettedClippySetting {
         file: String,
         setting: String,
@@ -118,12 +120,16 @@ impl PackageViolation {
                 .iter()
                 .map(PotentialOwner::to_string)
                 .collect(),
+            Self::IntegrationTests(IntegrationTestViolation::Split { targets, .. }) => {
+                targets.clone()
+            }
             Self::BenchmarkTarget(_)
             | Self::ClippyConfigurationAmbiguous { .. }
             | Self::ClippyConfigurationMissing { .. }
             | Self::Confinement(_)
+            | Self::IntegrationTests(IntegrationTestViolation::Discovered { .. })
             | Self::LintAllowedInManifest { .. }
-            | Self::NextestConfigurationMissing { .. }
+            | Self::NextestPresence(_)
             | Self::NextestOverride { .. }
             | Self::NextestSlowPeriodTooLong { .. }
             | Self::NextestSlowTimeoutUnset { .. }
@@ -138,6 +144,7 @@ impl PackageViolation {
             | Self::TestCrateDeclaredTwice { .. }
             | Self::TestCrateNotAMember { .. }
             | Self::TestCrateUsedByProduction { .. }
+            | Self::UnreachableTestFile { .. }
             | Self::UnvettedClippySetting { .. }
             | Self::UnvettedNextestSetting { .. } => Vec::new(),
         }
@@ -156,8 +163,8 @@ impl PackageViolation {
             | Self::NextestTestTerminatedTooLate { file, .. }
             | Self::NextestTimeoutPasses { file, .. }
             | Self::UnvettedNextestSetting { file, .. }
+            | Self::UnreachableTestFile { file }
             | Self::ClippyConfigurationMissing { manifest: file, .. }
-            | Self::NextestConfigurationMissing { manifest: file }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
             | Self::PublishableTestCrate { manifest: file, .. }
@@ -166,6 +173,8 @@ impl PackageViolation {
             | Self::TestCrateUsedByProduction { manifest: file, .. } => file,
             Self::BenchmarkTarget(violation) => violation.manifest(),
             Self::Confinement(violation) => violation.manifest(),
+            Self::IntegrationTests(violation) => violation.manifest(),
+            Self::NextestPresence(violation) => violation.file(),
             Self::WithoutLibrary(LibrarylessPackage { manifest, .. }) => manifest,
             Self::LintAllowedInManifest { table, .. }
             | Self::RequiredLintNotDenied { table, .. } => table.manifest(),
@@ -185,14 +194,12 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {package} has no {CLIPPY_CONFIGURATION_FILE} or {CLIPPY_HIDDEN_CONFIGURATION_FILE} within the workspace"
             ),
+            Self::IntegrationTests(violation) => violation.fmt(formatter),
             Self::Confinement(violation) => violation.fmt(formatter),
             Self::LintAllowedInManifest { lint, table, tool } => {
                 write!(formatter, "{table} allows {lint} in its {tool} lints")
             }
-            Self::NextestConfigurationMissing { .. } => write!(
-                formatter,
-                "Workspace has no {NEXTEST_CONFIGURATION_DIRECTORY}/{NEXTEST_CONFIGURATION_FILE}"
-            ),
+            Self::NextestPresence(violation) => violation.fmt(formatter),
             Self::NextestOverride { profile, .. } => write!(
                 formatter,
                 "Profile {profile} overrides the settings of some tests"
@@ -267,6 +274,9 @@ impl Display for PackageViolation {
                 formatter,
                 "Clippy configuration sets {setting}, which Heisenberg has not vetted"
             ),
+            Self::UnreachableTestFile { .. } => {
+                formatter.write_str("Test file is a module file of no crate target")
+            }
             Self::UnvettedNextestSetting { setting, .. } => write!(
                 formatter,
                 "Nextest configuration sets {setting}, which Heisenberg has not vetted"

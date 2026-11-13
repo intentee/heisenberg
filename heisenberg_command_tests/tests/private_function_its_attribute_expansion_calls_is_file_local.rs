@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn private_function_its_attribute_expansion_calls_is_file_local() {
@@ -22,7 +22,9 @@ fn private_function_its_attribute_expansion_calls_is_file_local() {
             "------------------------------\n\
             No errors found!\n\
             ------------------------------\n",
-            host_footer(2, 4).as_str()
+            NextestPresenceEvaluation::Evaluated
+                .host_footer(2, 4)
+                .as_str()
         ]
         .concat()
         .as_str())

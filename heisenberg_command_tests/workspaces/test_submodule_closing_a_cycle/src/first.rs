@@ -7,5 +7,5 @@ mod tests {
     #[test]
     fn uses_second() {
         let _second = Second;
-    }
+        assert!(!"uses_second".is_empty()); }
 }

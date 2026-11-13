@@ -3,9 +3,9 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::constants::CONFIGURATION_ARGUMENT;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
-use heisenberg_command_tests::constants::PARTIAL_RUN_FOOTER_END;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const LEFT_OUT_CONFIGURATIONS: &str = "x86_64-pc-windows-msvc, x86_64-pc-windows-msvc-without-features, x86_64-unknown-linux-gnu-without-features";
@@ -43,7 +43,7 @@ fn cycle_behind_a_selected_feature_is_found() {
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 1 crate targets, 3 modules\n\
             Not analysed: {LEFT_OUT_CONFIGURATIONS}\n\
-            {PARTIAL_RUN_FOOTER_END}").as_str())
+            {}", NextestPresenceEvaluation::NotEvaluated.partial_run_footer_end()).as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

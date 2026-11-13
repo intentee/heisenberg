@@ -4,8 +4,11 @@ use clap::ValueEnum;
 use clap::builder::PossibleValue;
 use humantime::format_duration;
 
+use heisenberg_module_graph::error_violation::ErrorViolation;
 use heisenberg_module_graph::harness_violation::HarnessViolation;
+use heisenberg_module_graph::impl_placement::ImplPlacement;
 use heisenberg_module_graph::non_production_users::NonProductionUsers;
+use heisenberg_module_graph::test_violation::TestViolation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::benchmark_target_violation::BenchmarkTargetViolation;
 use heisenberg_project_model::confinement_violation::ConfinementViolation;
@@ -24,6 +27,7 @@ use heisenberg_project_model::constants::VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS;
 use heisenberg_project_model::harness_methods::HarnessMethods;
 use heisenberg_project_model::libraryless_contents::LibrarylessContents;
 use heisenberg_project_model::libraryless_package::LibrarylessPackage;
+use heisenberg_project_model::nextest_presence_violation::NextestPresenceViolation;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::required_clippy_setting::RequiredClippySetting;
 
@@ -82,6 +86,7 @@ use crate::constants::REQUIRED_CLIPPY_SETTING_MISSING;
 use crate::constants::REQUIRED_LINT_NOT_DENIED;
 use crate::constants::SHARED_MODULE_FILE;
 use crate::constants::SINGLE_LETTER_NAME;
+use crate::constants::SPLIT_INTEGRATION_TESTS;
 use crate::constants::TEST_CRATE_DECLARED_TWICE;
 use crate::constants::TEST_CRATE_NOT_A_MEMBER;
 use crate::constants::TEST_CRATE_USED_BY_PRODUCTION;
@@ -94,8 +99,10 @@ use crate::constants::UNDETERMINED_BENCHMARK_OUTPUT;
 use crate::constants::UNIMPLEMENTED_BUILTIN_MACRO;
 use crate::constants::UNKNOWN_CONFINED_PACKAGE;
 use crate::constants::UNMAPPED_ITEM;
+use crate::constants::UNNEEDED_NEXTEST_CONFIGURATION;
 use crate::constants::UNPARSABLE_MACRO_EXPANSION;
 use crate::constants::UNPREFIXED_TYPE_PARAMETER;
+use crate::constants::UNREACHABLE_TEST_FILE;
 use crate::constants::UNRESOLVED_EXTERN_CRATE;
 use crate::constants::UNRESOLVED_MACRO_CALL;
 use crate::constants::UNRESOLVED_METHOD_CALL;
@@ -105,10 +112,14 @@ use crate::constants::UNSAFE_CODE;
 use crate::constants::UNVETTED_CLIPPY_SETTING;
 use crate::constants::UNVETTED_CRITERION_METHOD;
 use crate::constants::UNVETTED_NEXTEST_SETTING;
+use crate::error_issue::ErrorIssue;
 use crate::issue_text::IssueText;
+use crate::test_issue::TestIssue;
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IssueType {
+    Error(ErrorIssue),
+    Test(TestIssue),
     AdditionalPublicItem,
     BenchmarkTargetExcludedFromBenchmarks,
     BenchmarkTargetRunByTests,
@@ -164,6 +175,7 @@ pub enum IssueType {
     RequiredLintNotDenied,
     SharedModuleFile,
     SingleLetterName,
+    SplitIntegrationTests,
     TestCrateDeclaredTwice,
     TestCrateNotAMember,
     TestCrateUsedByProduction,
@@ -176,8 +188,10 @@ pub enum IssueType {
     UnimplementedBuiltinMacro,
     UnknownConfinedPackage,
     UnmappedItem,
+    UnneededNextestConfiguration,
     UnparsableMacroExpansion,
     UnprefixedTypeParameter,
+    UnreachableTestFile,
     UnresolvedExternCrate,
     UnresolvedMacroCall,
     UnresolvedMethodCall,
@@ -221,6 +235,8 @@ impl IssueType {
     #[must_use]
     pub const fn text(self) -> IssueText {
         match self {
+            Self::Error(issue) => issue.text(),
+            Self::Test(issue) => issue.text(),
             Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
             Self::BenchmarkTargetExcludedFromBenchmarks => {
                 BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS
@@ -284,6 +300,7 @@ impl IssueType {
             Self::RequiredLintNotDenied => REQUIRED_LINT_NOT_DENIED,
             Self::SharedModuleFile => SHARED_MODULE_FILE,
             Self::SingleLetterName => SINGLE_LETTER_NAME,
+            Self::SplitIntegrationTests => SPLIT_INTEGRATION_TESTS,
             Self::TestCrateDeclaredTwice => TEST_CRATE_DECLARED_TWICE,
             Self::TestCrateNotAMember => TEST_CRATE_NOT_A_MEMBER,
             Self::TestCrateUsedByProduction => TEST_CRATE_USED_BY_PRODUCTION,
@@ -296,8 +313,10 @@ impl IssueType {
             Self::UnimplementedBuiltinMacro => UNIMPLEMENTED_BUILTIN_MACRO,
             Self::UnknownConfinedPackage => UNKNOWN_CONFINED_PACKAGE,
             Self::UnmappedItem => UNMAPPED_ITEM,
+            Self::UnneededNextestConfiguration => UNNEEDED_NEXTEST_CONFIGURATION,
             Self::UnparsableMacroExpansion => UNPARSABLE_MACRO_EXPANSION,
             Self::UnprefixedTypeParameter => UNPREFIXED_TYPE_PARAMETER,
+            Self::UnreachableTestFile => UNREACHABLE_TEST_FILE,
             Self::UnresolvedExternCrate => UNRESOLVED_EXTERN_CRATE,
             Self::UnresolvedMacroCall => UNRESOLVED_MACRO_CALL,
             Self::UnresolvedMethodCall => UNRESOLVED_METHOD_CALL,
@@ -378,9 +397,25 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::BenchmarkHarness(HarnessViolation::UnvettedMethod { .. }) => {
                 Self::UnvettedCriterionMethod
             }
+            ViolationKind::Error(ErrorViolation::Discarded) => {
+                Self::Error(ErrorIssue::DiscardedError)
+            }
+            ViolationKind::Error(ErrorViolation::Handwritten) => {
+                Self::Error(ErrorIssue::HandwrittenErrorType)
+            }
+            ViolationKind::Error(ErrorViolation::MultipleTypes { .. }) => {
+                Self::Error(ErrorIssue::MultipleErrorTypes)
+            }
+            ViolationKind::Error(ErrorViolation::SourceInMessage) => {
+                Self::Error(ErrorIssue::SourceInErrorMessage)
+            }
+            ViolationKind::Error(ErrorViolation::SourceOutsideChain) => {
+                Self::Error(ErrorIssue::ErrorSourceOutsideChain)
+            }
             ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Benchmarks) => {
                 Self::FunctionUsedOnlyByBenchmarks
             }
+            ViolationKind::Test(TestViolation::Ignored) => Self::Test(TestIssue::IgnoredTest),
             ViolationKind::NonBenchmarkItemInBenchmarkTarget => {
                 Self::NonBenchmarkItemInBenchmarkTarget
             }
@@ -395,10 +430,16 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::InvalidMacroDefinition => Self::InvalidMacroDefinition,
             ViolationKind::LintSuppression => Self::LintSuppression,
             ViolationKind::MethodOutOfOrder { .. } => Self::MethodOutOfOrder,
-            ViolationKind::MisplacedBlanketImpl { .. } => Self::MisplacedBlanketImpl,
-            ViolationKind::MisplacedForeignTypeImpl { .. } => Self::MisplacedForeignTypeImpl,
-            ViolationKind::MisplacedImpl { .. } => Self::MisplacedImpl,
-            ViolationKind::MisplacedTraitObjectImpl { .. } => Self::MisplacedTraitObjectImpl,
+            ViolationKind::MisplacedImpl(ImplPlacement::Blanket { .. }) => {
+                Self::MisplacedBlanketImpl
+            }
+            ViolationKind::MisplacedImpl(ImplPlacement::ForeignType { .. }) => {
+                Self::MisplacedForeignTypeImpl
+            }
+            ViolationKind::MisplacedImpl(ImplPlacement::TraitObject { .. }) => {
+                Self::MisplacedTraitObjectImpl
+            }
+            ViolationKind::MisplacedImpl(ImplPlacement::Type { .. }) => Self::MisplacedImpl,
             ViolationKind::ModuleFileInsideBlock => Self::ModuleFileInsideBlock,
             ViolationKind::ModuleNotNamedAfterItsItem { .. } => Self::ModuleNotNamedAfterItsItem,
             ViolationKind::NegatedConfiguration => Self::NegatedConfiguration,
@@ -412,7 +453,14 @@ impl From<&ViolationKind> for IssueType {
             }
             ViolationKind::Reexport => Self::Reexport,
             ViolationKind::SingleLetterName => Self::SingleLetterName,
+            ViolationKind::Test(TestViolation::SerializationRoundTrip) => {
+                Self::Test(TestIssue::SerializationRoundTripTest)
+            }
+            ViolationKind::Test(TestViolation::Sleeping) => Self::Test(TestIssue::SleepInTest),
             ViolationKind::TestOnlyCodeInProduction => Self::TestOnlyCodeInProduction,
+            ViolationKind::Test(TestViolation::WithoutAssertion) => {
+                Self::Test(TestIssue::TestWithoutAssertion)
+            }
             ViolationKind::TupleInSignature => Self::TupleInSignature,
             ViolationKind::UndestructuredParameter { .. } => Self::UndestructuredParameter,
             ViolationKind::UnimplementedBuiltinMacro => Self::UnimplementedBuiltinMacro,
@@ -427,6 +475,9 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::IncludedSourceFile { .. } => Self::IncludedSourceFile,
             ViolationKind::UnsafeCode => Self::UnsafeCode,
             ViolationKind::ReferencedTest => Self::ReferencedTest,
+            ViolationKind::Error(ErrorViolation::UntypedResult { .. }) => {
+                Self::Error(ErrorIssue::UntypedResultError)
+            }
         }
     }
 }
@@ -446,6 +497,11 @@ impl From<&PackageViolation> for IssueType {
             PackageViolation::Confinement(ConfinementViolation::UnknownPackage { .. }) => {
                 Self::UnknownConfinedPackage
             }
+            PackageViolation::IntegrationTests(_) => Self::SplitIntegrationTests,
+            PackageViolation::UnreachableTestFile { .. } => Self::UnreachableTestFile,
+            PackageViolation::NextestPresence(NextestPresenceViolation::Unneeded { .. }) => {
+                Self::UnneededNextestConfiguration
+            }
             PackageViolation::Confinement(ConfinementViolation::UserListedTwice { .. }) => {
                 Self::ConfinedPackageUserListedTwice
             }
@@ -460,7 +516,7 @@ impl From<&PackageViolation> for IssueType {
             }
             PackageViolation::ClippyConfigurationMissing { .. } => Self::ClippyConfigurationMissing,
             PackageViolation::LintAllowedInManifest { .. } => Self::LintAllowedInManifest,
-            PackageViolation::NextestConfigurationMissing { .. } => {
+            PackageViolation::NextestPresence(NextestPresenceViolation::Missing { .. }) => {
                 Self::NextestConfigurationMissing
             }
             PackageViolation::NextestOverride { .. } => Self::NextestOverride,
@@ -511,11 +567,15 @@ impl ValueEnum for IssueType {
             Self::ConfinedPackageUserListedTwice,
             Self::ConfinedPackageUserNotAMember,
             Self::ConfinedPackageUserNotReachingIt,
+            Self::Error(ErrorIssue::DiscardedError),
             Self::DuplicatedFunctionBody,
+            Self::Error(ErrorIssue::ErrorSourceOutsideChain),
             Self::FailedMacroExpansion,
             Self::FunctionUsedOnlyByBenchmarks,
             Self::FunctionUsedOnlyByTests,
             Self::GlobImport,
+            Self::Error(ErrorIssue::HandwrittenErrorType),
+            Self::Test(TestIssue::IgnoredTest),
             Self::ImplWithoutLocalType,
             Self::IncludedSourceFile,
             Self::InvalidMacroDefinition,
@@ -530,6 +590,7 @@ impl ValueEnum for IssueType {
             Self::ModuleCycle,
             Self::ModuleFileInsideBlock,
             Self::ModuleNotNamedAfterItsItem,
+            Self::Error(ErrorIssue::MultipleErrorTypes),
             Self::MustUseBenchmarkOutput,
             Self::NegatedConfiguration,
             Self::NextestConfigurationMissing,
@@ -549,12 +610,17 @@ impl ValueEnum for IssueType {
             Self::ReferencedTest,
             Self::RequiredClippySettingMissing,
             Self::RequiredLintNotDenied,
+            Self::Test(TestIssue::SerializationRoundTripTest),
             Self::SharedModuleFile,
             Self::SingleLetterName,
+            Self::Test(TestIssue::SleepInTest),
+            Self::Error(ErrorIssue::SourceInErrorMessage),
+            Self::SplitIntegrationTests,
             Self::TestCrateDeclaredTwice,
             Self::TestCrateNotAMember,
             Self::TestCrateUsedByProduction,
             Self::TestOnlyCodeInProduction,
+            Self::Test(TestIssue::TestWithoutAssertion),
             Self::TestsOnlyPackageWithoutTestLibraries,
             Self::TupleInSignature,
             Self::UncoveredCode,
@@ -563,14 +629,17 @@ impl ValueEnum for IssueType {
             Self::UnimplementedBuiltinMacro,
             Self::UnknownConfinedPackage,
             Self::UnmappedItem,
+            Self::UnneededNextestConfiguration,
             Self::UnparsableMacroExpansion,
             Self::UnprefixedTypeParameter,
+            Self::UnreachableTestFile,
             Self::UnresolvedExternCrate,
             Self::UnresolvedMacroCall,
             Self::UnresolvedMethodCall,
             Self::UnresolvedModule,
             Self::UnresolvedPath,
             Self::UnsafeCode,
+            Self::Error(ErrorIssue::UntypedResultError),
             Self::UnvettedClippySetting,
             Self::UnvettedCriterionMethod,
             Self::UnvettedNextestSetting,

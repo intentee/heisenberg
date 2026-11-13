@@ -28,7 +28,8 @@ fn sysroot_without_rust_src_fails_to_load_the_project() {
         .command(&workspace)
         .expect("the arguments must parse"),
         &BTreeMap::new(),
-    );
+    )
+    .expect("the errors of the run must be reported");
 
     assert_eq!(
         str::from_utf8(&outcome.errors),

@@ -2,6 +2,7 @@
 name = "cycle_in_an_integration_test_target"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [workspace]
 
@@ -36,3 +37,7 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "cycle"
+path = "tests/cycle.rs"

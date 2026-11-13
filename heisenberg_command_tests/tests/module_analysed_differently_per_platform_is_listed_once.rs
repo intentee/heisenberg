@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const INCLUSIONS: &str = "- src/shared.rs: Module file belongs to 2 modules\n      \
@@ -45,7 +45,7 @@ fn module_analysed_differently_per_platform_is_listed_once() {
              1 errors found\n\
              ------------------------------\n\
              {}",
-            host_footer(1, HOST_MODULES)
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, HOST_MODULES)
         )
         .as_str())
     );

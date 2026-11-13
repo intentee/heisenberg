@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn function_used_only_by_tests_of_a_publishable_library_is_reported_only_when_unreachable_from_other_crates()
@@ -29,7 +29,7 @@ fn function_used_only_by_tests_of_a_publishable_library_is_reported_only_when_un
             \n\
             ------------------------------\n\
             2 errors found\n\
-            ------------------------------\n", host_footer(3, 6).as_str()].concat().as_str())
+            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(3, 6).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

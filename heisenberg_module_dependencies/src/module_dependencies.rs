@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::iter::once;
 
 use ra_ap_cfg::CfgExpr;
@@ -38,6 +37,9 @@ use crate::inactive_code_site::InactiveCodeSite;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
 use crate::module_paths::ModulePaths;
+use crate::serialization_traits::SerializationTraits;
+use crate::standard_items::StandardItems;
+use crate::vetted_crates::VettedCrates;
 
 fn inactive_code(diagnostics: &[ModuleDiagnostics]) -> HashMap<InFile<SyntaxNodePtr>, CfgExpr> {
     diagnostics
@@ -61,36 +63,9 @@ impl ModuleDependencies<'_, '_> {
         member_crates(self.project)
             .map_err(ModuleDependenciesError::MemberCrates)
             .and_then(|resolved| {
-                self.benchmark_harness_crates()
-                    .and_then(|harness_crates| self.member_graphs(&harness_crates, &resolved))
+                self.vetted_crates()
+                    .and_then(|vetted_crates| self.member_graphs(&vetted_crates, &resolved))
             })
-    }
-
-    fn benchmark_harness_crates(&self) -> Result<HashSet<Crate>, ModuleDependenciesError> {
-        let LoadedProject {
-            database,
-            files,
-            packages,
-            ..
-        } = &*self.project;
-        let locator = SourceLocator { database, files };
-
-        attach_db(database, || {
-            Crate::all(database)
-                .into_iter()
-                .filter_map(|krate| {
-                    locator
-                        .source_file::<ModuleDependenciesError>(krate.root_file(database))
-                        .map(|SourceFile { path, .. }| {
-                            packages
-                                .benchmark_harness_roots
-                                .contains(&VfsPath::from(path.to_path_buf()))
-                                .then_some(krate)
-                        })
-                        .transpose()
-                })
-                .collect()
-        })
     }
 
     fn category_files(
@@ -122,7 +97,8 @@ impl ModuleDependencies<'_, '_> {
 
     fn graphs(
         &self,
-        benchmark_harness_crates: &HashSet<Crate>,
+        vetted_crates: &VettedCrates,
+        serialization_traits: &SerializationTraits,
         members: &[ResolvedMemberCrate],
         workspace_files: &BTreeSet<FileId>,
         non_production_files: &NonProductionFiles,
@@ -155,44 +131,55 @@ impl ModuleDependencies<'_, '_> {
                             .copied()
                             .collect()
                     });
-                    let diagnostics =
-                        attached_work(database, &modules_with_files, |module_database, module| {
-                            ModuleDiagnostics::new(&Semantics::new(module_database), *module)
-                        });
-                    let inactive_code = inactive_code(&diagnostics);
-                    let crate_walk = CrateWalk {
-                        benchmark_harness_crates,
-                        build_script_output_files,
-                        crate_target,
-                        file_modules,
-                        files: member_files,
-                        inactive_code: &inactive_code,
-                        krate: *krate,
-                        module_paths: &module_paths,
-                        non_production_files,
-                        source_files: files,
-                        test_gated_code: &test_gated_code,
-                        test_modules: &test_modules,
-                        unpublished_packages,
-                        workspace_files,
-                    };
-                    let walked =
-                        attached_work(database, &modules_with_files, |module_database, module| {
-                            crate_walk.module(module_database, *module)
-                        });
-
                     attach_db(database, || {
-                        CrateExtraction {
+                        StandardItems::new(&Semantics::new(database), *krate)
+                    })
+                    .and_then(|standard_items| {
+                        let diagnostics = attached_work(
+                            database,
+                            &modules_with_files,
+                            |module_database, module| {
+                                ModuleDiagnostics::new(&Semantics::new(module_database), *module)
+                            },
+                        );
+                        let inactive_code = inactive_code(&diagnostics);
+                        let crate_walk = CrateWalk {
+                            build_script_output_files,
                             crate_target,
-                            diagnostics: &diagnostics,
+                            file_modules,
                             files: member_files,
+                            inactive_code: &inactive_code,
                             krate: *krate,
-                            locator: &SourceLocator { database, files },
-                            modules: &modules,
-                            semantics: &Semantics::new(database),
+                            module_paths: &module_paths,
+                            non_production_files,
+                            source_files: files,
+                            standard_items: &standard_items,
+                            test_gated_code: &test_gated_code,
+                            test_modules: &test_modules,
+                            serialization_traits,
+                            unpublished_packages,
+                            vetted_crates,
                             workspace_files,
-                        }
-                        .graph(walked)
+                        };
+                        let walked = attached_work(
+                            database,
+                            &modules_with_files,
+                            |module_database, module| crate_walk.module(module_database, *module),
+                        );
+
+                        attach_db(database, || {
+                            CrateExtraction {
+                                crate_target,
+                                diagnostics: &diagnostics,
+                                files: member_files,
+                                krate: *krate,
+                                locator: &SourceLocator { database, files },
+                                modules: &modules,
+                                semantics: &Semantics::new(database),
+                                workspace_files,
+                            }
+                            .graph(walked)
+                        })
                     })
                 },
             )
@@ -203,7 +190,7 @@ impl ModuleDependencies<'_, '_> {
 
     fn member_graphs(
         &mut self,
-        benchmark_harness_crates: &HashSet<Crate>,
+        vetted_crates: &VettedCrates,
         members: &[ResolvedMemberCrate],
     ) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         let workspace_files = module_files(members.iter());
@@ -212,6 +199,10 @@ impl ModuleDependencies<'_, '_> {
             test: self.category_files(members, CodeCategory::Test),
         };
         let file_modules = self.file_modules(&workspace_files);
+        let database = &self.project.database;
+        let serialization_traits = attach_db(database, || {
+            SerializationTraits::new(database, &vetted_crates.serialization)
+        });
         let shared_files: BTreeSet<FileId> = file_modules
             .iter()
             .filter(|(_, modules)| modules.len() > 1)
@@ -225,7 +216,8 @@ impl ModuleDependencies<'_, '_> {
             .cloned()
             .collect();
         self.graphs(
-            benchmark_harness_crates,
+            vetted_crates,
+            &serialization_traits,
             &members
                 .iter()
                 .filter(
@@ -263,7 +255,8 @@ impl ModuleDependencies<'_, '_> {
                         .collect();
 
                     self.graphs(
-                        benchmark_harness_crates,
+                        vetted_crates,
+                        &serialization_traits,
                         &[member],
                         &workspace_files,
                         &non_production_files,
@@ -292,5 +285,46 @@ impl ModuleDependencies<'_, '_> {
             .collect();
 
         set_all_crates_with_durability(database, order, Durability::MEDIUM);
+    }
+
+    fn vetted_crates(&self) -> Result<VettedCrates, ModuleDependenciesError> {
+        let LoadedProject {
+            database,
+            files,
+            packages,
+            ..
+        } = &*self.project;
+        let locator = SourceLocator { database, files };
+
+        attach_db(database, || {
+            Crate::all(database).into_iter().try_fold(
+                VettedCrates::default(),
+                |mut vetted, krate| {
+                    locator
+                        .source_file::<ModuleDependenciesError>(krate.root_file(database))
+                        .map(|SourceFile { path, .. }| {
+                            let root = VfsPath::from(path.to_path_buf());
+
+                            if packages.benchmark_harness_roots.contains(&root) {
+                                vetted.benchmark_harness.insert(krate);
+                            }
+
+                            if packages.error_derive_roots.contains(&root) {
+                                vetted.error_derive.insert(krate);
+                            }
+
+                            if packages.error_runtime_roots.contains(&root) {
+                                vetted.error_runtime.insert(krate);
+                            }
+
+                            if packages.serialization_roots.contains(&root) {
+                                vetted.serialization.insert(krate);
+                            }
+
+                            vetted
+                        })
+                },
+            )
+        })
     }
 }

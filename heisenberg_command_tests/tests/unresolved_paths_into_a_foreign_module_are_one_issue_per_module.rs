@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn unresolved_paths_into_a_foreign_module_are_one_issue_per_module() {
@@ -28,7 +28,7 @@ fn unresolved_paths_into_a_foreign_module_are_one_issue_per_module() {
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n",
-            host_footer(1, 1).as_str()
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()
         ]
         .concat()
         .as_str())

@@ -28,7 +28,8 @@ fn explanation_that_cannot_be_written_fails() {
     let status =
         HeisenbergCommand::try_parse_from([PROGRAM_NAME, EXPLAIN_SUBCOMMAND, "GlobImport"])
             .expect("the arguments must parse")
-            .run(&BTreeMap::new(), &mut read_only_output, &mut errors);
+            .run(&BTreeMap::new(), &mut read_only_output, &mut errors)
+            .expect("the errors of the run must be reported");
 
     assert_eq!(
         str::from_utf8(&errors),

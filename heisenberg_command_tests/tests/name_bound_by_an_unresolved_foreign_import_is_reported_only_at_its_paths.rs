@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
@@ -31,7 +31,7 @@ fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
             ------------------------------\n\
             1 errors found\n\
             ------------------------------\n",
-            host_footer(1, 2).as_str()
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()
         ]
         .concat()
         .as_str())

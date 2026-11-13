@@ -83,9 +83,6 @@ pub const LLVM_PROFILE_FILE_VARIABLE: &str = "LLVM_PROFILE_FILE";
 
 pub const PACKAGE_DIRECTORY: &str = env!("CARGO_MANIFEST_DIR");
 
-pub const PARTIAL_RUN_FOOTER_END: &str = "Not evaluated in a partial run: CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt, the empty-library checks of TestsOnlyPackageWithoutTestLibraries and BenchmarksOnlyPackageWithoutLibraries\n\
-    Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration\n";
-
 pub const PATH_VARIABLE: &str = "PATH";
 
 pub const PROGRAM_NAME: &str = "heisenberg";

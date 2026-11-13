@@ -10,7 +10,9 @@ use crate::nextest_configuration::NextestConfiguration;
 use crate::nextest_configuration_file::NextestConfigurationFile;
 use crate::nextest_duration::NextestDuration;
 use crate::nextest_period_setting::NextestPeriodSetting;
+use crate::nextest_presence::NextestPresence;
 use crate::nextest_profile::NextestProfile;
+use crate::nextest_review::NextestReview;
 use crate::nextest_slow_timeout::NextestSlowTimeout;
 use crate::nextest_termination::NextestTermination;
 use crate::nextest_timeout_limits::NextestTimeoutLimits;
@@ -152,22 +154,30 @@ impl NextestRequirements<'_> {
     ///
     /// Returns [`ProjectModelError`] when the nextest configuration of the workspace
     /// cannot be read or is not a valid nextest configuration.
-    pub fn violations(&self) -> Result<Vec<PackageViolation>, ProjectModelError> {
+    pub fn review(&self) -> Result<NextestReview, ProjectModelError> {
         let workspace_path = self.resolved.workspace_path();
 
         NextestConfigurationFile::read(workspace_path.root).map(|configuration_file| {
             match configuration_file {
-                NextestConfigurationFile::Missing => {
-                    vec![PackageViolation::NextestConfigurationMissing {
+                NextestConfigurationFile::Missing => NextestReview {
+                    presence: NextestPresence::Missing {
                         manifest: workspace_path.manifest(),
-                    }]
-                }
+                    },
+                    violations: Vec::new(),
+                },
                 NextestConfigurationFile::Present {
                     configuration,
                     file,
-                } => configuration_violations(&workspace_path.relative(&file), &configuration)
-                    .into_iter()
-                    .collect(),
+                } => {
+                    let relative = workspace_path.relative(&file);
+
+                    NextestReview {
+                        violations: configuration_violations(&relative, &configuration)
+                            .into_iter()
+                            .collect(),
+                        presence: NextestPresence::Present { file: relative },
+                    }
+                }
             }
         })
     }

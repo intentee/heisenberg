@@ -3,7 +3,7 @@ impl helpers::Helpers {
 }
 
 #[test]
-fn helps() {}
+fn helps() { assert!(!"helps".is_empty()); }
 
 mod helpers {
     #[derive(Debug)]

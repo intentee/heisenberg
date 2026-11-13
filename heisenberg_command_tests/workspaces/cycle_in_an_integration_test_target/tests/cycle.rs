@@ -2,7 +2,7 @@
 fn runs_both_modules() {
     first::first();
     second::back();
-}
+    assert!(!"runs_both_modules".is_empty()); }
 
 mod first {
     pub fn first() {

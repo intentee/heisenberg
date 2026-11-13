@@ -15,4 +15,9 @@ pub enum ModuleDependenciesError {
     SelfTypeWithoutSource(Impl),
     #[error(transparent)]
     SourceLocator(#[from] SourceLocatorError),
+    #[error(
+        "the standard library lacks the items that the analysis relies on: {}",
+        items.join(", ")
+    )]
+    StandardItemsMissing { items: Vec<&'static str> },
 }

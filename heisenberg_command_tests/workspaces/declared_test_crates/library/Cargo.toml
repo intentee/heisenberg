@@ -3,6 +3,7 @@ name = "library"
 edition = "2024"
 version = "0.1.0"
 publish = false
+autotests = false
 
 [dependencies]
 shared = { path = "../shared" }
@@ -27,3 +28,7 @@ todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
 unwrap_used = "deny"
+
+[[test]]
+name = "total_exceeds_the_sample"
+path = "tests/total_exceeds_the_sample.rs"

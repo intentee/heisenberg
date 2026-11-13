@@ -15,7 +15,8 @@ fn explain_prints_the_definition_and_the_purpose_of_a_rule() {
     let status =
         HeisenbergCommand::try_parse_from([PROGRAM_NAME, EXPLAIN_SUBCOMMAND, "GlobImport"])
             .expect("the arguments must parse")
-            .run(&BTreeMap::new(), &mut output, &mut errors);
+            .run(&BTreeMap::new(), &mut output, &mut errors)
+            .expect("the errors of the run must be reported");
 
     assert_eq!(
         str::from_utf8(&output),

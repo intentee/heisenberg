@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn test_module_of_a_member_closes_a_cycle() {
@@ -32,7 +32,7 @@ fn test_module_of_a_member_closes_a_cycle() {
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n", host_footer(1, 4).as_str()].concat().as_str())
+            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -3,9 +3,9 @@ use std::str;
 
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
-use heisenberg_command_tests::constants::PARTIAL_RUN_FOOTER_END;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_command_tests::host_only_fixture::HostOnlyFixture;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn confined_package_user_reaching_it_is_not_checked_in_a_partial_run() {
@@ -66,7 +66,7 @@ fn confined_package_user_reaching_it_is_not_checked_in_a_partial_run() {
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Not analysed: {HOST_CONFIGURATION}-without-features\n\
-            {PARTIAL_RUN_FOOTER_END}").as_str())
+            {}", NextestPresenceEvaluation::Evaluated.partial_run_footer_end()).as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

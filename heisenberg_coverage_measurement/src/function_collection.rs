@@ -16,7 +16,6 @@ use ra_ap_syntax::WalkEvent;
 use ra_ap_syntax::ast;
 use ra_ap_syntax::ast::HasName;
 
-use heisenberg_error_context::contextual_error::ContextualError;
 use heisenberg_expanded_code::expansion_syntax_errors::expansion_syntax_errors;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_source_locator::written_range::written_range;
@@ -139,12 +138,10 @@ impl FunctionCollection<'_, '_> {
                 .cloned()
                 .map_or(Ok(()), |error| {
                     self.invocation(call).and_then(|location| {
-                        Err(CoverageMeasurementError::UnparsableMacroExpansion(
-                            ContextualError {
-                                context: location,
-                                source: error,
-                            },
-                        ))
+                        Err(CoverageMeasurementError::UnparsableMacroExpansion {
+                            location,
+                            source: error,
+                        })
                     })
                 })
         })

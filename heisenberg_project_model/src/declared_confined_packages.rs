@@ -54,11 +54,6 @@ impl DeclaredConfinedPackages {
                     },
                 })
                 .collect(),
-            names: resolved
-                .packages
-                .iter()
-                .map(|package| (package.metadata.id.repr.clone(), package.versioned_name()))
-                .collect(),
             workspace_manifest: workspace_path.manifest(),
         }
     }

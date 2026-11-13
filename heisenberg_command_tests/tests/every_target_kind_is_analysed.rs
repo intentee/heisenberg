@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn every_target_kind_is_analysed() {
@@ -22,7 +22,9 @@ fn every_target_kind_is_analysed() {
             "------------------------------\n\
             No errors found!\n\
             ------------------------------\n",
-            host_footer(6, 6).as_str()
+            NextestPresenceEvaluation::Evaluated
+                .host_footer(6, 6)
+                .as_str()
         ]
         .concat()
         .as_str())

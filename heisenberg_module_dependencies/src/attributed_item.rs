@@ -32,6 +32,15 @@ impl AttributedItem<'_, '_> {
         })
     }
 
+    pub fn is_libtest_test(&self) -> bool {
+        self.attribute_macros().into_iter().any(|definition| {
+            matches!(
+                MacroId::from(definition).definition(self.semantics.db).kind,
+                MacroDefKind::BuiltInAttr(_, BuiltinAttrExpander::Test)
+            )
+        })
+    }
+
     fn attribute_macros(&self) -> Vec<Macro> {
         self.item
             .attrs()

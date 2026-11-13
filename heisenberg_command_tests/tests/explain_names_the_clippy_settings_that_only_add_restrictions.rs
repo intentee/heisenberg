@@ -18,7 +18,8 @@ fn explain_names_the_clippy_settings_that_only_add_restrictions() {
         "UnvettedClippySetting",
     ])
     .expect("the arguments must parse")
-    .run(&BTreeMap::new(), &mut output, &mut errors);
+    .run(&BTreeMap::new(), &mut output, &mut errors)
+    .expect("the errors of the run must be reported");
 
     assert_eq!(
         str::from_utf8(&output),

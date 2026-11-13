@@ -2440,7 +2440,6 @@ dependencies = [
  "heisenberg_analysis_threads",
  "heisenberg_coverage_export",
  "heisenberg_coverage_measurement",
- "heisenberg_error_context",
  "heisenberg_module_cycles",
  "heisenberg_module_dependencies",
  "heisenberg_module_graph",
@@ -2455,12 +2454,19 @@ dependencies = [
 name = "heisenberg_command_tests"
 version = "0.1.0"
 dependencies = [
+ "cargo",
+ "cargo-util-terminal",
  "clap",
+ "heisenberg_analysis_threads",
  "heisenberg_command",
  "heisenberg_coverage_export",
- "heisenberg_error_context",
  "heisenberg_project_model",
+ "heisenberg_workspace_build",
  "humantime",
+ "ra_ap_ide_db",
+ "ra_ap_paths",
+ "ra_ap_proc_macro_api",
+ "ra_ap_project_model",
  "rayon",
  "serde_json",
  "thiserror",
@@ -2486,8 +2492,8 @@ dependencies = [
 name = "heisenberg_coverage_export"
 version = "0.1.0"
 dependencies = [
+ "filetime",
  "heisenberg_absolute_path",
- "heisenberg_error_context",
  "ra_ap_paths",
  "serde",
  "serde_json",
@@ -2498,10 +2504,10 @@ dependencies = [
 name = "heisenberg_coverage_measurement"
 version = "0.1.0"
 dependencies = [
+ "filetime",
  "heisenberg_attached_work",
  "heisenberg_configured_code",
  "heisenberg_coverage_export",
- "heisenberg_error_context",
  "heisenberg_expanded_code",
  "heisenberg_member_crates",
  "heisenberg_module_graph",
@@ -2519,10 +2525,6 @@ dependencies = [
  "rayon",
  "thiserror",
 ]
-
-[[package]]
-name = "heisenberg_error_context"
-version = "0.1.0"
 
 [[package]]
 name = "heisenberg_expanded_code"
@@ -2609,13 +2611,13 @@ dependencies = [
  "cargo_metadata",
  "guppy",
  "heisenberg_analysis_threads",
- "heisenberg_error_context",
  "heisenberg_graph_cycles",
  "heisenberg_module_graph",
  "heisenberg_task_graph",
  "heisenberg_workspace_build",
  "humantime",
  "ra_ap_cfg",
+ "ra_ap_hir_expand",
  "ra_ap_ide_db",
  "ra_ap_intern",
  "ra_ap_load-cargo",
@@ -2629,6 +2631,7 @@ dependencies = [
  "thiserror",
  "toml",
  "triomphe",
+ "walkdir",
 ]
 
 [[package]]

@@ -7,7 +7,6 @@ use heisenberg_absolute_path::absolute_path::AbsolutePath;
 use heisenberg_coverage_export::coverage_export_file::CoverageExportFile;
 use heisenberg_coverage_export::exported_coverage::ExportedCoverage;
 use heisenberg_coverage_measurement::coverage_measurement::CoverageMeasurement;
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::resolved_project::ResolvedProject;
@@ -38,7 +37,7 @@ impl CoverageCheckCommand {
     pub fn execute(
         &self,
         environment: &BTreeMap<OsString, OsString>,
-    ) -> Result<CoverageReport, Vec<HeisenbergCommandError>> {
+    ) -> Result<CoverageReport, HeisenbergCommandError> {
         self.run(&self.project.model(environment))
     }
 }
@@ -57,10 +56,10 @@ impl ConfigurationPipeline for CoverageCheckCommand {
         CoverageMeasurement { coverage, project }
             .measure()
             .map_err(Box::new)
-            .map_err(error_context(
-                configuration.clone(),
-                HeisenbergCommandError::CoverageMeasurement,
-            ))
+            .map_err(|source| HeisenbergCommandError::CoverageMeasurement {
+                configuration: configuration.clone(),
+                source,
+            })
             .map(|coverage| ConfigurationCoverage {
                 configuration: configuration.clone(),
                 coverage,

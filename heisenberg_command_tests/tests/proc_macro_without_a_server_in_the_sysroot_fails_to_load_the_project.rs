@@ -44,7 +44,8 @@ fn proc_macro_without_a_server_in_the_sysroot_fails_to_load_the_project() {
         .command(&sysroot)
         .expect("the arguments must parse"),
         &BTreeMap::new(),
-    );
+    )
+    .expect("the errors of the run must be reported");
     let missing = format!(
         "error: the sysroot has no procedural macro server\n\
          error: cannot find proc-macro server in sysroot `{}`\n",

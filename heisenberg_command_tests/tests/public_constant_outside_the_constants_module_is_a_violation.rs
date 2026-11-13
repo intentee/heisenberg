@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn public_constant_outside_the_constants_module_is_a_violation() {
@@ -36,7 +36,9 @@ fn public_constant_outside_the_constants_module_is_a_violation() {
             ------------------------------\n\
             5 errors found\n\
             ------------------------------\n",
-            host_footer(1, 7).as_str()
+            NextestPresenceEvaluation::NotEvaluated
+                .host_footer(1, 7)
+                .as_str()
         ]
         .concat()
         .as_str())

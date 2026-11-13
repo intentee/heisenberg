@@ -10,7 +10,6 @@ members = [
     "heisenberg_configured_code",
     "heisenberg_coverage_export",
     "heisenberg_coverage_measurement",
-    "heisenberg_error_context",
     "heisenberg_expanded_code",
     "heisenberg_graph_cycles",
     "heisenberg_member_crates",
@@ -160,6 +159,7 @@ cargo-util-schemas = "0.14"
 cargo-util-terminal = "0.1"
 cargo_metadata = "0.23"
 clap = { version = "4.6", features = ["derive", "env"] }
+filetime = "0.2"
 guppy = { version = "0.19", features = ["custom-cfg-platforms"] }
 heisenberg_absolute_path = { version = "0.1", path = "heisenberg_absolute_path" }
 heisenberg_analysis_threads = { version = "0.1", path = "heisenberg_analysis_threads" }
@@ -169,7 +169,6 @@ heisenberg_command_tests = { version = "0.1", path = "heisenberg_command_tests" 
 heisenberg_configured_code = { version = "0.1", path = "heisenberg_configured_code" }
 heisenberg_coverage_export = { version = "0.1", path = "heisenberg_coverage_export" }
 heisenberg_coverage_measurement = { version = "0.1", path = "heisenberg_coverage_measurement" }
-heisenberg_error_context = { version = "0.1", path = "heisenberg_error_context" }
 heisenberg_expanded_code = { version = "0.1", path = "heisenberg_expanded_code" }
 heisenberg_graph_cycles = { version = "0.1", path = "heisenberg_graph_cycles" }
 heisenberg_member_crates = { version = "0.1", path = "heisenberg_member_crates" }
@@ -204,8 +203,9 @@ salsa = { version = "0.28", default-features = false, features = ["inventory", "
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-triomphe = "0.1"
 toml = "1.1"
+triomphe = "0.1"
+walkdir = "2.5"
 
 [profile.dev.package."*"]
 debug = false

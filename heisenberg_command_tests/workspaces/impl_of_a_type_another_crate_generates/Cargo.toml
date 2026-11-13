@@ -2,6 +2,7 @@
 name = "impl_of_a_type_another_crate_generates"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dev-dependencies]
 generator = { path = "generator" }
@@ -40,3 +41,7 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "generated"
+path = "tests/generated.rs"

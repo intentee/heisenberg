@@ -24,7 +24,8 @@ fn report_that_cannot_be_written_fails() {
     }
     .toolchain_command()
     .expect("the arguments must parse")
-    .run(&BTreeMap::new(), &mut read_only_output, &mut errors);
+    .run(&BTreeMap::new(), &mut read_only_output, &mut errors)
+    .expect("the errors of the run must be reported");
 
     assert_eq!(
         str::from_utf8(&errors),

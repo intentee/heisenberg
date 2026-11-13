@@ -13,8 +13,6 @@ use serde_json::to_value;
 use toml::Table;
 use toml::Value;
 
-use heisenberg_error_context::error_context::error_context;
-
 use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::dependency_document::DependencyDocument;
 use crate::dependency_kind_document::DependencyKindDocument;
@@ -79,10 +77,12 @@ impl CargoMetadataDocument<'_, '_> {
                                 metadata_json,
                             })
                         })
-                        .map_err(error_context(
-                            package_id.to_string(),
-                            ProjectModelError::PackageMetadata,
-                        ))
+                        .map_err(|source| {
+                            ProjectModelError::PackageMetadata {
+                                package: package_id.to_string(),
+                                source,
+                            }
+                        })
                     })
             })
             .collect()

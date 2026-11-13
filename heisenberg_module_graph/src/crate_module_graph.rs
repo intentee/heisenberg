@@ -10,5 +10,7 @@ pub struct CrateModuleGraph {
     pub findings: ModuleFindings,
     pub function_bodies: BTreeSet<FunctionBody>,
     pub module_count: usize,
+    pub module_files: BTreeSet<String>,
     pub root_module_is_empty: bool,
+    pub runs_libtest_tests: bool,
 }

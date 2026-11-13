@@ -59,7 +59,7 @@ impl HeisenbergInvocation<'_> {
         arguments: impl IntoIterator<Item = OsString>,
     ) -> Result<CheckOutcome, HeisenbergCheckError> {
         self.toolchain_command(arguments)
-            .map(|command| CheckOutcome::of(&command, &BTreeMap::new()))
+            .and_then(|command| CheckOutcome::of(&command, &BTreeMap::new()))
     }
 
     /// # Errors

@@ -1,12 +1,14 @@
 use std::cell::OnceCell;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::iter;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
 use ra_ap_hir::Adt;
 use ra_ap_hir::AsAssocItem;
+use ra_ap_hir::AssocItem;
 use ra_ap_hir::AssocItemContainer;
 use ra_ap_hir::Const;
 use ra_ap_hir::Crate;
@@ -26,6 +28,8 @@ use ra_ap_hir::PathResolution;
 use ra_ap_hir::PathResolutionPerNs;
 use ra_ap_hir::Semantics;
 use ra_ap_hir::Trait;
+use ra_ap_hir::Type;
+use ra_ap_hir::TypeAlias;
 use ra_ap_hir_def::FunctionId;
 use ra_ap_hir_def::MacroId;
 use ra_ap_hir_def::rustc_abi::ExternAbi;
@@ -52,6 +56,7 @@ use ra_ap_syntax::SyntaxToken;
 use ra_ap_syntax::T;
 use ra_ap_syntax::WalkEvent;
 use ra_ap_syntax::ast;
+use ra_ap_syntax::ast::HasGenericArgs;
 use ra_ap_syntax::ast::HasName as _;
 use ra_ap_syntax::ast::HasVisibility as _;
 use ra_ap_vfs::FileId;
@@ -64,8 +69,10 @@ use heisenberg_expanded_code::code_tokens::code_tokens;
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
+use heisenberg_module_graph::error_violation::ErrorViolation;
 use heisenberg_module_graph::foreign_module::ForeignModule;
 use heisenberg_module_graph::harness_violation::HarnessViolation;
+use heisenberg_module_graph::impl_placement::ImplPlacement;
 use heisenberg_module_graph::inactive_focus::InactiveFocus;
 use heisenberg_module_graph::item_group::ItemGroup;
 use heisenberg_module_graph::item_placement::ItemPlacement;
@@ -76,6 +83,7 @@ use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::non_production_users::NonProductionUsers;
 use heisenberg_module_graph::shared_module_file::SharedModuleFile;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_module_graph::test_violation::TestViolation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
@@ -93,9 +101,12 @@ use heisenberg_source_locator::written_range::written_range;
 use heisenberg_task_graph::once_map::OnceMap;
 
 use crate::adt_violation::AdtViolation;
+use crate::attribute_directives::AttributeDirectives;
 use crate::attributed_item::AttributedItem;
 use crate::benchmark_harness::BenchmarkHarness;
 use crate::benchmark_output::BenchmarkOutput;
+use crate::constants::ASSERTION_MACROS;
+use crate::constants::EQUALITY_ASSERTION_MACROS;
 use crate::constants::LIFETIME_PREFIX;
 use crate::constants_module::ConstantsModule;
 use crate::constructor::Constructor;
@@ -103,6 +114,9 @@ use crate::covered_code::CoveredCode;
 use crate::crate_findings::CrateFindings;
 use crate::defined_items::DefinedItems;
 use crate::definition_usages::DefinitionUsages;
+use crate::error_derive::ErrorDerive;
+use crate::error_discards::ErrorDiscards;
+use crate::error_types::ErrorTypes;
 use crate::expanded_items::ExpandedItems;
 use crate::expansion_chain::ExpansionChain;
 use crate::field_only_parameter::FieldOnlyParameter;
@@ -117,7 +131,6 @@ use crate::item_definition::ItemDefinition;
 use crate::item_expansion::ItemExpansion;
 use crate::item_focus::ItemFocus;
 use crate::item_order::ItemOrder;
-use crate::lint_suppressions::LintSuppressions;
 use crate::local_impl_home::LocalImplHome;
 use crate::local_macro::LocalMacro;
 use crate::local_macro_import::LocalMacroImport;
@@ -132,6 +145,7 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_item::ModuleItem;
 use crate::module_paths::ModulePaths;
 use crate::name_words::NameWords;
+use crate::node_attributes::NodeAttributes;
 use crate::ordered_entries::OrderedEntries;
 use crate::ordered_entry::OrderedEntry;
 use crate::output_use::OutputUse;
@@ -141,11 +155,17 @@ use crate::path_reference::PathReference;
 use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
+use crate::round_trips::RoundTrips;
+use crate::serialization_traits::SerializationTraits;
+use crate::signature_scope::SignatureScope;
 use crate::signature_tuple::SignatureTuple;
+use crate::standard_items::StandardItems;
 use crate::substituted_resolution::SubstitutedResolution;
 use crate::subtree::Subtree;
 use crate::subtree_origin::SubtreeOrigin;
 use crate::template_captures::TemplateCaptures;
+use crate::test_assertions::TestAssertions;
+use crate::test_site::TestSite;
 use crate::test_target_findings::TestTargetFindings;
 use crate::test_target_items::TestTargetItems;
 use crate::token_origin::TokenOrigin;
@@ -158,6 +178,8 @@ pub struct ModuleWalk<'walk, 'database> {
     pub benchmark_harness: &'walk BenchmarkHarness<'walk, 'database>,
     pub build_script_output_files: &'walk BTreeSet<FileId>,
     pub crate_target: &'walk CrateTarget,
+    pub error_derive_crates: &'walk HashSet<Crate>,
+    pub error_runtime_crates: &'walk HashSet<Crate>,
     pub file_modules: &'walk HashMap<FileId, Vec<Module>>,
     pub inactive_code: &'walk HashMap<InFile<SyntaxNodePtr>, CfgExpr>,
     pub krate: Crate,
@@ -169,7 +191,10 @@ pub struct ModuleWalk<'walk, 'database> {
     pub paths: &'walk PathResolutions<'walk, 'database>,
     pub production_options: &'walk CfgOptions,
     pub semantics: &'walk Semantics<'database, RootDatabase>,
+    pub serialization_traits: &'walk SerializationTraits,
+    pub standard_items: &'walk StandardItems,
     pub template_captures: &'walk TemplateCaptures<'walk, 'database>,
+    pub test_assertions: &'walk TestAssertions,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub token_origin: &'walk TokenOrigin<'walk, 'database>,
     pub unpublished_packages: &'walk BTreeSet<String>,
@@ -236,6 +261,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                                 .written_in(&root)
                                 .map(|bodies| walked.function_bodies.extend(bodies))
                             })
+                            .and_then(|()| self.test_findings(walked))
                     } else {
                         Ok(())
                     }
@@ -259,6 +285,67 @@ impl<'database> ModuleWalk<'_, 'database> {
 
             self.record_own_tokens(file, &tokens, active_tokens)
         }
+    }
+
+    fn attribute_directives(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        let holds_workspace_text = OnceCell::new();
+        let AttributeDirectives {
+            expects_a_panic,
+            ignores,
+            suppressions,
+        } = NodeAttributes {
+            node,
+            options: self.options,
+            paths: self.paths,
+            semantics: self.semantics,
+        }
+        .directives();
+
+        self.record_test(node, origin, expects_a_panic);
+
+        suppressions
+            .iter()
+            .filter(|meta| {
+                self.is_written_by_the_workspace(meta.syntax())
+                    && *holds_workspace_text.get_or_init(|| {
+                        CoveredCode {
+                            options: self.options,
+                            semantics: self.semantics,
+                            token_origin: self.token_origin,
+                        }
+                        .holds_workspace_text(node)
+                    })
+            })
+            .map(|meta| self.attribute_violation(meta, ViolationKind::LintSuppression, origin))
+            .chain(
+                ignores
+                    .iter()
+                    .filter(|meta| self.is_written_by_the_workspace(meta.syntax()))
+                    .map(|meta| {
+                        self.attribute_violation(
+                            meta,
+                            ViolationKind::Test(TestViolation::Ignored),
+                            origin,
+                        )
+                    }),
+            )
+            .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
+            .map(|found| violations.extend(found))
+    }
+
+    fn attribute_violation(
+        &self,
+        meta: &ast::Meta,
+        kind: ViolationKind,
+        origin: &SubtreeOrigin,
+    ) -> Result<Violation, ModuleDependenciesError> {
+        self.locate(meta.syntax(), origin)
+            .map(|location| Violation { kind, location })
     }
 
     fn configured_out(
@@ -452,6 +539,28 @@ impl<'database> ModuleWalk<'_, 'database> {
         )
     }
 
+    fn discarded_error(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        ErrorDiscards {
+            error_types: &self.error_types(),
+            method_calls: self.method_calls,
+            paths: self.paths,
+            semantics: self.semantics,
+            standard_items: self.standard_items,
+        }
+        .discarded(node)
+        .map_or(Ok(None), |discarded| {
+            self.own_violation(
+                ViolationKind::Error(ErrorViolation::Discarded),
+                &discarded,
+                origin,
+            )
+        })
+    }
+
     fn enter(
         &self,
         node: &SyntaxNode,
@@ -491,7 +600,9 @@ impl<'database> ModuleWalk<'_, 'database> {
                         .and_then(|()| {
                             self.unresolved_captures(node, file, origin, &mut walked.findings)
                         })
-                        .and_then(|()| self.lint_suppressions(node, origin, &mut walked.findings))
+                        .and_then(|()| {
+                            self.attribute_directives(node, origin, &mut walked.findings)
+                        })
                         .and_then(|()| self.test_only_code(node, origin))
                         .and_then(|test_only| {
                             walked.findings.violations.extend(test_only);
@@ -499,6 +610,97 @@ impl<'database> ModuleWalk<'_, 'database> {
                         })
                 }
             })
+    }
+
+    const fn error_derive(&self) -> ErrorDerive<'_, 'database> {
+        ErrorDerive {
+            derive_crates: self.error_derive_crates,
+            error_types: self.error_types(),
+            method_calls: self.method_calls,
+            paths: self.paths,
+            runtime_crates: self.error_runtime_crates,
+            semantics: self.semantics,
+        }
+    }
+
+    fn error_derive_violations(
+        &self,
+        expansion: MacroCallId,
+        derive: &ast::Meta,
+        origin: &SubtreeOrigin,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        let error_derive = self.error_derive();
+
+        match derive.syntax().ancestors().find_map(ast::Enum::cast) {
+            Some(written) if error_derive.generates(expansion) => {
+                let sources = error_derive.sources(&written);
+                let expansion_origin = origin.expansion_of(derive.syntax());
+
+                error_derive
+                    .sources_outside_chain(&written, &sources)
+                    .iter()
+                    .try_for_each(|field| {
+                        self.locate_focus(field, origin).map(|location| {
+                            violations.insert(Violation {
+                                kind: ViolationKind::Error(ErrorViolation::SourceOutsideChain),
+                                location,
+                            });
+                        })
+                    })
+                    .and_then(|()| {
+                        error_derive
+                            .sources_in_messages(expansion, &sources)
+                            .iter()
+                            .try_for_each(|argument| {
+                                self.locate(argument, &expansion_origin).map(|location| {
+                                    violations.insert(Violation {
+                                        kind: ViolationKind::Error(ErrorViolation::SourceInMessage),
+                                        location,
+                                    });
+                                })
+                            })
+                    })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn error_implementation(
+        &self,
+        node: &SyntaxNode,
+        definition: &ItemDefinition,
+        origin: &SubtreeOrigin,
+        ModuleFindings { violations, .. }: &mut ModuleFindings,
+        CrateFindings { error_types, .. }: &mut CrateFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        match definition {
+            ItemDefinition::Impl(implementation)
+                if implementation.trait_(self.semantics.db)
+                    == Some(self.standard_items.error_trait) =>
+            {
+                self.locate_focus(node, origin).map(|location| {
+                    if !self.is_derived_error_enum(node, *implementation) {
+                        violations.insert(Violation {
+                            kind: ViolationKind::Error(ErrorViolation::Handwritten),
+                            location: location.clone(),
+                        });
+                    }
+
+                    error_types
+                        .implementations
+                        .insert(*implementation, location);
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    const fn error_types(&self) -> ErrorTypes<'_, 'database> {
+        ErrorTypes {
+            semantics: self.semantics,
+            standard_items: self.standard_items,
+        }
     }
 
     fn expand(
@@ -509,6 +711,8 @@ impl<'database> ModuleWalk<'_, 'database> {
         module_findings: &mut ModuleFindings,
     ) -> Result<(), ModuleDependenciesError> {
         let database = self.semantics.db;
+
+        self.record_assertion(call);
 
         self.semantics.to_def(call).map_or(Ok(()), |expansion| {
             let call_location = expansion.lookup(database);
@@ -573,7 +777,16 @@ impl<'database> ModuleWalk<'_, 'database> {
                 self.semantics.hir_file_for(&value).macro_file()
             })
             .try_for_each(|expansion| {
-                self.push_expansion(expansion, derive.syntax(), origin, pending, module_findings)
+                self.error_derive_violations(expansion, derive, origin, module_findings)
+                    .and_then(|()| {
+                        self.push_expansion(
+                            expansion,
+                            derive.syntax(),
+                            origin,
+                            pending,
+                            module_findings,
+                        )
+                    })
             })
     }
 
@@ -996,6 +1209,17 @@ impl<'database> ModuleWalk<'_, 'database> {
         })
     }
 
+    fn is_derived_error_enum(&self, node: &SyntaxNode, implementation: Impl) -> bool {
+        matches!(
+            implementation.self_ty(self.semantics.db).as_adt(),
+            Some(Adt::Enum(_))
+        ) && self
+            .semantics
+            .hir_file_for(node)
+            .macro_file()
+            .is_some_and(|expansion| self.error_derive().generates(expansion))
+    }
+
     fn is_exempt_from_the_procedural_rule(&self, function: Function, node: &SyntaxNode) -> bool {
         let database = self.semantics.db;
 
@@ -1093,6 +1317,11 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.method_calls.resolve(call).is_none()
     }
 
+    fn is_written_by_the_workspace(&self, node: &SyntaxNode) -> bool {
+        self.token_origin.is_workspace_text(node)
+            || self.token_origin.is_generated_by_a_workspace_macro(node)
+    }
+
     fn item(
         &self,
         node: &SyntaxNode,
@@ -1188,47 +1417,6 @@ impl<'database> ModuleWalk<'_, 'database> {
                     })
             })
             .collect()
-    }
-
-    fn lint_suppressions(
-        &self,
-        node: &SyntaxNode,
-        origin: &SubtreeOrigin,
-        ModuleFindings { violations, .. }: &mut ModuleFindings,
-    ) -> Result<(), ModuleDependenciesError> {
-        let holds_workspace_text = OnceCell::new();
-
-        LintSuppressions {
-            node,
-            options: self.options,
-            paths: self.paths,
-            semantics: self.semantics,
-        }
-        .attributes()
-        .iter()
-        .filter(|meta| {
-            (self.token_origin.is_workspace_text(meta.syntax())
-                || self
-                    .token_origin
-                    .is_generated_by_a_workspace_macro(meta.syntax()))
-                && *holds_workspace_text.get_or_init(|| {
-                    CoveredCode {
-                        options: self.options,
-                        semantics: self.semantics,
-                        token_origin: self.token_origin,
-                    }
-                    .holds_workspace_text(node)
-                })
-        })
-        .map(|meta| {
-            self.locate(meta.syntax(), origin)
-                .map(|location| Violation {
-                    kind: ViolationKind::LintSuppression,
-                    location,
-                })
-        })
-        .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
-        .map(|suppressions| violations.extend(suppressions))
     }
 
     fn locate(
@@ -1351,23 +1539,29 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         self.locator.file(file).map(|home_file| match home {
             LocalImplHome::Type { .. } | LocalImplHome::TypeArgument { .. } => {
-                ViolationKind::MisplacedImpl {
+                ViolationKind::MisplacedImpl(ImplPlacement::Type {
                     type_file: home_file,
-                }
+                })
             }
-            LocalImplHome::TraitBlanket { .. } => ViolationKind::MisplacedBlanketImpl {
-                trait_file: home_file,
-            },
-            LocalImplHome::TraitObject { .. } => ViolationKind::MisplacedTraitObjectImpl {
-                trait_file: home_file,
-            },
-            LocalImplHome::TraitForeignType { owner } => ViolationKind::MisplacedForeignTypeImpl {
-                trait_file: home_file,
-                trait_name: owner
-                    .name(database)
-                    .display(database, self.krate.edition(database))
-                    .to_string(),
-            },
+            LocalImplHome::TraitBlanket { .. } => {
+                ViolationKind::MisplacedImpl(ImplPlacement::Blanket {
+                    trait_file: home_file,
+                })
+            }
+            LocalImplHome::TraitObject { .. } => {
+                ViolationKind::MisplacedImpl(ImplPlacement::TraitObject {
+                    trait_file: home_file,
+                })
+            }
+            LocalImplHome::TraitForeignType { owner } => {
+                ViolationKind::MisplacedImpl(ImplPlacement::ForeignType {
+                    trait_file: home_file,
+                    trait_name: owner
+                        .name(database)
+                        .display(database, self.krate.edition(database))
+                        .to_string(),
+                })
+            }
         })
     }
 
@@ -1491,6 +1685,41 @@ impl<'database> ModuleWalk<'_, 'database> {
                 })
                 .transpose(),
             ModuleItem::Absent | ModuleItem::Accepted(_) => Ok(None),
+        }
+    }
+
+    fn names_a_result_error_of_its_trait(&self, definition: TypeAlias) -> bool {
+        let database = self.semantics.db;
+
+        match definition
+            .as_assoc_item(database)
+            .map(|item| item.container(database))
+        {
+            Some(AssocItemContainer::Impl(implementation)) => {
+                implementation.trait_(database).is_some_and(|declaring| {
+                    let items = declaring.items(database);
+
+                    items
+                        .iter()
+                        .find_map(|item| match item {
+                            AssocItem::TypeAlias(declared)
+                                if declared.name(database) == definition.name(database) =>
+                            {
+                                Some(*declared)
+                            }
+                            _ => None,
+                        })
+                        .is_some_and(|declared| {
+                            items.iter().any(|item| match item {
+                                AssocItem::Function(function) => {
+                                    self.result_errors_of(*function).contains(&declared)
+                                }
+                                _ => false,
+                            })
+                        })
+                })
+            }
+            _ => false,
         }
     }
 
@@ -1772,6 +2001,36 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
     }
 
+    fn record_assertion(&self, call: &ast::MacroCall) {
+        let database = self.semantics.db;
+
+        if let Some(assertion) = self
+            .semantics
+            .resolve_macro_call(call)
+            .filter(|definition| {
+                self.standard_items
+                    .library_crates
+                    .contains(&definition.module(database).krate(database))
+                    && ASSERTION_MACROS.contains(&definition.name(database).as_str())
+            })
+            && let Some(written) = self
+                .semantics
+                .ancestors_with_macros(call.syntax().clone())
+                .find_map(ast::Fn::cast)
+            && let Some(function) = self.semantics.to_def(&written)
+        {
+            self.test_assertions.assert_in(function);
+
+            if EQUALITY_ASSERTION_MACROS.contains(&assertion.name(database).as_str()) {
+                self.test_assertions.compare_in(
+                    function,
+                    self.round_trips()
+                        .compares_a_round_trip(call, written.syntax()),
+                );
+            }
+        }
+    }
+
     fn record_own_tokens(
         &self,
         file: HirFileId,
@@ -1789,6 +2048,34 @@ impl<'database> ModuleWalk<'_, 'database> {
                     recorded.insert(written_file, u32::from(written.range.start()));
                 })
             })
+    }
+
+    fn record_test(&self, node: &SyntaxNode, origin: &SubtreeOrigin, expects_a_panic: bool) {
+        if let Some(written) = ast::Fn::cast(node.clone()).filter(|function| {
+            AttributedItem {
+                item: &ast::Item::Fn(function.clone()),
+                paths: self.paths,
+                semantics: self.semantics,
+            }
+            .is_libtest_test()
+        }) {
+            self.test_assertions.run_test();
+
+            if written.name().is_some_and(|name| {
+                self.token_origin.is_own_text(
+                    self.semantics.hir_file_for(name.syntax()),
+                    name.syntax().text_range(),
+                )
+            }) && let Some(function) = self.semantics.to_def(&written)
+            {
+                self.test_assertions.record(TestSite {
+                    expects_a_panic,
+                    function,
+                    node: node.clone(),
+                    origin: origin.clone(),
+                });
+            }
+        }
     }
 
     fn referenced_test(
@@ -1820,6 +2107,64 @@ impl<'database> ModuleWalk<'_, 'database> {
             .transpose()
     }
 
+    fn result_errors_of(&self, function: Function) -> Vec<TypeAlias> {
+        self.semantics
+            .source(function)
+            .map(
+                |InFile {
+                     value: declared, ..
+                 }| {
+                    declared
+                        .ret_type()
+                        .into_iter()
+                        .flat_map(|returned| returned.syntax().descendants())
+                        .chain(
+                            declared
+                                .param_list()
+                                .into_iter()
+                                .flat_map(|parameters| parameters.syntax().descendants()),
+                        )
+                        .filter_map(ast::PathType::cast)
+                        .filter(|written| {
+                            self.semantics
+                                .resolve_type(&ast::Type::PathType(written.clone()))
+                                .is_some_and(|resolved| {
+                                    resolved.as_adt() == Some(Adt::Enum(self.standard_items.result))
+                                })
+                        })
+                        .filter_map(|written| {
+                            written
+                                .path()
+                                .and_then(|path| path.segment())
+                                .and_then(|segment| segment.generic_arg_list())
+                                .and_then(|arguments| arguments.generic_args().nth(1))
+                        })
+                        .filter_map(|argument| ast::TypeArg::cast(argument.syntax().clone()))
+                        .filter_map(|error| error.ty())
+                        .filter_map(|error| match error {
+                            ast::Type::PathType(error) => error.path(),
+                            _ => None,
+                        })
+                        .filter_map(|error| match self.semantics.resolve_path(&error) {
+                            Some(PathResolution::Def(ModuleDef::TypeAlias(alias))) => Some(alias),
+                            _ => None,
+                        })
+                        .collect()
+                },
+            )
+            .unwrap_or_default()
+    }
+
+    const fn round_trips(&self) -> RoundTrips<'_, 'database> {
+        RoundTrips {
+            method_calls: self.method_calls,
+            paths: self.paths,
+            semantics: self.semantics,
+            serialization_traits: self.serialization_traits,
+            standard_items: self.standard_items,
+        }
+    }
+
     fn signature_violations(
         &self,
         node: &SyntaxNode,
@@ -1829,20 +2174,70 @@ impl<'database> ModuleWalk<'_, 'database> {
             || {
                 ast::TupleType::cast(node.clone())
                     .filter(|tuple| SignatureTuple { tuple }.is_in_a_signature())
-                    .map_or_else(
-                        || self.generic_parameter_violation(node, origin),
-                        |tuple| {
-                            self.own_violation(
-                                ViolationKind::TupleInSignature,
-                                tuple.syntax(),
-                                origin,
-                            )
-                        },
-                    )
+                    .map(|tuple| {
+                        self.own_violation(ViolationKind::TupleInSignature, tuple.syntax(), origin)
+                    })
+                    .or_else(|| {
+                        ast::PathType::cast(node.clone())
+                            .map(|written| self.untyped_result_error(&written, origin))
+                    })
+                    .or_else(|| {
+                        ast::TypeAlias::cast(node.clone())
+                            .map(|alias| self.untyped_associated_error(&alias, origin))
+                    })
+                    .unwrap_or_else(|| self.generic_parameter_violation(node, origin))
                     .map(|violation| violation.into_iter().collect())
             },
             |parameter| self.parameter_violations(&parameter, origin),
         )
+    }
+
+    fn sleep_in_test(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        ast::Path::cast(node.clone())
+            .filter(|path| {
+                matches!(
+                    self.paths.resolve(path),
+                    Some(PathResolution::Def(ModuleDef::Function(function)))
+                        if self.standard_items.sleeps.contains(&function)
+                ) && self.non_production_code.is_test(node)
+            })
+            .map_or(Ok(None), |path| {
+                self.own_violation(
+                    ViolationKind::Test(TestViolation::Sleeping),
+                    path.syntax(),
+                    origin,
+                )
+            })
+    }
+
+    fn test_findings(
+        &self,
+        WalkedModule {
+            crate_findings,
+            findings: ModuleFindings { violations, .. },
+            ..
+        }: &mut WalkedModule,
+    ) -> Result<(), ModuleDependenciesError> {
+        crate_findings.runs_libtest_tests |= self.test_assertions.runs_tests();
+
+        self.test_site_violations(
+            &self.test_assertions.without_assertions(),
+            &TestViolation::WithoutAssertion,
+        )
+        .and_then(|without_assertions| {
+            self.test_site_violations(
+                &self.test_assertions.round_trip_tests(),
+                &TestViolation::SerializationRoundTrip,
+            )
+            .map(|round_trips| {
+                violations.extend(without_assertions);
+                violations.extend(round_trips);
+            })
+        })
     }
 
     fn test_only_code(
@@ -1866,6 +2261,22 @@ impl<'database> ModuleWalk<'_, 'database> {
             })
         })
         .transpose()
+    }
+
+    fn test_site_violations(
+        &self,
+        sites: &[TestSite],
+        violation: &TestViolation,
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
+        sites
+            .iter()
+            .map(|TestSite { node, origin, .. }| {
+                self.locate_focus(node, origin).map(|location| Violation {
+                    kind: ViolationKind::Test(violation.clone()),
+                    location,
+                })
+            })
+            .collect()
     }
 
     fn test_target_violations(
@@ -2077,6 +2488,71 @@ impl<'database> ModuleWalk<'_, 'database> {
             })
     }
 
+    fn untyped_associated_error(
+        &self,
+        alias: &ast::TypeAlias,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        self.semantics
+            .to_def(alias)
+            .filter(|definition| self.names_a_result_error_of_its_trait(*definition))
+            .map(|definition| definition.ty(database))
+            .filter(|chosen| !self.error_types().is_error_type(chosen))
+            .map_or(Ok(None), |chosen| {
+                alias.ty().map_or(Ok(None), |written| {
+                    self.own_violation(
+                        self.untyped_result_violation(&chosen),
+                        written.syntax(),
+                        origin,
+                    )
+                })
+            })
+    }
+
+    fn untyped_result_error(
+        &self,
+        written: &ast::PathType,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        SignatureScope {
+            node: written.syntax(),
+        }
+        .is_in_a_signature()
+        .then(|| {
+            self.semantics
+                .resolve_type(&ast::Type::PathType(written.clone()))
+        })
+        .flatten()
+        .filter(|resolved| resolved.as_adt() == Some(Adt::Enum(self.standard_items.result)))
+        .and_then(|resolved| resolved.type_arguments().nth(1))
+        .filter(|error| {
+            error.as_type_param(database).is_none()
+                && error.as_associated_type_parent_trait(database).is_none()
+                && !self.error_types().is_error_type(error)
+        })
+        .map_or(Ok(None), |error| {
+            self.own_violation(
+                self.untyped_result_violation(&error),
+                written.syntax(),
+                origin,
+            )
+        })
+    }
+
+    fn untyped_result_violation(&self, error: &Type<'_>) -> ViolationKind {
+        let database = self.semantics.db;
+
+        ViolationKind::Error(ErrorViolation::UntypedResult {
+            error_type: error
+                .display_truncated(database, None, self.krate.to_display_target(database))
+                .to_string(),
+        })
+    }
+
     fn visit(
         &self,
         node: &SyntaxNode,
@@ -2092,8 +2568,17 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.unresolved_method_call(node, origin)
             .and_then(|unresolved| {
                 findings.violations.extend(unresolved);
-                self.harness_call(node, origin, findings, crate_findings)
+                self.sleep_in_test(node, origin)
             })
+            .and_then(|sleep| {
+                findings.violations.extend(sleep);
+                self.discarded_error(node, origin)
+            })
+            .and_then(|discarded| {
+                findings.violations.extend(discarded);
+                self.error_implementation(node, definition, origin, findings, crate_findings)
+            })
+            .and_then(|()| self.harness_call(node, origin, findings, crate_findings))
             .and_then(|()| {
                 if let Some(path) = ast::Path::cast(node.clone()) {
                     self.record(&path, origin, findings)

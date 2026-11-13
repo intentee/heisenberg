@@ -2,6 +2,7 @@
 name = "module_file_shared_on_some_platforms"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [workspace]
 
@@ -36,3 +37,7 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "first"
+path = "tests/first.rs"

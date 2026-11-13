@@ -2,6 +2,7 @@
 name = "derive_attribute_on_a_test_target_function"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [lints.rust]
 warnings = "deny"
@@ -36,3 +37,7 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "derived"
+path = "tests/derived.rs"

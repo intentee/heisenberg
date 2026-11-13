@@ -26,6 +26,11 @@ impl NonProductionCode<'_, '_> {
         self.files.benchmark.contains(&self.original_file(node))
     }
 
+    #[must_use]
+    pub fn is_test(&self, node: &SyntaxNode) -> bool {
+        self.files.test.contains(&self.original_file(node)) || self.modules.contains(node)
+    }
+
     fn original_file(&self, node: &SyntaxNode) -> FileId {
         let semantics = self.modules.semantics;
 

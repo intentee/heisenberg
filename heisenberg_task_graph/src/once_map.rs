@@ -11,15 +11,21 @@ pub struct OnceMap<TKey, TValue> {
 
 impl<TKey: Eq + Hash, TValue: Clone> OnceMap<TKey, TValue> {
     pub fn get_or_init(&self, key: TKey, init: impl FnOnce() -> TValue) -> TValue {
-        let cell = Arc::clone(
+        self.cell(key).get_or_init(init).clone()
+    }
+
+    pub fn initialize(&self, key: TKey, init: impl FnOnce() -> TValue) {
+        self.cell(key).get_or_init(init);
+    }
+
+    fn cell(&self, key: TKey) -> Arc<OnceLock<TValue>> {
+        Arc::clone(
             self.cells
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .entry(key)
                 .or_default(),
-        );
-
-        cell.get_or_init(init).clone()
+        )
     }
 }
 

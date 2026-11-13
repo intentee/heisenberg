@@ -15,7 +15,6 @@ use ra_ap_project_model::ProjectWorkspace;
 use ra_ap_vfs::Vfs;
 use ra_ap_vfs::VfsPath;
 
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_task_graph::once_map::OnceMap;
 use heisenberg_workspace_build::build_outputs::BuildOutputs;
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
@@ -44,10 +43,12 @@ fn build_script_atoms(
             build_scripts.get(id).map(|BuildScriptOutput { cfgs, .. }| {
                 cfgs.iter()
                     .map(|cfg| {
-                        Cfg::from_str(cfg).map(cfg_atom).map_err(error_context(
-                            cfg.clone(),
-                            ProjectModelError::BuildScriptCfg,
-                        ))
+                        Cfg::from_str(cfg).map(cfg_atom).map_err(|source| {
+                            ProjectModelError::BuildScriptCfg {
+                                cfg: cfg.clone(),
+                                source,
+                            }
+                        })
                     })
                     .collect::<Result<Vec<CfgAtom>, ProjectModelError>>()
                     .map(|atoms| (root.clone(), atoms))

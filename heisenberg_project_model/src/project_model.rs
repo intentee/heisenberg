@@ -12,7 +12,6 @@ use ra_ap_project_model::ManifestPath;
 
 use heisenberg_analysis_threads::analysis_thread::AnalysisThread;
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_task_graph::once_map::OnceMap;
 
@@ -76,10 +75,10 @@ fn validate_crate_roots(
             });
         }
 
-        fs::read(root).map_err(error_context(
-            root.clone().into(),
-            ProjectModelError::CrateRootUnreadable,
-        ))?;
+        fs::read(root).map_err(|source| ProjectModelError::CrateRootUnreadable {
+            path: root.clone().into(),
+            source,
+        })?;
     }
 
     Ok(())
@@ -112,7 +111,7 @@ impl ProjectModel {
 
         scope(|scope| {
             let library =
-                AnalysisThreads { scope }.spawn(move || self.library_graph(&library_environment));
+                AnalysisThreads::new(scope).spawn(move || self.library_graph(&library_environment));
             let project = CargoPackages {
                 cargo_home: run.cargo_home.as_ref(),
                 environment: &run.environment,

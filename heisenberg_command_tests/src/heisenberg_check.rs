@@ -39,7 +39,7 @@ impl HeisenbergCheck<'_> {
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<CheckOutcome, HeisenbergCheckError> {
         self.toolchain_command()
-            .map(|command| CheckOutcome::of(&command, environment))
+            .and_then(|command| CheckOutcome::of(&command, environment))
     }
 
     /// # Errors

@@ -6,7 +6,6 @@ use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
 use ra_ap_paths::AbsPath;
 
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
 use crate::configuration::Configuration;
@@ -97,10 +96,10 @@ impl DeclaredOutDirs<'_> {
                     });
                 }
 
-                fs::read_dir(&out_dir).map_err(error_context(
-                    out_dir.clone().into(),
-                    ProjectModelError::UnreadableOutDir,
-                ))?;
+                fs::read_dir(&out_dir).map_err(|source| ProjectModelError::UnreadableOutDir {
+                    path: out_dir.clone().into(),
+                    source,
+                })?;
                 declared.insert(
                     configuration.clone(),
                     BuildScriptOutput {

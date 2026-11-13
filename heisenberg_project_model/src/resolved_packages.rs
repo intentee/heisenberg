@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use guppy::graph::cargo::CargoResolverVersion;
 use ra_ap_paths::Utf8Path;
@@ -20,6 +21,7 @@ pub struct ResolvedPackages {
     pub member_targets: Vec<MemberTarget>,
     pub packages: Vec<PackageDocument>,
     pub resolver: CargoResolverVersion,
+    pub test_discovering_members: BTreeSet<String>,
     pub workspace: WorkspaceDocument,
 }
 

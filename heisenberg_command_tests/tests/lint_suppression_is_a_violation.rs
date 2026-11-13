@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const UNIX_SUPPRESSIONS: &str = "- src/suppressed.rs:1:18: Attribute suppresses lints\n    \
@@ -55,7 +55,7 @@ fn lint_suppression_is_a_violation() {
              {SUPPRESSIONS} errors found\n\
              ------------------------------\n\
              {}",
-            host_footer(1, 2)
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2)
         )
         .as_str())
     );

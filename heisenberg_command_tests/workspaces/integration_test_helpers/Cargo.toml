@@ -2,6 +2,7 @@
 name = "integration_test_helpers"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [workspace]
 
@@ -36,3 +37,19 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "contained_operation"
+path = "tests/contained_operation.rs"
+
+[[test]]
+name = "first_shared"
+path = "tests/first_shared.rs"
+
+[[test]]
+name = "recorded_values"
+path = "tests/recorded_values.rs"
+
+[[test]]
+name = "second_shared"
+path = "tests/second_shared.rs"

@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn macro_calls_in_an_integration_test_target_are_judged_by_the_items_they_expand_to() {
@@ -27,7 +27,7 @@ fn macro_calls_in_an_integration_test_target_are_judged_by_the_items_they_expand
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n", host_footer(2, 2).as_str()].concat().as_str())
+            ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

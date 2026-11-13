@@ -8,6 +8,7 @@ use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
 use crate::benchmark_target_violation::BenchmarkTargetViolation;
 use crate::dependency_document::DependencyDocument;
+use crate::integration_test_violation::IntegrationTestViolation;
 use crate::libraryless_contents::LibrarylessContents;
 use crate::libraryless_package::LibrarylessPackage;
 use crate::member_target::MemberTarget;
@@ -31,6 +32,7 @@ impl PackageRules<'_> {
             self.dependency_cycles().into_iter().collect();
 
         violations.extend(self.benchmark_target_flags());
+        violations.extend(self.integration_test_targets());
         violations.extend(self.packages_without_libraries());
 
         violations.into_iter().collect()
@@ -161,6 +163,48 @@ impl PackageRules<'_> {
                     }
                 }
             })
+            .collect()
+    }
+
+    fn integration_test_targets(&self) -> Vec<PackageViolation> {
+        let workspace_path = self.resolved.workspace_path();
+
+        self.resolved
+            .members()
+            .flat_map(|member| {
+                let manifest = member.relative_manifest(&workspace_path);
+                let name = member.metadata.name.to_string();
+                let targets: Vec<String> = self
+                    .resolved
+                    .member_targets
+                    .iter()
+                    .filter(
+                        |MemberTarget {
+                             crate_target,
+                             manifest_flags: TargetManifestFlags { harness, .. },
+                             ..
+                         }| {
+                            *harness
+                                && crate_target.kind == CrateTargetKind::IntegrationTest
+                                && crate_target.package_name == name
+                        },
+                    )
+                    .map(|MemberTarget { crate_target, .. }| {
+                        crate_target.target_description.clone()
+                    })
+                    .collect();
+
+                [
+                    (!targets.is_empty() && self.resolved.test_discovering_members.contains(&name))
+                        .then(|| IntegrationTestViolation::Discovered {
+                            manifest: manifest.clone(),
+                        }),
+                    (targets.len() > 1)
+                        .then_some(IntegrationTestViolation::Split { manifest, targets }),
+                ]
+            })
+            .flatten()
+            .map(PackageViolation::IntegrationTests)
             .collect()
     }
 

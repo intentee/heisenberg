@@ -6,6 +6,10 @@ use crate::required_clippy_setting::RequiredClippySetting;
 use crate::required_lint::RequiredLint;
 use crate::supported_target::SupportedTarget;
 
+pub const SERIALIZATION_PACKAGES: [&str; 2] = ["serde", "serde_core"];
+
+pub const TESTS_DIRECTORY: &str = "tests";
+
 pub const SUPPORTED_TARGETS: [SupportedTarget; 3] = [
     SupportedTarget::AArch64AppleDarwin,
     SupportedTarget::X86_64PcWindowsMsvc,
@@ -59,6 +63,10 @@ pub const CLIPPY_RESTRICTION_GROUP: &str = "restriction";
 
 pub const COMPILER_VARIABLES: [&str; 3] =
     [RUSTC_VARIABLE, "RUSTC_WORKSPACE_WRAPPER", "RUSTC_WRAPPER"];
+
+pub const ERROR_DERIVE_PACKAGE: &str = "thiserror-impl";
+
+pub const ERROR_RUNTIME_PACKAGE: &str = "thiserror";
 
 pub const HEISENBERG_SETTINGS_KEY: &str = "heisenberg";
 

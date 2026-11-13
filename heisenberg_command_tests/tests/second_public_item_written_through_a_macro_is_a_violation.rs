@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn second_public_item_written_through_a_macro_is_a_violation() {
@@ -26,7 +26,7 @@ fn second_public_item_written_through_a_macro_is_a_violation() {
             \n\
             ------------------------------\n\
             1 errors found\n\
-            ------------------------------\n", host_footer(1, 2).as_str()].concat().as_str())
+            ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

@@ -6,7 +6,6 @@ use clap::Args;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
-use heisenberg_error_context::error_context::error_context;
 use heisenberg_module_cycles::module_cycles::ModuleCycles;
 use heisenberg_module_dependencies::module_dependencies::ModuleDependencies;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
@@ -19,15 +18,18 @@ use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::nextest_requirements::NextestRequirements;
+use heisenberg_project_model::nextest_review::NextestReview;
 use heisenberg_project_model::package_rules::PackageRules;
-use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::resolved_project::ResolvedProject;
 
 use crate::check_report::CheckReport;
 use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::configuration_pipeline::ConfigurationPipeline;
 use crate::heisenberg_command_error::HeisenbergCommandError;
+use crate::nextest_presence_verdict::NextestPresenceVerdict;
 use crate::project_arguments::ProjectArguments;
+use crate::tool_review::ToolReview;
+use crate::unreachable_test_files::unreachable_test_files;
 
 fn empty_libraries(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
     let mut libraries: BTreeMap<&str, bool> = BTreeMap::new();
@@ -91,14 +93,14 @@ impl CheckCommand {
     pub fn execute(
         &self,
         environment: &BTreeMap<OsString, OsString>,
-    ) -> Result<CheckReport, Vec<HeisenbergCommandError>> {
+    ) -> Result<CheckReport, HeisenbergCommandError> {
         self.run(&self.project.model(environment))
     }
 }
 
 impl ConfigurationPipeline for CheckCommand {
     type Analysis = ConfigurationAnalysis;
-    type Prerequisite = Vec<PackageViolation>;
+    type Prerequisite = ToolReview;
     type Report = CheckReport;
 
     fn analysis(
@@ -107,31 +109,24 @@ impl ConfigurationPipeline for CheckCommand {
         project: &mut LoadedProject<'_>,
         _: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError> {
-        project
-            .packages
-            .confinement
-            .reach(&project.build)
-            .map_err(Box::new)
-            .map_err(error_context(
-                configuration.clone(),
-                HeisenbergCommandError::ConfigurationProjectModel,
-            ))
-            .and_then(|confinement| {
-                ModuleDependencies { project }
-                    .extract()
-                    .map_err(error_context(
-                        configuration.clone(),
-                        HeisenbergCommandError::ModuleDependencies,
-                    ))
-                    .map(|graphs| ConfigurationAnalysis {
-                        configuration: configuration.clone(),
-                        confinement,
-                        cycles: graphs
-                            .par_iter()
-                            .flat_map_iter(|graph| ModuleCycles { graph }.find())
-                            .collect(),
-                        graphs,
-                    })
+        let test_directory_files = project.files.under(&project.packages.test_directories);
+        let confinement = project.packages.confinement.reach(&project.build);
+
+        ModuleDependencies { project }
+            .extract()
+            .map_err(|source| HeisenbergCommandError::ModuleDependencies {
+                configuration: configuration.clone(),
+                source,
+            })
+            .map(|graphs| ConfigurationAnalysis {
+                configuration: configuration.clone(),
+                confinement,
+                cycles: graphs
+                    .par_iter()
+                    .flat_map_iter(|graph| ModuleCycles { graph }.find())
+                    .collect(),
+                graphs,
+                test_directory_files,
             })
     }
 
@@ -147,12 +142,10 @@ impl ConfigurationPipeline for CheckCommand {
             NextestRequirements {
                 resolved: &project.resolved,
             }
-            .violations()
-            .map(|nextest_violations| {
-                clippy_violations
-                    .into_iter()
-                    .chain(nextest_violations)
-                    .collect()
+            .review()
+            .map(|nextest| ToolReview {
+                clippy_violations,
+                nextest,
             })
         })
         .map_err(HeisenbergCommandError::ProjectModel)
@@ -168,13 +161,27 @@ impl ConfigurationPipeline for CheckCommand {
             ..
         }: &ResolvedProject<'_>,
         analyses: Vec<Self::Analysis>,
-        tool_violations: &Self::Prerequisite,
+        ToolReview {
+            clippy_violations,
+            nextest:
+                NextestReview {
+                    presence,
+                    violations: nextest_violations,
+                },
+        }: &Self::Prerequisite,
     ) -> Self::Report {
-        let package_violations = tool_violations
+        let nextest_presence = NextestPresenceVerdict::new(presence, &analyses, scope);
+        let package_violations = clippy_violations
             .iter()
+            .chain(nextest_violations)
             .cloned()
             .chain(declared_test_crates.violations(&project.resolved, &packages.test_crates))
             .chain(packages.confinement.violations())
+            .chain(if scope.is_partial() {
+                Vec::new()
+            } else {
+                unreachable_test_files(&analyses)
+            })
             .chain(if scope.is_partial() {
                 Vec::new()
             } else {
@@ -206,6 +213,7 @@ impl ConfigurationPipeline for CheckCommand {
 
         CheckReport {
             analyses,
+            nextest_presence,
             package_violations,
             scope: scope.clone(),
         }

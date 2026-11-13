@@ -2,6 +2,7 @@
 name = "library_tests"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dev-dependencies]
 harness = { path = "../harness" }
@@ -24,3 +25,7 @@ todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
 unwrap_used = "deny"
+
+[[test]]
+name = "library_is_held_by_its_harness"
+path = "tests/library_is_held_by_its_harness.rs"

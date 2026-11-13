@@ -106,7 +106,10 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     criterion package from crates.io, whose calls the criterion rules check wherever workspace code\n\
     makes them; a test crate is a workspace member that test_crates lists, whose package cannot be\n\
     published (publish = false), and that no member other than a test crate depends on through a normal\n\
-    or build dependency.\n\
+    or build dependency. The error type rules count every implementation of std::error::Error in a crate\n\
+    target, those that macros generate included, and accept only those that the Error derive of\n\
+    thiserror, the thiserror-impl package from crates.io, generates for an enum, and the serialization\n\
+    rule recognizes serde, the serde and serde_core packages from crates.io.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\
@@ -117,9 +120,12 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     in some of the crate targets or configurations that analyse its file, the message names them. A\n\
     cause and its direct consequences form one issue. A partial run, one that leaves out a declared\n\
     configuration, names the configurations it left out after the analysed ones and does not evaluate\n\
-    CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt or the empty-library checks of\n\
-    TestsOnlyPackageWithoutTestLibraries and BenchmarksOnlyPackageWithoutLibraries, which hold only over\n\
-    every declared configuration; a partial run without issues exits as compliant.\n\
+    CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt, UnreachableTestFile or the\n\
+    empty-library checks of TestsOnlyPackageWithoutTestLibraries and\n\
+    BenchmarksOnlyPackageWithoutLibraries, which hold only over every declared configuration, nor, when\n\
+    no analysed configuration runs a test under libtest's harness, NextestConfigurationMissing and\n\
+    UnneededNextestConfiguration, and names the rules it does not evaluate; a partial run without issues\n\
+    exits as compliant.\n\
     \n\
     Rules:\n  \
     AdditionalPublicItem: A module with more than one public item\n  \
@@ -137,11 +143,15 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ConfinedPackageUserListedTwice: A confined package user listed more than once\n  \
     ConfinedPackageUserNotAMember: A confined package user that is not a workspace member\n  \
     ConfinedPackageUserNotReachingIt: A confined package user that never reaches the package\n  \
+    DiscardedError: An error that is dropped without being handled\n  \
     DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n  \
+    ErrorSourceOutsideChain: An error held outside the source chain\n  \
     FailedMacroExpansion: A macro call that fails to expand\n  \
     FunctionUsedOnlyByBenchmarks: A production function that only benchmarks use\n  \
     FunctionUsedOnlyByTests: A production function that only tests use\n  \
     GlobImport: A glob import\n  \
+    HandwrittenErrorType: An error type that is not an enum deriving thiserror::Error\n  \
+    IgnoredTest: A test that the test run skips\n  \
     ImplWithoutLocalType: An impl of another crate's trait with no home in this crate\n  \
     IncludedSourceFile: An include! of a file that is not a build script output\n  \
     InvalidMacroDefinition: A macro definition that is not valid\n  \
@@ -156,6 +166,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ModuleCycle: Modules that depend on each other\n  \
     ModuleFileInsideBlock: A module file declared inside a block\n  \
     ModuleNotNamedAfterItsItem: A module that is not named after its public item\n  \
+    MultipleErrorTypes: A crate with more than one error type\n  \
     MustUseBenchmarkOutput: A measured routine whose must-use result criterion drops\n  \
     NegatedConfiguration: A cfg predicate that negates a feature, test or debug_assertions\n  \
     NextestConfigurationMissing: A workspace without a nextest configuration\n  \
@@ -176,12 +187,17 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ReferencedTest: A test that other code references\n  \
     RequiredClippySettingMissing: A clippy configuration without a required setting\n  \
     RequiredLintNotDenied: A workspace member that leaves a required lint or lint group below deny\n  \
+    SerializationRoundTripTest: A test that only checks a serialization round trip\n  \
     SharedModuleFile: A module file included as several modules\n  \
     SingleLetterName: A parameter name of a single character\n  \
+    SleepInTest: Test code that sleeps\n  \
+    SourceInErrorMessage: An error message that formats its own source\n  \
+    SplitIntegrationTests: Integration tests spread over several targets or discovered automatically\n  \
     TestCrateDeclaredTwice: A test crate listed more than once\n  \
     TestCrateNotAMember: A declared test crate that is not a workspace member\n  \
     TestCrateUsedByProduction: A declared test crate that production code depends on\n  \
     TestOnlyCodeInProduction: Code that exists only under cfg(test) outside test code\n  \
+    TestWithoutAssertion: A test that asserts nothing\n  \
     TestsOnlyPackageWithoutTestLibraries: A package of tests that holds no test library of its own\n  \
     TupleInSignature: A tuple type in an item signature\n  \
     UndestructuredParameter: A parameter used only through its fields\n  \
@@ -189,14 +205,17 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     UnimplementedBuiltinMacro: A built-in macro that rust-analyzer cannot expand\n  \
     UnknownConfinedPackage: A confined package that the workspace does not resolve\n  \
     UnmappedItem: An item that cannot be mapped to its definition\n  \
+    UnneededNextestConfiguration: A nextest configuration in a workspace without libtest tests\n  \
     UnparsableMacroExpansion: A macro expansion that does not parse\n  \
     UnprefixedTypeParameter: A type parameter not named T followed by a capitalized word\n  \
+    UnreachableTestFile: A test file that no crate target includes\n  \
     UnresolvedExternCrate: An extern crate that rust-analyzer cannot resolve\n  \
     UnresolvedMacroCall: A macro call, attribute or derive whose macro rust-analyzer cannot resolve\n  \
     UnresolvedMethodCall: A method call that rust-analyzer cannot resolve\n  \
     UnresolvedModule: A module declaration whose file rust-analyzer cannot resolve\n  \
     UnresolvedPath: A path that rust-analyzer cannot resolve\n  \
     UnsafeCode: Unsafe code in a crate that integrates no foreign code\n  \
+    UntypedResultError: A Result whose error type is not an error\n  \
     UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n  \
     UnvettedCriterionMethod: A criterion method that Heisenberg has not vetted\n  \
     UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n\

@@ -6,7 +6,6 @@ use crate::analysis_contexts::AnalysisContexts;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::issue::Issue;
 use crate::issue_section::IssueSection;
-use crate::issue_type::IssueType;
 use crate::located_issue::LocatedIssue;
 use crate::rendered_report::RenderedReport;
 
@@ -46,16 +45,16 @@ impl IssueReport<'_> {
         } = self;
         let issues = sorted_issues(issues);
         let mut lines: Vec<String> = Vec::new();
-        let mut sections: BTreeMap<IssueType, NonEmpty<&Issue>> = BTreeMap::new();
+        let mut sections: BTreeMap<&str, NonEmpty<&Issue>> = BTreeMap::new();
 
         for issue in &issues {
-            NonEmpty::push_into(&mut sections, issue.issue_type(), issue);
+            NonEmpty::push_into(&mut sections, issue.issue_type().text().name, issue);
         }
 
-        for (issue_type, issues) in &sections {
+        for issues in sections.values() {
             lines.extend(
                 IssueSection {
-                    issue_type: *issue_type,
+                    issue_type: issues.first.issue_type(),
                     issues,
                 }
                 .lines(contexts),

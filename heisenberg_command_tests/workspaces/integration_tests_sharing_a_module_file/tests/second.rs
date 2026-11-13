@@ -1,4 +1,4 @@
 mod common;
 
 #[test]
-fn second() {}
+fn second() { assert!(!"second".is_empty()); }

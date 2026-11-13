@@ -1,2 +1,2 @@
 #[test]
-fn platform() {}
+fn platform() { assert!(!"platform".is_empty()); }

@@ -16,9 +16,9 @@ use ra_ap_vfs::VfsPath;
 use serde_json::error;
 use thiserror::Error;
 use toml::de;
+use walkdir::Error as WalkError;
 
 use heisenberg_analysis_threads::analysis_threads_error::AnalysisThreadsError;
-use heisenberg_error_context::contextual_error::ContextualError;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_workspace_build::workspace_build_error::WorkspaceBuildError;
 
@@ -87,10 +87,6 @@ pub enum ProjectModelError {
         declared: BTreeSet<Configuration>,
         manifest_path: AbsPathBuf,
     },
-    #[error(
-        "guppy resolves the package `{package_id}` into the build of the configuration, but the resolved workspace does not hold it"
-    )]
-    UnknownBuildGraphPackage { package_id: String },
     #[error(
         "the configuration `{configuration}` of `{manifest_path}` selects the feature `{feature}`, which no workspace member defines"
     )]
@@ -218,12 +214,24 @@ pub enum ProjectModelError {
         crate_root: PathBuf,
         workspace_root: PathBuf,
     },
-    #[error("the crate root `{}` cannot be read", .0.context.display())]
-    CrateRootUnreadable(#[source] ContextualError<PathBuf, io::Error>),
-    #[error("`{}` is not UTF-8, so rust-analyzer loads it without text", .0.context)]
-    SourceFileNotUtf8(#[source] ContextualError<AbsPathBuf, Utf8Error>),
-    #[error("`{}` cannot be read to confirm that rust-analyzer loaded its text", .0.context)]
-    SourceFileUnreadable(#[source] ContextualError<AbsPathBuf, io::Error>),
+    #[error("the crate root `{}` cannot be read", .path.display())]
+    CrateRootUnreadable {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    #[error("`{}` is not UTF-8, so rust-analyzer loads it without text", .path)]
+    SourceFileNotUtf8 {
+        path: AbsPathBuf,
+        #[source]
+        source: Utf8Error,
+    },
+    #[error("`{}` cannot be read to confirm that rust-analyzer loaded its text", .path)]
+    SourceFileUnreadable {
+        path: AbsPathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error(transparent)]
     SourceFileUnavailable(Arc<Self>),
     #[error(
@@ -242,8 +250,8 @@ pub enum ProjectModelError {
     LibraryWorkspaceMissing { library_directory: AbsPathBuf },
     #[error("the [env] table of the cargo configuration cannot be read")]
     CargoEnvironmentTable(#[source] Box<dyn Error + Send + Sync>),
-    #[error("the configured value of `{}` is not UTF-8", .0.context)]
-    NonUtf8ConfiguredEnvironmentValue(ContextualError<String, OsString>),
+    #[error("the configured value of `{}` is not UTF-8", .variable)]
+    NonUtf8ConfiguredEnvironmentValue { variable: String, value: OsString },
     #[error(
         "`{manifest_path}` declares an out-dir for `{package}`, which is not a package of the workspace"
     )]
@@ -291,16 +299,36 @@ pub enum ProjectModelError {
         manifest_path: AbsPathBuf,
         package: String,
     },
-    #[error("the build scripts and procedural macros of the workspace cannot be built for the configuration `{}`", .0.context.name)]
-    WorkspaceBuild(#[source] ContextualError<Configuration, Box<WorkspaceBuildError>>),
+    #[error("the build scripts and procedural macros of the workspace cannot be built for the configuration `{}`", .configuration.name)]
+    WorkspaceBuild {
+        configuration: Configuration,
+        #[source]
+        source: Box<WorkspaceBuildError>,
+    },
     #[error("cargo cannot prepare the build of the build scripts and procedural macros")]
     WorkspaceBuildSession(#[source] WorkspaceBuildError),
     #[error("the embedded target specification cannot be read")]
     TargetSpec(#[source] error::Error),
-    #[error("the build script output cfg `{}` cannot be parsed", .0.context)]
-    BuildScriptCfg(#[source] ContextualError<String, ParseError>),
-    #[error("the build script output `{}` cannot be read", .0.context.display())]
-    UnreadableBuildScriptOutput(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("the build script output cfg `{}` cannot be parsed", .cfg)]
+    BuildScriptCfg {
+        cfg: String,
+        #[source]
+        source: ParseError,
+    },
+    #[error("the build script output `{out_dir}` is not a directory")]
+    BuildScriptOutputNotADirectory { out_dir: AbsPathBuf },
+    #[error("the build script output in `{out_dir}` cannot be listed")]
+    UnwalkableBuildScriptOutput {
+        out_dir: AbsPathBuf,
+        #[source]
+        source: WalkError,
+    },
+    #[error("the build script output `{}` cannot be read", .path.display())]
+    UnreadableBuildScriptOutput {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error(
         "the build script of `{package}` writes `{}` into its OUT_DIR, and that name is not UTF-8",
         name.display()
@@ -314,16 +342,28 @@ pub enum ProjectModelError {
     RelativeBuildScriptOutput(Utf8PathBuf),
     #[error("the procedural macro crate rooted at `{0}` has no built library")]
     ProcMacroLibraryMissing(VfsPath),
-    #[error("the procedural macros of `{}` cannot be loaded", .0.context)]
-    ProcMacroLoad(#[source] ContextualError<AbsPathBuf, ProcMacroLoadingError>),
-    #[error("the procedural macros of `{}` cannot be loaded on a thread of their own", .0.context)]
-    ProcMacroLoadThread(#[source] ContextualError<AbsPathBuf, AnalysisThreadsError>),
+    #[error("the procedural macros of `{}` cannot be loaded", .path)]
+    ProcMacroLoad {
+        path: AbsPathBuf,
+        #[source]
+        source: ProcMacroLoadingError,
+    },
+    #[error("the procedural macros of `{}` cannot be loaded on a thread of their own", .path)]
+    ProcMacroLoadThread {
+        path: AbsPathBuf,
+        #[source]
+        source: AnalysisThreadsError,
+    },
     #[error("the sysroot has no rustc in `{directory}`")]
     SysrootWithoutCompiler { directory: AbsPathBuf },
     #[error("the sysroot has no procedural macro server")]
     ProcMacroServerMissing(#[source] Box<dyn Error + Send + Sync>),
-    #[error("the procedural macro server `{}` cannot be started", .0.context)]
-    ProcMacroServerSpawn(#[source] ContextualError<AbsPathBuf, io::Error>),
+    #[error("the procedural macro server `{}` cannot be started", .path)]
+    ProcMacroServerSpawn {
+        path: AbsPathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error(transparent)]
     ProcMacroServerUnavailable(Arc<Self>),
     #[error(transparent)]
@@ -332,8 +372,12 @@ pub enum ProjectModelError {
     TargetModelUnavailable(Arc<Self>),
     #[error("the standard library resolution thread cannot be started")]
     LibraryResolutionThread(#[source] AnalysisThreadsError),
-    #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
-    UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
+    #[error("the declared out-dir `{}` cannot be read", .path.display())]
+    UnreadableOutDir {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]
     PackageSources {
         manifest_path: PathBuf,
@@ -374,8 +418,12 @@ pub enum ProjectModelError {
     RelativeTargetDirectory(Utf8PathBuf),
     #[error("the crate root `{0}` is not an absolute path")]
     RelativeCrateRoot(Utf8PathBuf),
-    #[error("cargo_metadata cannot read the metadata cargo produces for package `{}`", .0.context)]
-    PackageMetadata(#[source] ContextualError<String, error::Error>),
+    #[error("cargo_metadata cannot read the metadata cargo produces for package `{}`", .package)]
+    PackageMetadata {
+        package: String,
+        #[source]
+        source: error::Error,
+    },
     #[error("guppy rejects the project metadata document")]
     ProjectPackageGraph(#[source] Box<errors::Error>),
     #[error("crate root `{crate_root}` belongs to both {first} and {second}")]

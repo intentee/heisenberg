@@ -2,6 +2,7 @@
 name = "every_target_kind"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false }
@@ -43,3 +44,7 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "library_is_constructible"
+path = "tests/library_is_constructible.rs"

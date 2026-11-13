@@ -6,11 +6,18 @@ publish = false
 autotests = false
 
 [dependencies]
+cargo = { workspace = true }
+cargo-util-terminal = { workspace = true }
 clap = { workspace = true }
+heisenberg_analysis_threads = { workspace = true }
 heisenberg_command = { workspace = true }
 heisenberg_coverage_export = { workspace = true }
-heisenberg_error_context = { workspace = true }
 heisenberg_project_model = { workspace = true }
+heisenberg_workspace_build = { workspace = true }
+ra_ap_ide_db = { workspace = true }
+ra_ap_paths = { workspace = true }
+ra_ap_proc_macro_api = { workspace = true }
+ra_ap_project_model = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }

@@ -1,12 +1,11 @@
-use std::fs::File;
-use std::io::Read;
+use std::fs;
+use std::time::SystemTime;
 
+use filetime::FileTime;
 use ra_ap_paths::AbsPath;
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json::from_slice;
-
-use heisenberg_error_context::error_context::error_context;
 
 use crate::coverage_export::CoverageExport;
 use crate::coverage_export_error::CoverageExportError;
@@ -28,57 +27,44 @@ impl CoverageExportFile<'_> {
     pub fn read(&self) -> Result<ExportedCoverage, CoverageExportError> {
         let path = self.path;
 
-        File::open(path)
-            .map_err(error_context(
-                path.to_path_buf(),
-                CoverageExportError::Unopenable,
-            ))
-            .and_then(|mut file| {
-                file.metadata()
-                    .map_err(error_context(
-                        path.to_path_buf(),
-                        CoverageExportError::MetadataUnreadable,
-                    ))
-                    .and_then(|metadata| {
-                        metadata.modified().map_err(error_context(
-                            path.to_path_buf(),
-                            CoverageExportError::ModificationTimeUnavailable,
-                        ))
-                    })
-                    .and_then(|modified| {
-                        let mut contents = Vec::new();
+        fs::metadata(path)
+            .map_err(|source| CoverageExportError::MetadataUnreadable {
+                path: path.to_path_buf(),
+                source,
+            })
+            .and_then(|metadata| {
+                let modified = SystemTime::from(FileTime::from_last_modification_time(&metadata));
 
-                        file.read_to_end(&mut contents)
-                            .map_err(error_context(
-                                path.to_path_buf(),
-                                CoverageExportError::Unreadable,
-                            ))
-                            .and_then(|_| {
-                                from_slice::<Value>(&contents).map_err(error_context(
-                                    path.to_path_buf(),
-                                    CoverageExportError::MalformedJson,
-                                ))
+                fs::read(path)
+                    .map_err(|source| CoverageExportError::Unreadable {
+                        path: path.to_path_buf(),
+                        source,
+                    })
+                    .and_then(|contents| {
+                        from_slice::<Value>(&contents).map_err(|source| {
+                            CoverageExportError::MalformedJson {
+                                path: path.to_path_buf(),
+                                source,
+                            }
+                        })
+                    })
+                    .and_then(|document| {
+                        ExportHeader::deserialize(&document)
+                            .map_err(|source| CoverageExportError::NotAnExport {
+                                path: path.to_path_buf(),
+                                source,
                             })
-                            .and_then(|document| {
-                                ExportHeader::deserialize(&document)
-                                    .map_err(error_context(
-                                        path.to_path_buf(),
-                                        CoverageExportError::NotAnExport,
-                                    ))
-                                    .and_then(|header| header.supported(path))
-                                    .and_then(|()| {
-                                        CoverageExport::deserialize(&document).map_err(
-                                            error_context(
-                                                path.to_path_buf(),
-                                                CoverageExportError::SchemaMismatch,
-                                            ),
-                                        )
-                                    })
-                            })
-                            .and_then(|export| {
-                                export.coverage(path, modified, self.workspace_manifest)
+                            .and_then(|header| header.supported(path))
+                            .and_then(|()| {
+                                CoverageExport::deserialize(&document).map_err(|source| {
+                                    CoverageExportError::SchemaMismatch {
+                                        path: path.to_path_buf(),
+                                        source,
+                                    }
+                                })
                             })
                     })
+                    .and_then(|export| export.coverage(path, modified, self.workspace_manifest))
             })
     }
 }

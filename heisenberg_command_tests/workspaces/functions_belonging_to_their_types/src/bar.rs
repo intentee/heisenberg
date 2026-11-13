@@ -1,3 +1,5 @@
+use std::num::TryFromIntError;
+
 use crate::foo::Foo;
 
 pub struct Bar {
@@ -9,7 +11,7 @@ impl Bar {
         value.checked_sub(1).map(|value| Self { value })
     }
 
-    pub async fn fetched(foo: &Foo) -> Result<Self, u8> {
+    pub async fn fetched(foo: &Foo) -> Result<Self, TryFromIntError> {
         Self::parsed(foo)
     }
 
@@ -21,11 +23,8 @@ impl Bar {
         Self { value: *value }
     }
 
-    pub fn parsed(Foo { value }: &Foo) -> Result<Self, u8> {
-        value
-            .checked_add(1)
-            .map(|value| Self { value })
-            .ok_or(*value)
+    pub fn parsed(Foo { value }: &Foo) -> Result<Self, TryFromIntError> {
+        u8::try_from(u16::from(*value).saturating_add(1)).map(|value| Self { value })
     }
 }
 

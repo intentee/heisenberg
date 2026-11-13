@@ -12,7 +12,6 @@ use ra_ap_vfs::FileId;
 use thiserror::Error;
 
 use heisenberg_coverage_export::region_position::RegionPosition;
-use heisenberg_error_context::contextual_error::ContextualError;
 use heisenberg_member_crates::member_crates_error::MemberCratesError;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_source_locator::source_locator_error::SourceLocatorError;
@@ -111,15 +110,21 @@ pub enum CoverageMeasurementError {
     },
     #[error(transparent)]
     SourceLocator(#[from] SourceLocatorError),
-    #[error("the metadata of `{}` cannot be read", .0.context)]
-    SourceMetadataUnreadable(#[source] ContextualError<AbsPathBuf, io::Error>),
-    #[error("the modification time of `{}` is not available", .0.context)]
-    SourceModificationTimeUnavailable(#[source] ContextualError<AbsPathBuf, io::Error>),
+    #[error("the metadata of `{}` cannot be read", .path)]
+    SourceMetadataUnreadable {
+        path: AbsPathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error(
         "the expansion of the macro invocation at {} does not parse under rust-analyzer, so the functions it writes cannot be measured",
-        .0.context
+        .location
     )]
-    UnparsableMacroExpansion(#[source] ContextualError<SourceLocation, SyntaxError>),
+    UnparsableMacroExpansion {
+        location: SourceLocation,
+        #[source]
+        source: SyntaxError,
+    },
     #[error(
         "rust-analyzer cannot resolve the attribute or derive at {attribute}, so the code it applies to cannot be measured"
     )]

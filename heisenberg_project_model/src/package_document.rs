@@ -5,6 +5,7 @@ use serde_json::Value;
 use crate::dependency_document::DependencyDocument;
 use crate::lint_table::LintTable;
 use crate::lints_source::LintsSource;
+use crate::versioned_name::versioned_name;
 use crate::workspace_path::WorkspacePath;
 
 pub struct PackageDocument {
@@ -38,6 +39,6 @@ impl PackageDocument {
     }
 
     pub fn versioned_name(&self) -> String {
-        format!("{} v{}", self.metadata.name, self.metadata.version)
+        versioned_name(&self.metadata.name, &self.metadata.version)
     }
 }

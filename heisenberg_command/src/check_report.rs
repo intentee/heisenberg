@@ -28,13 +28,18 @@ use crate::configuration_function_body::ConfigurationFunctionBody;
 use crate::constants::BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES;
 use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
 use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
+use crate::constants::NEXTEST_CONFIGURATION_MISSING;
 use crate::constants::SUPPORTED_RUST_VERSION;
 use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
+use crate::constants::UNNEEDED_NEXTEST_CONFIGURATION;
+use crate::constants::UNREACHABLE_TEST_FILE;
 use crate::cycle_shape::CycleShape;
 use crate::inactive_code::InactiveCode;
 use crate::issue::Issue;
 use crate::issue_report::IssueReport;
+use crate::issue_text::IssueText;
 use crate::module_inclusion::ModuleInclusion;
+use crate::nextest_presence_verdict::NextestPresenceVerdict;
 use crate::rendered_report::RenderedReport;
 use crate::shared_file::SharedFile;
 use crate::shared_file_tree::SharedFileTree;
@@ -68,6 +73,7 @@ fn shared_module_file_issues(
 
 pub struct CheckReport {
     pub analyses: Vec<ConfigurationAnalysis>,
+    pub nextest_presence: NextestPresenceVerdict,
     pub package_violations: Vec<PackageViolation>,
     pub scope: RunScope,
 }
@@ -365,6 +371,10 @@ impl CheckReport {
         issues.extend(self.confinement_breach_issues());
         issues.extend(self.duplicated_function_body_issues());
 
+        if let NextestPresenceVerdict::Violation(violation) = &self.nextest_presence {
+            issues.push(Issue::new_package(violation));
+        }
+
         for violation in &self.package_violations {
             issues.push(Issue::new_package(violation));
         }
@@ -376,6 +386,23 @@ impl CheckReport {
         let RunScope {
             left_out_configurations,
         } = &self.scope;
+        let full_run_rules: Vec<&str> = [
+            CODE_ACTIVE_IN_NO_CONFIGURATION,
+            CONFINED_PACKAGE_USER_NOT_REACHING_IT,
+        ]
+        .into_iter()
+        .chain(match self.nextest_presence {
+            NextestPresenceVerdict::NotEvaluated => {
+                vec![
+                    NEXTEST_CONFIGURATION_MISSING,
+                    UNNEEDED_NEXTEST_CONFIGURATION,
+                ]
+            }
+            NextestPresenceVerdict::Compliant | NextestPresenceVerdict::Violation(_) => Vec::new(),
+        })
+        .chain([UNREACHABLE_TEST_FILE])
+        .map(|IssueText { name, .. }| name)
+        .collect();
 
         [
             format!(
@@ -385,9 +412,8 @@ impl CheckReport {
                 }
             ),
             format!(
-                "Not evaluated in a partial run: {}, {}, the empty-library checks of {} and {}",
-                CODE_ACTIVE_IN_NO_CONFIGURATION.name,
-                CONFINED_PACKAGE_USER_NOT_REACHING_IT.name,
+                "Not evaluated in a partial run: {}, the empty-library checks of {} and {}",
+                full_run_rules.join(", "),
                 TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name,
                 BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES.name
             ),

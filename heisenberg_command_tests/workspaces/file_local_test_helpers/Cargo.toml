@@ -2,6 +2,7 @@
 name = "file_local_test_helpers"
 edition = "2024"
 version = "0.1.0"
+autotests = false
 
 [workspace]
 
@@ -36,3 +37,15 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
+
+[[test]]
+name = "helper_used_by_a_submodule"
+path = "tests/helper_used_by_a_submodule.rs"
+
+[[test]]
+name = "local_helpers"
+path = "tests/local_helpers.rs"
+
+[[test]]
+name = "unused_helper"
+path = "tests/unused_helper.rs"

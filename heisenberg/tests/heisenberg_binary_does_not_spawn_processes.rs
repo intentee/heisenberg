@@ -9,7 +9,7 @@ use heisenberg_command_tests::constants::CARGO_HOME_VARIABLE;
 use heisenberg_command_tests::constants::CHECK_SUBCOMMAND;
 use heisenberg_command_tests::constants::SYSROOT_VARIABLE;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[test]
 fn heisenberg_binary_analyses_the_real_sysroot_without_spawning_processes() {
@@ -37,7 +37,9 @@ fn heisenberg_binary_analyses_the_real_sysroot_without_spawning_processes() {
             "------------------------------\n\
              No errors found!\n\
              ------------------------------\n",
-            host_footer(1, 4).as_str()
+            NextestPresenceEvaluation::NotEvaluated
+                .host_footer(1, 4)
+                .as_str()
         ]
         .concat()
         .as_str())
@@ -73,7 +75,9 @@ fn heisenberg_binary_runs_without_spawning_processes() {
             "------------------------------\n\
              No errors found!\n\
              ------------------------------\n",
-            host_footer(1, 1).as_str()
+            NextestPresenceEvaluation::NotEvaluated
+                .host_footer(1, 1)
+                .as_str()
         ]
         .concat()
         .as_str())

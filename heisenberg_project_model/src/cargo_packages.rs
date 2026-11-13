@@ -3,6 +3,7 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use cargo::GlobalContext;
 use cargo::ops::resolve_ws;
 use cargo::util::data_structures::HashMap;
 use cargo::workspace::Package;
@@ -34,18 +35,7 @@ pub struct CargoPackages<'request> {
 impl CargoPackages<'_> {
     pub fn resolve(&self) -> Result<ResolvedPackages, ProjectModelError> {
         let manifest_path: PathBuf = workspace_manifest(self.workspace_directory).into();
-        let context = ConfiguredContext {
-            cargo_home: self.cargo_home,
-            environment: self.environment,
-            nightly_features_allowed: self.role == CargoWorkspaceRole::Library,
-            workspace_directory: self.workspace_directory.as_ref(),
-        }
-        .with_shell(Shell::from_write(Box::new(io::sink())))
-        .and_then(|context| context.values().map(|_| ()).map(|()| context))
-        .map_err(|source| ProjectModelError::CargoConfiguration {
-            manifest_path: manifest_path.clone(),
-            source: source.into(),
-        })?;
+        let context = self.configured_context(&manifest_path)?;
 
         if self.role == CargoWorkspaceRole::Project {
             CargoConfigurationOverrides {
@@ -132,10 +122,46 @@ impl CargoPackages<'_> {
                             behavior: workspace.resolve_behavior(),
                         }
                         .to_guppy(),
+                        test_discovering_members: workspace
+                            .members()
+                            .filter(|member| {
+                                member
+                                    .manifest()
+                                    .original_toml()
+                                    .and_then(|manifest| manifest.package())
+                                    .and_then(|package| package.autotests)
+                                    != Some(false)
+                            })
+                            .map(|member| member.name().to_string())
+                            .collect(),
                         workspace: workspace_document,
                     })
                 })
             })
+        })
+    }
+
+    fn configured_context(&self, manifest_path: &Path) -> Result<GlobalContext, ProjectModelError> {
+        ConfiguredContext {
+            cargo_home: self.cargo_home,
+            environment: self.environment,
+            nightly_features_allowed: self.role == CargoWorkspaceRole::Library,
+            workspace_directory: self.workspace_directory.as_ref(),
+        }
+        .with_shell(Shell::from_write(Box::new(io::sink())))
+        .map_err(|source| ProjectModelError::CargoConfiguration {
+            manifest_path: manifest_path.to_path_buf(),
+            source: Box::new(source),
+        })
+        .and_then(|context| {
+            context
+                .values()
+                .map(|_| ())
+                .map(|()| context)
+                .map_err(|source| ProjectModelError::CargoConfiguration {
+                    manifest_path: manifest_path.to_path_buf(),
+                    source: source.into(),
+                })
         })
     }
 }

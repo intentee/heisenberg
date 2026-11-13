@@ -3,7 +3,7 @@ use std::str;
 use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
-use heisenberg_command_tests::host_footer::host_footer;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const NEGATED_PREDICATE: &str = "- src/platform.rs:1:1: Configuration predicate negates a feature, test or debug_assertions\n    \
@@ -42,7 +42,7 @@ fn negated_predicate_of_a_module_file_active_on_one_platform_is_reported_where_i
              1 errors found\n\
              ------------------------------\n\
              {}",
-            host_footer(1, HOST_MODULES)
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, HOST_MODULES)
         )
         .as_str())
     );

@@ -2,6 +2,7 @@
 name = "heisenberg"
 edition.workspace = true
 version.workspace = true
+autotests = false
 
 [dependencies]
 clap = { workspace = true }
@@ -12,3 +13,7 @@ heisenberg_command_tests = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "heisenberg"
+path = "tests/main.rs"

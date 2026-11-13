@@ -12,7 +12,6 @@ use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::CrateBuilderId;
 use ra_ap_ide_db::base_db::CrateGraphBuilder;
 use ra_ap_ide_db::base_db::DependencyBuilder;
-use ra_ap_load_cargo::load_proc_macro;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_paths::Utf8PathBuf;
 use ra_ap_proc_macro_api::ProcMacroClient;
@@ -23,8 +22,8 @@ use ra_ap_vfs::VfsPath;
 
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use heisenberg_analysis_threads::joined::joined;
-use heisenberg_error_context::error_context::error_context;
 
+use crate::proc_macro_loading::ProcMacroLoading;
 use crate::project_model_error::ProjectModelError;
 
 pub struct LoadedProcMacros<'project> {
@@ -66,7 +65,7 @@ impl LoadedProcMacros<'_> {
         self.servers(&proc_macro_crates)
             .and_then(|servers| {
                 scope(|scope| {
-                    let threads = &AnalysisThreads { scope };
+                    let threads = &AnalysisThreads::new(scope);
                     let crate_graph = &crate_graph;
                     let dylibs = &dylibs;
                     let loading: Vec<_> = servers
@@ -80,26 +79,22 @@ impl LoadedProcMacros<'_> {
                                     .get(root)
                                     .ok_or(ProjectModelError::ProcMacroLibraryMissing(root.clone()))
                                     .and_then(|dylib| {
-                                        threads
-                                            .spawn(move || {
-                                                load_proc_macro(server, dylib, &[])
-                                                    .map_err(error_context(
-                                                        dylib.clone(),
-                                                        ProjectModelError::ProcMacroLoad,
-                                                    ))
-                                                    .map(|macros| (*krate, Ok(macros)))
-                                            })
-                                            .map_err(error_context(
-                                                dylib.clone(),
-                                                ProjectModelError::ProcMacroLoadThread,
-                                            ))
+                                        ProcMacroLoading {
+                                            dylib,
+                                            server,
+                                            threads,
+                                        }
+                                        .spawn()
                                     })
                             })
                         })
                         .collect();
 
-                    joined(loading)
-                        .into_iter()
+                    servers
+                        .iter()
+                        .flat_map(|_| proc_macro_crates.iter().copied())
+                        .zip(joined(loading))
+                        .map(|(krate, loaded)| loaded.map(|macros| (krate, Ok(macros))))
                         .collect::<Result<Vec<_>, ProjectModelError>>()
                 })
             })
@@ -156,10 +151,12 @@ impl LoadedProcMacros<'_> {
                             None,
                             usize::from(self.processes.get()),
                         )
-                        .map_err(error_context(
-                            server,
-                            ProjectModelError::ProcMacroServerSpawn,
-                        ))
+                        .map_err(|source| {
+                            ProjectModelError::ProcMacroServerSpawn {
+                                path: server,
+                                source,
+                            }
+                        })
                     })
                     .collect()
             })

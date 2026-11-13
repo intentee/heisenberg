@@ -1,3 +1,3 @@
 #[cfg(test)]
 #[test]
-fn shared() {}
+fn shared() { assert!(!"shared".is_empty()); }

@@ -1,7 +1,9 @@
+use std::fmt;
+
 pub struct Counter;
 
 impl Counter {
-    pub fn reset(&mut self) -> Result<(), u8> {
+    pub fn reset(&mut self) -> Result<(), fmt::Error> {
         let pair: (u8, u8) = (1, 2);
         let matches = |entry: (u8, u8)| entry == pair;
         let pairs = vec![pair].into_iter().collect::<Vec<(u8, u8)>>();
@@ -9,7 +11,7 @@ impl Counter {
         if pairs.into_iter().any(matches) {
             Ok(())
         } else {
-            Err(0)
+            Err(fmt::Error)
         }
     }
 }

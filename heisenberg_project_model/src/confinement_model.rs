@@ -13,25 +13,17 @@ use crate::confinement_member::ConfinementMember;
 use crate::confinement_violation::ConfinementViolation;
 use crate::declared_names::DeclaredNames;
 use crate::package_violation::PackageViolation;
-use crate::project_model_error::ProjectModelError;
 use crate::resolved_build::ResolvedBuild;
 
 pub struct ConfinementModel {
     pub confined: BTreeMap<String, ConfinedPackage>,
     pub members: Vec<ConfinementMember>,
-    pub names: BTreeMap<String, String>,
     pub workspace_manifest: String,
 }
 
 impl ConfinementModel {
-    /// # Errors
-    ///
-    /// Returns [`ProjectModelError::UnknownBuildGraphPackage`] when the build graph of the
-    /// configuration holds a package that the resolved workspace does not.
-    pub fn reach(
-        &self,
-        ResolvedBuild { links, .. }: &ResolvedBuild,
-    ) -> Result<ConfinedPackageReach, ProjectModelError> {
+    #[must_use]
+    pub fn reach(&self, ResolvedBuild { links, .. }: &ResolvedBuild) -> ConfinedPackageReach {
         let units: BTreeSet<&BuildUnit> = links
             .iter()
             .flat_map(|BuildLink { from, to, .. }| [from, to])
@@ -48,77 +40,62 @@ impl ConfinementModel {
         );
         let mut reach = ConfinedPackageReach::default();
 
-        self.members
-            .iter()
-            .try_for_each(
-                |ConfinementMember {
-                     id,
-                     manifest,
-                     name,
-                     side,
-                 }| {
-                    let own = BuildUnit {
-                        package: id.clone(),
-                        side: *side,
-                    };
-                    let start = units.get(&&own).copied();
-                    let development: BTreeSet<&BuildUnit> = links
-                        .iter()
-                        .filter(
-                            |BuildLink {
-                                 development_only,
-                                 from,
-                                 ..
-                             }| *development_only && *from == own,
-                        )
-                        .map(|BuildLink { to, .. }| to)
-                        .collect();
-
-                    self.confined.iter().try_for_each(
-                        |(package, ConfinedPackage { ids, users })| {
-                            let confined = ConfinedReach {
-                                manifest: manifest.clone(),
-                                member: name.clone(),
-                                package: package.clone(),
-                            };
-
-                            start
-                                .and_then(|start| {
-                                    paths.path_to(
-                                        start,
-                                        &development,
-                                        |BuildUnit { package, .. }| {
-                                            package != id && ids.contains(package)
-                                        },
-                                    )
-                                })
-                                .map_or(Ok(()), |path| {
-                                    if users.contains(name) {
-                                        reach.users.insert(confined);
-
-                                        Ok(())
-                                    } else {
-                                        path.into_iter()
-                                            .map(|BuildUnit { package, .. }| {
-                                                let package_id = package.clone();
-
-                                                self.names.get(package).cloned().ok_or(
-                                                    ProjectModelError::UnknownBuildGraphPackage {
-                                                        package_id,
-                                                    },
-                                                )
-                                            })
-                                            .collect::<Result<Vec<String>, ProjectModelError>>()
-                                            .map(|path| {
-                                                reach.breaches.insert(confined, path);
-                                            })
-                                    }
-                                })
-                        },
+        self.members.iter().for_each(
+            |ConfinementMember {
+                 id,
+                 manifest,
+                 name,
+                 side,
+             }| {
+                let is_own =
+                    |BuildUnit {
+                         package,
+                         side: unit_side,
+                         ..
+                     }: &BuildUnit| { package == id && unit_side == side };
+                let start = units.iter().copied().find(|unit| is_own(unit));
+                let development: BTreeSet<&BuildUnit> = links
+                    .iter()
+                    .filter(
+                        |BuildLink {
+                             development_only,
+                             from,
+                             ..
+                         }| *development_only && is_own(from),
                     )
-                },
-            )
-            .map(|()| reach)
+                    .map(|BuildLink { to, .. }| to)
+                    .collect();
+
+                self.confined
+                    .iter()
+                    .for_each(|(package, ConfinedPackage { ids, users })| {
+                        let confined = ConfinedReach {
+                            manifest: manifest.clone(),
+                            member: name.clone(),
+                            package: package.clone(),
+                        };
+
+                        if let Some(path) = start.and_then(|start| {
+                            paths.path_to(start, &development, |BuildUnit { package, .. }| {
+                                package != id && ids.contains(package)
+                            })
+                        }) {
+                            if users.contains(name) {
+                                reach.users.insert(confined);
+                            } else {
+                                reach.breaches.insert(
+                                    confined,
+                                    path.into_iter()
+                                        .map(|BuildUnit { name, .. }| name.clone())
+                                        .collect(),
+                                );
+                            }
+                        }
+                    });
+            },
+        );
+
+        reach
     }
 
     #[must_use]
