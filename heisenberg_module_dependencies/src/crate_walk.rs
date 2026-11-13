@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_hir::Crate;
@@ -10,7 +11,8 @@ use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::SyntaxNodePtr;
 use ra_ap_vfs::FileId;
 
-use heisenberg_configured_code::test_code::TestCode;
+use heisenberg_configured_code::non_production_code::NonProductionCode;
+use heisenberg_configured_code::non_production_files::NonProductionFiles;
 use heisenberg_configured_code::test_module_code::TestModuleCode;
 use heisenberg_configured_code::test_modules::TestModules;
 use heisenberg_module_graph::crate_target::CrateTarget;
@@ -18,6 +20,9 @@ use heisenberg_project_model::source_files::SourceFiles;
 use heisenberg_source_locator::source_locator::SourceLocator;
 use heisenberg_task_graph::once_map::OnceMap;
 
+use crate::benchmark_harness::BenchmarkHarness;
+use crate::definition_usages::DefinitionUsages;
+use crate::method_call_resolutions::MethodCallResolutions;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
@@ -27,6 +32,7 @@ use crate::token_origin::TokenOrigin;
 use crate::walked_module::WalkedModule;
 
 pub struct CrateWalk<'walk> {
+    pub benchmark_harness_crates: &'walk HashSet<Crate>,
     pub build_script_output_files: &'walk BTreeSet<FileId>,
     pub crate_target: &'walk CrateTarget,
     pub file_modules: &'walk HashMap<FileId, Vec<Module>>,
@@ -34,8 +40,8 @@ pub struct CrateWalk<'walk> {
     pub inactive_code: &'walk HashMap<InFile<SyntaxNodePtr>, CfgExpr>,
     pub krate: Crate,
     pub module_paths: &'walk ModulePaths,
+    pub non_production_files: &'walk NonProductionFiles,
     pub source_files: &'walk SourceFiles,
-    pub test_code_files: &'walk BTreeSet<FileId>,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub test_modules: &'walk TestModules,
     pub unpublished_packages: &'walk BTreeSet<String>,
@@ -50,12 +56,18 @@ impl CrateWalk<'_> {
     ) -> Result<WalkedModule, ModuleDependenciesError> {
         let semantics = Semantics::new(database);
         let paths = PathResolutions::new(&semantics);
+        let method_calls = MethodCallResolutions::new(&semantics);
         let options = self.krate.cfg(database);
         let production_options = self.test_modules.production_options(database, self.krate);
         let template_captures = TemplateCaptures::new(&semantics);
+        let usages = DefinitionUsages::new(&semantics);
         let mut walked = WalkedModule::default();
 
         ModuleWalk {
+            benchmark_harness: &BenchmarkHarness {
+                crates: self.benchmark_harness_crates,
+                semantics: &semantics,
+            },
             build_script_output_files: self.build_script_output_files,
             crate_target: self.crate_target,
             file_modules: self.file_modules,
@@ -65,19 +77,20 @@ impl CrateWalk<'_> {
                 database,
                 files: self.source_files,
             },
+            method_calls: &method_calls,
             module_paths: self.module_paths,
-            options,
-            paths: &paths,
-            production_options: &production_options,
-            semantics: &semantics,
-            template_captures: &template_captures,
-            test_code: &TestCode {
-                files: self.test_code_files,
+            non_production_code: &NonProductionCode {
+                files: self.non_production_files,
                 modules: TestModuleCode {
                     modules: self.test_modules,
                     semantics: &semantics,
                 },
             },
+            options,
+            paths: &paths,
+            production_options: &production_options,
+            semantics: &semantics,
+            template_captures: &template_captures,
             test_gated_code: self.test_gated_code,
             token_origin: &TokenOrigin {
                 own_files: self.files,
@@ -85,6 +98,7 @@ impl CrateWalk<'_> {
                 workspace_files: self.workspace_files,
             },
             unpublished_packages: self.unpublished_packages,
+            usages: &usages,
         }
         .module(module, &mut walked)
         .map(|()| walked)

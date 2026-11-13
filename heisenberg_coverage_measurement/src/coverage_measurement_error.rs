@@ -69,6 +69,13 @@ pub enum CoverageMeasurementError {
     )]
     ProductionOnlyCode { code: SourceLocation },
     #[error(
+        "the coverage export `{export}` records regions in `{file}`, a module file that only benchmark targets include; benchmarks never run in the test run, so export the coverage of a run that builds no benchmark target"
+    )]
+    RegionInBenchmarkTarget {
+        export: AbsPathBuf,
+        file: AbsPathBuf,
+    },
+    #[error(
         "the coverage export `{export}` records regions in `{file}`, a file of a workspace member that no crate target of the analysed configuration includes as a module file; export the coverage of a run of the analysed configuration"
     )]
     RegionInFileOutsideModuleTrees {

@@ -5,6 +5,7 @@ use std::num::NonZeroU16;
 use std::sync::OnceLock;
 use std::thread::scope;
 
+use cargo::util::data_structures::HashMap;
 use ra_ap_ide_db::base_db::Env;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_project_model::ManifestPath;
@@ -54,7 +55,10 @@ fn validate_crate_roots(
 ) -> Result<(), ProjectModelError> {
     let mut owners: BTreeMap<AbsPathBuf, &CrateTarget> = BTreeMap::new();
 
-    for MemberTarget { crate_target, root } in member_targets {
+    for MemberTarget {
+        crate_target, root, ..
+    } in member_targets
+    {
         let crate_root = root.normalize();
 
         if !crate_root.starts_with(&workspace.root) {
@@ -107,15 +111,8 @@ impl ProjectModel {
         let library_environment = run.environment.clone();
 
         scope(|scope| {
-            let library = AnalysisThreads { scope }.spawn(move || {
-                CargoPackages {
-                    cargo_home: self.cargo_home.as_ref(),
-                    environment: &library_environment,
-                    role: CargoWorkspaceRole::Library,
-                    workspace_directory: &library_directory(&self.sysroot),
-                }
-                .resolve()
-            });
+            let library =
+                AnalysisThreads { scope }.spawn(move || self.library_graph(&library_environment));
             let project = CargoPackages {
                 cargo_home: run.cargo_home.as_ref(),
                 environment: &run.environment,
@@ -154,52 +151,68 @@ impl ProjectModel {
                 .and_then(AnalysisThread::join)
                 .and_then(|library| {
                     project_graph.and_then(|project| {
-                        FeatureGraph::new(library)
-                            .map_err(Box::new)
-                            .map_err(ProjectModelError::LibraryPackageGraph)
-                            .and_then(|library| {
-                                ManifestPath::try_from(manifest_path)
-                                    .map_err(ProjectModelError::WorkspaceManifestPath)
-                                    .map(|manifest| {
-                                        let declared_test_crates =
-                                            DeclaredTestCrates { names: test_crates };
+                        library.and_then(|library| {
+                            ManifestPath::try_from(manifest_path)
+                                .map_err(ProjectModelError::WorkspaceManifestPath)
+                                .map(|manifest| {
+                                    let declared_test_crates =
+                                        DeclaredTestCrates { names: test_crates };
 
-                                        ResolvedProject {
-                                            build_script_contents: OnceMap::default(),
-                                            cargo_environment: cargo_environment(
-                                                &project.resolved.configured_environment,
-                                            ),
-                                            configurations: substituted
-                                                .into_iter()
-                                                .filter(|(configuration, _)| {
-                                                    configurations.contains(configuration)
-                                                })
-                                                .collect(),
-                                            packages: WorkspacePackages::new(
-                                                &project.resolved,
-                                                &DeclaredConfinedPackages {
-                                                    packages: confined_packages,
-                                                },
-                                                &declared_test_crates,
-                                            ),
-                                            declared_test_crates,
-                                            library,
-                                            manifest,
-                                            project,
-                                            proc_macro_server: OnceLock::new(),
-                                            run,
-                                            scope: RunScope {
-                                                left_out_configurations: declared
-                                                    .difference(&configurations)
-                                                    .cloned()
-                                                    .collect(),
+                                    ResolvedProject {
+                                        build_script_contents: OnceMap::default(),
+                                        cargo_environment: cargo_environment(
+                                            &project.resolved.configured_environment,
+                                        ),
+                                        configurations: substituted
+                                            .into_iter()
+                                            .filter(|(configuration, _)| {
+                                                configurations.contains(configuration)
+                                            })
+                                            .collect(),
+                                        packages: WorkspacePackages::new(
+                                            &project.resolved,
+                                            &DeclaredConfinedPackages {
+                                                packages: confined_packages,
                                             },
-                                            source_text_checks: OnceMap::default(),
-                                        }
-                                    })
-                            })
+                                            &declared_test_crates,
+                                        ),
+                                        declared_test_crates,
+                                        library,
+                                        manifest,
+                                        project,
+                                        proc_macro_server: OnceLock::new(),
+                                        run,
+                                        scope: RunScope {
+                                            left_out_configurations: declared
+                                                .difference(&configurations)
+                                                .cloned()
+                                                .collect(),
+                                        },
+                                        source_text_checks: OnceMap::default(),
+                                        target_models: OnceMap::default(),
+                                    }
+                                })
+                        })
                     })
                 })
+        })
+    }
+
+    fn library_graph(
+        &self,
+        environment: &HashMap<String, String>,
+    ) -> Result<Result<FeatureGraph, ProjectModelError>, ProjectModelError> {
+        CargoPackages {
+            cargo_home: self.cargo_home.as_ref(),
+            environment,
+            role: CargoWorkspaceRole::Library,
+            workspace_directory: &library_directory(&self.sysroot),
+        }
+        .resolve()
+        .map(|library| {
+            FeatureGraph::new(library)
+                .map_err(Box::new)
+                .map_err(ProjectModelError::LibraryPackageGraph)
         })
     }
 }

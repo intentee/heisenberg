@@ -24,7 +24,7 @@ fn fully_executed_production_code_is_compliant() {
             "------------------------------\n\
             No errors found!\n\
             ------------------------------\n",
-            coverage_footer(5, 6, 33).as_str()
+            coverage_footer(4, 5, 29).as_str()
         ]
         .concat()
         .as_str())

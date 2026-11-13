@@ -55,7 +55,7 @@ fn empty_libraries(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
         .collect()
 }
 
-fn test_library_packages(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
+fn helper_holding_packages(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
     analyses
         .iter()
         .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
@@ -65,10 +65,12 @@ fn test_library_packages(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String>
                  findings: ModuleFindings { violations, .. },
                  ..
              }| {
-                crate_target.kind == CrateTargetKind::IntegrationTest
-                    && violations.iter().any(|(Violation { kind, .. }, _)| {
-                        *kind == ViolationKind::NonTestItemInTestTarget
-                    })
+                violations.iter().any(|(Violation { kind, .. }, _)| {
+                    (crate_target.kind == CrateTargetKind::IntegrationTest
+                        && *kind == ViolationKind::NonTestItemInTestTarget)
+                        || (crate_target.kind == CrateTargetKind::Benchmark
+                            && *kind == ViolationKind::NonBenchmarkItemInBenchmarkTarget)
+                })
             },
         )
         .map(|CrateModuleGraph { crate_target, .. }| crate_target.package_name.clone())
@@ -195,8 +197,8 @@ impl ConfigurationPipeline for CheckCommand {
                     } else {
                         empty_libraries(&analyses)
                     },
+                    helper_holding_packages: &helper_holding_packages(&analyses),
                     resolved: &project.resolved,
-                    test_library_packages: &test_library_packages(&analyses),
                 }
                 .violations(),
             )

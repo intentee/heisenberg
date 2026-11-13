@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::iter::once;
 
 use ra_ap_cfg::CfgExpr;
@@ -14,16 +15,20 @@ use ra_ap_ide_db::base_db::salsa::Durability;
 use ra_ap_ide_db::base_db::set_all_crates_with_durability;
 use ra_ap_syntax::SyntaxNodePtr;
 use ra_ap_vfs::FileId;
+use ra_ap_vfs::VfsPath;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 
 use heisenberg_attached_work::attached_work::attached_work;
+use heisenberg_configured_code::non_production_files::NonProductionFiles;
 use heisenberg_configured_code::test_modules::TestModules;
 use heisenberg_member_crates::member_crates::member_crates;
 use heisenberg_member_crates::module_files::module_files;
 use heisenberg_member_crates::resolved_member_crate::ResolvedMemberCrate;
+use heisenberg_module_graph::code_category::CodeCategory;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_project_model::loaded_project::LoadedProject;
+use heisenberg_project_model::source_file::SourceFile;
 use heisenberg_source_locator::source_locator::SourceLocator;
 use heisenberg_task_graph::once_map::OnceMap;
 
@@ -55,7 +60,51 @@ impl ModuleDependencies<'_, '_> {
     pub fn extract(&mut self) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         member_crates(self.project)
             .map_err(ModuleDependenciesError::MemberCrates)
-            .and_then(|resolved| self.member_graphs(&resolved))
+            .and_then(|resolved| {
+                self.benchmark_harness_crates()
+                    .and_then(|harness_crates| self.member_graphs(&harness_crates, &resolved))
+            })
+    }
+
+    fn benchmark_harness_crates(&self) -> Result<HashSet<Crate>, ModuleDependenciesError> {
+        let LoadedProject {
+            database,
+            files,
+            packages,
+            ..
+        } = &*self.project;
+        let locator = SourceLocator { database, files };
+
+        attach_db(database, || {
+            Crate::all(database)
+                .into_iter()
+                .filter_map(|krate| {
+                    locator
+                        .source_file::<ModuleDependenciesError>(krate.root_file(database))
+                        .map(|SourceFile { path, .. }| {
+                            packages
+                                .benchmark_harness_roots
+                                .contains(&VfsPath::from(path.to_path_buf()))
+                                .then_some(krate)
+                        })
+                        .transpose()
+                })
+                .collect()
+        })
+    }
+
+    fn category_files(
+        &self,
+        members: &[ResolvedMemberCrate],
+        category: CodeCategory,
+    ) -> BTreeSet<FileId> {
+        module_files(
+            members
+                .iter()
+                .filter(|ResolvedMemberCrate { crate_target, .. }| {
+                    crate_target.code_category(&self.project.packages.test_crates) == category
+                }),
+        )
     }
 
     fn file_modules(&self, files: &BTreeSet<FileId>) -> HashMap<FileId, Vec<Module>> {
@@ -73,9 +122,10 @@ impl ModuleDependencies<'_, '_> {
 
     fn graphs(
         &self,
+        benchmark_harness_crates: &HashSet<Crate>,
         members: &[ResolvedMemberCrate],
         workspace_files: &BTreeSet<FileId>,
-        test_code_files: &BTreeSet<FileId>,
+        non_production_files: &NonProductionFiles,
         file_modules: &HashMap<FileId, Vec<Module>>,
     ) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         let project = &*self.project;
@@ -111,6 +161,7 @@ impl ModuleDependencies<'_, '_> {
                         });
                     let inactive_code = inactive_code(&diagnostics);
                     let crate_walk = CrateWalk {
+                        benchmark_harness_crates,
                         build_script_output_files,
                         crate_target,
                         file_modules,
@@ -118,8 +169,8 @@ impl ModuleDependencies<'_, '_> {
                         inactive_code: &inactive_code,
                         krate: *krate,
                         module_paths: &module_paths,
+                        non_production_files,
                         source_files: files,
-                        test_code_files,
                         test_gated_code: &test_gated_code,
                         test_modules: &test_modules,
                         unpublished_packages,
@@ -137,7 +188,6 @@ impl ModuleDependencies<'_, '_> {
                             files: member_files,
                             krate: *krate,
                             locator: &SourceLocator { database, files },
-                            module_paths: &module_paths,
                             modules: &modules,
                             semantics: &Semantics::new(database),
                             workspace_files,
@@ -153,14 +203,14 @@ impl ModuleDependencies<'_, '_> {
 
     fn member_graphs(
         &mut self,
+        benchmark_harness_crates: &HashSet<Crate>,
         members: &[ResolvedMemberCrate],
     ) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         let workspace_files = module_files(members.iter());
-        let test_code_files = module_files(members.iter().filter(
-            |ResolvedMemberCrate { crate_target, .. }| {
-                crate_target.is_test_code(&self.project.packages.test_crates)
-            },
-        ));
+        let non_production_files = NonProductionFiles {
+            benchmark: self.category_files(members, CodeCategory::Benchmark),
+            test: self.category_files(members, CodeCategory::Test),
+        };
         let file_modules = self.file_modules(&workspace_files);
         let shared_files: BTreeSet<FileId> = file_modules
             .iter()
@@ -175,6 +225,7 @@ impl ModuleDependencies<'_, '_> {
             .cloned()
             .collect();
         self.graphs(
+            benchmark_harness_crates,
             &members
                 .iter()
                 .filter(
@@ -193,7 +244,7 @@ impl ModuleDependencies<'_, '_> {
                 .cloned()
                 .collect::<Vec<ResolvedMemberCrate>>(),
             &workspace_files,
-            &test_code_files,
+            &non_production_files,
             &file_modules,
         )
         .and_then(|mut graphs| {
@@ -202,13 +253,21 @@ impl ModuleDependencies<'_, '_> {
                 .try_for_each(|member| {
                     self.put_first(member.krate);
 
-                    let shared_file_modules = self.file_modules(&member.files);
+                    let member_file_modules: HashMap<FileId, Vec<Module>> = file_modules
+                        .iter()
+                        .filter(|(file, _)| member.files.contains(*file))
+                        .map(|(file, modules)| (*file, modules.clone()))
+                        .chain(self.file_modules(
+                            &member.files.intersection(&shared_files).copied().collect(),
+                        ))
+                        .collect();
 
                     self.graphs(
+                        benchmark_harness_crates,
                         &[member],
                         &workspace_files,
-                        &test_code_files,
-                        &shared_file_modules,
+                        &non_production_files,
+                        &member_file_modules,
                     )
                     .map(|shared| graphs.extend(shared))
                 })

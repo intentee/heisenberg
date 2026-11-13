@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -38,6 +39,7 @@ use crate::project_model_error::ProjectModelError;
 use crate::resolved_build::ResolvedBuild;
 use crate::run_context::RunContext;
 use crate::run_scope::RunScope;
+use crate::source_files::SourceFiles;
 use crate::supported_target::SupportedTarget;
 use crate::target_cfg::TargetCfg;
 use crate::target_model::TargetModel;
@@ -57,6 +59,8 @@ pub struct ResolvedProject<'model> {
     pub(crate) run: RunContext<'model>,
     pub scope: RunScope,
     pub(crate) source_text_checks: OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
+    pub(crate) target_models:
+        OnceMap<SupportedTarget, Result<Arc<TargetModel>, Arc<ProjectModelError>>>,
 }
 
 impl ResolvedProject<'_> {
@@ -85,10 +89,51 @@ impl ResolvedProject<'_> {
 
     /// # Errors
     ///
-    /// Returns [`ProjectModelError`] when the feature graph, the metadata documents or the
-    /// rust-analyzer workspace of `configuration` cannot be built, or when rust-analyzer
+    /// Returns [`ProjectModelError`] when the standard library of the target of
+    /// `configuration` cannot be resolved, when the feature graph, the metadata documents or
+    /// the rust-analyzer workspace of `configuration` cannot be built, or when rust-analyzer
     /// cannot load it.
     pub fn load(
+        &self,
+        configuration: &Configuration,
+    ) -> Result<LoadedWorkspace<'_>, ProjectModelError> {
+        self.target_model(configuration.target)
+            .map_err(ProjectModelError::TargetModelUnavailable)
+            .and_then(|target| self.loaded(configuration, &target))
+    }
+
+    /// # Errors
+    ///
+    /// Returns [`ProjectModelError`] when the standard library of a configured target cannot be
+    /// resolved, the first such failure in target order.
+    pub fn resolve_standard_libraries(&self) -> Result<(), ProjectModelError> {
+        self.configurations
+            .keys()
+            .map(|Configuration { target, .. }| *target)
+            .collect::<BTreeSet<SupportedTarget>>()
+            .into_iter()
+            .try_for_each(|target| {
+                self.target_model(target)
+                    .map(drop)
+                    .map_err(ProjectModelError::TargetModelUnavailable)
+            })
+    }
+
+    fn cargo_workspace(&self, build: &ResolvedBuild) -> Result<CargoWorkspace, ProjectModelError> {
+        self.project
+            .metadata(build)
+            .map_err(ProjectModelError::ProjectMetadata)
+            .map(|metadata| {
+                CargoWorkspace::new(
+                    metadata,
+                    self.manifest.clone(),
+                    self.cargo_environment.clone(),
+                    false,
+                )
+            })
+    }
+
+    fn loaded(
         &self,
         configuration: &Configuration,
         target: &Arc<TargetModel>,
@@ -129,65 +174,24 @@ impl ResolvedProject<'_> {
                         )
                         .map_err(Into::into)
                         .map_err(ProjectModelError::WorkspaceLoad)
-                        .map(|(database, vfs, _)| LoadedWorkspace {
-                            build,
-                            build_script_contents: &self.build_script_contents,
-                            database,
-                            jobs: self.run.jobs,
-                            packages: &self.packages,
-                            proc_macro_server: &self.proc_macro_server,
-                            source_text_checks: &self.source_text_checks,
-                            target: Arc::clone(target),
-                            vfs,
-                            workspace,
-                            workspace_root: &self.project.resolved.workspace.root,
+                        .map(|(database, vfs, _)| {
+                            SourceFiles::check_texts(&vfs, &self.source_text_checks);
+
+                            LoadedWorkspace {
+                                build,
+                                build_script_contents: &self.build_script_contents,
+                                database,
+                                jobs: self.run.jobs,
+                                packages: &self.packages,
+                                proc_macro_server: &self.proc_macro_server,
+                                source_text_checks: &self.source_text_checks,
+                                target: Arc::clone(target),
+                                vfs,
+                                workspace,
+                                workspace_root: &self.project.resolved.workspace.root,
+                            }
                         })
                     })
-            })
-    }
-
-    /// # Errors
-    ///
-    /// Returns [`ProjectModelError`] when the standard library of a configured target cannot be
-    /// resolved.
-    pub fn target_models(
-        &self,
-    ) -> Result<BTreeMap<Configuration, Arc<TargetModel>>, ProjectModelError> {
-        let mut targets: BTreeMap<SupportedTarget, Vec<&Configuration>> = BTreeMap::new();
-
-        for configuration in self.configurations.keys() {
-            targets
-                .entry(configuration.target)
-                .or_default()
-                .push(configuration);
-        }
-
-        targets
-            .into_iter()
-            .map(|(target, configurations)| {
-                TargetModel::new(target, &self.library, self.run.sysroot).map(|model| {
-                    let model = Arc::new(model);
-
-                    configurations
-                        .into_iter()
-                        .map(move |configuration| (configuration.clone(), Arc::clone(&model)))
-                })
-            })
-            .collect::<Result<Vec<_>, ProjectModelError>>()
-            .map(|models| models.into_iter().flatten().collect())
-    }
-
-    fn cargo_workspace(&self, build: &ResolvedBuild) -> Result<CargoWorkspace, ProjectModelError> {
-        self.project
-            .metadata(build)
-            .map_err(ProjectModelError::ProjectMetadata)
-            .map(|metadata| {
-                CargoWorkspace::new(
-                    metadata,
-                    self.manifest.clone(),
-                    self.cargo_environment.clone(),
-                    false,
-                )
             })
     }
 
@@ -218,5 +222,16 @@ impl ResolvedProject<'_> {
             }),
             toolchain: None,
         }
+    }
+
+    fn target_model(
+        &self,
+        target: SupportedTarget,
+    ) -> Result<Arc<TargetModel>, Arc<ProjectModelError>> {
+        self.target_models.get_or_init(target, || {
+            TargetModel::new(target, &self.library, self.run.sysroot)
+                .map(Arc::new)
+                .map_err(Arc::new)
+        })
     }
 }

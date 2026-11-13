@@ -3,6 +3,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::code_category::CodeCategory;
 use crate::crate_target_kind::CrateTargetKind;
 use crate::test_harness::TestHarness;
 
@@ -17,6 +18,19 @@ pub struct CrateTarget {
 
 impl CrateTarget {
     #[must_use]
+    pub fn code_category(&self, test_crates: &BTreeSet<String>) -> CodeCategory {
+        if self.kind == CrateTargetKind::Benchmark {
+            CodeCategory::Benchmark
+        } else if self.kind == CrateTargetKind::IntegrationTest
+            || test_crates.contains(&self.package_name)
+        {
+            CodeCategory::Test
+        } else {
+            CodeCategory::Production
+        }
+    }
+
+    #[must_use]
     pub fn enters_through_main(&self) -> bool {
         match self.kind {
             CrateTargetKind::Binary | CrateTargetKind::BuildScript | CrateTargetKind::Example => {
@@ -27,11 +41,6 @@ impl CrateTarget {
             }
             CrateTargetKind::Library => false,
         }
-    }
-
-    #[must_use]
-    pub fn is_test_code(&self, test_crates: &BTreeSet<String>) -> bool {
-        self.kind == CrateTargetKind::IntegrationTest || test_crates.contains(&self.package_name)
     }
 }
 

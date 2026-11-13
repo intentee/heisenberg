@@ -6,17 +6,22 @@ use heisenberg_graph_cycles::graph_edge::GraphEdge;
 use heisenberg_graph_cycles::shortest_paths::ShortestPaths;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
+use crate::benchmark_target_violation::BenchmarkTargetViolation;
 use crate::dependency_document::DependencyDocument;
+use crate::libraryless_contents::LibrarylessContents;
+use crate::libraryless_package::LibrarylessPackage;
 use crate::member_target::MemberTarget;
+use crate::package_composition::PackageComposition;
 use crate::package_document::PackageDocument;
 use crate::package_violation::PackageViolation;
-use crate::potential_owner::PotentialOwner;
+use crate::potential_owners::PotentialOwners;
 use crate::resolved_packages::ResolvedPackages;
+use crate::target_manifest_flags::TargetManifestFlags;
 
 pub struct PackageRules<'rules> {
     pub empty_libraries: &'rules BTreeSet<String>,
+    pub helper_holding_packages: &'rules BTreeSet<String>,
     pub resolved: &'rules ResolvedPackages,
-    pub test_library_packages: &'rules BTreeSet<String>,
 }
 
 impl PackageRules<'_> {
@@ -25,9 +30,95 @@ impl PackageRules<'_> {
         let mut violations: BTreeSet<PackageViolation> =
             self.dependency_cycles().into_iter().collect();
 
-        violations.extend(self.tests_without_test_libraries());
+        violations.extend(self.benchmark_target_flags());
+        violations.extend(self.packages_without_libraries());
 
         violations.into_iter().collect()
+    }
+
+    fn benchmark_target_flags(&self) -> Vec<PackageViolation> {
+        let workspace_path = self.resolved.workspace_path();
+
+        self.resolved
+            .member_targets
+            .iter()
+            .filter(|MemberTarget { crate_target, .. }| {
+                crate_target.kind == CrateTargetKind::Benchmark
+            })
+            .filter_map(
+                |MemberTarget {
+                     crate_target,
+                     manifest_flags:
+                         TargetManifestFlags {
+                             benched,
+                             harness,
+                             tested,
+                         },
+                     ..
+                 }| {
+                    self.resolved
+                        .member_named(&crate_target.package_name)
+                        .map(|member| {
+                            let manifest = member.relative_manifest(&workspace_path);
+                            let target = crate_target.target_description.clone();
+
+                            [
+                                (!benched).then(|| {
+                                    BenchmarkTargetViolation::ExcludedFromBenchmarks {
+                                        manifest: manifest.clone(),
+                                        target: target.clone(),
+                                    }
+                                }),
+                                tested.then(|| BenchmarkTargetViolation::RunByTests {
+                                    manifest: manifest.clone(),
+                                    target: target.clone(),
+                                }),
+                                harness.then(|| BenchmarkTargetViolation::WithLibtestHarness {
+                                    manifest,
+                                    target,
+                                }),
+                            ]
+                        })
+                },
+            )
+            .flatten()
+            .flatten()
+            .map(PackageViolation::BenchmarkTarget)
+            .collect()
+    }
+
+    fn composition(
+        &self,
+        PackageDocument { metadata, .. }: &PackageDocument,
+    ) -> PackageComposition {
+        let name = metadata.name.as_str();
+        let targets: Vec<&MemberTarget> = self
+            .resolved
+            .member_targets
+            .iter()
+            .filter(|MemberTarget { crate_target, .. }| crate_target.package_name == name)
+            .collect();
+        let has_kind = |kind: CrateTargetKind| {
+            targets
+                .iter()
+                .any(|MemberTarget { crate_target, .. }| crate_target.kind == kind)
+        };
+        let holds_no_library = targets.iter().all(|MemberTarget { crate_target, .. }| {
+            crate_target.kind == CrateTargetKind::Benchmark
+                || crate_target.kind == CrateTargetKind::IntegrationTest
+                || (crate_target.kind == CrateTargetKind::Library
+                    && self.empty_libraries.contains(name))
+        });
+
+        if !holds_no_library {
+            PackageComposition::HoldsProductionCode
+        } else if has_kind(CrateTargetKind::IntegrationTest) {
+            PackageComposition::WithoutLibrary(LibrarylessContents::Tests)
+        } else if has_kind(CrateTargetKind::Benchmark) {
+            PackageComposition::WithoutLibrary(LibrarylessContents::Benchmarks)
+        } else {
+            PackageComposition::HoldsProductionCode
+        }
     }
 
     fn dependency_cycles(&self) -> Vec<PackageViolation> {
@@ -73,27 +164,6 @@ impl PackageRules<'_> {
             .collect()
     }
 
-    fn is_tests_package(&self, PackageDocument { metadata, .. }: &PackageDocument) -> bool {
-        let name = metadata.name.as_str();
-        let targets: Vec<&MemberTarget> = self
-            .resolved
-            .member_targets
-            .iter()
-            .filter(|MemberTarget { crate_target, .. }| crate_target.package_name == name)
-            .collect();
-        let others: Vec<&&MemberTarget> = targets
-            .iter()
-            .filter(|MemberTarget { crate_target, .. }| {
-                crate_target.kind != CrateTargetKind::IntegrationTest
-            })
-            .collect();
-
-        others.len() < targets.len()
-            && others.iter().all(|MemberTarget { crate_target, .. }| {
-                crate_target.kind == CrateTargetKind::Library && self.empty_libraries.contains(name)
-            })
-    }
-
     fn package_edges(&self) -> impl Iterator<Item = GraphEdge<&str>> {
         self.resolved.packages.iter().flat_map(
             |PackageDocument {
@@ -111,7 +181,7 @@ impl PackageRules<'_> {
         )
     }
 
-    fn tests_without_test_libraries(&self) -> Vec<PackageViolation> {
+    fn packages_without_libraries(&self) -> Vec<PackageViolation> {
         let workspace_path = self.resolved.workspace_path();
         let members: Vec<&PackageDocument> = self.resolved.members().collect();
         let paths = ShortestPaths::new(self.package_edges());
@@ -121,62 +191,36 @@ impl PackageRules<'_> {
             .iter()
             .map(|package| (package.metadata.id.repr.as_str(), package))
             .collect();
+        let potential_owners = |member: &PackageDocument| {
+            PotentialOwners {
+                members: &members,
+                packages_by_id: &packages_by_id,
+                paths: &paths,
+            }
+            .of(member)
+        };
 
         members
             .iter()
-            .filter(|member| {
-                self.is_tests_package(member)
-                    && !self
-                        .test_library_packages
-                        .contains(member.metadata.name.as_str())
+            .filter(|PackageDocument { metadata, .. }| {
+                !self
+                    .helper_holding_packages
+                    .contains(metadata.name.as_str())
             })
-            .map(|member| {
-                let dependencies: BTreeSet<&str> = member
-                    .dependencies
-                    .iter()
-                    .map(|DependencyDocument { package_id, .. }| package_id.as_str())
-                    .collect();
-                let potential_owners: BTreeMap<&str, PotentialOwner> = members
-                    .iter()
-                    .filter(|PackageDocument { metadata, .. }| {
-                        dependencies.contains(metadata.id.repr.as_str())
-                    })
-                    .map(|PackageDocument { metadata, .. }| {
-                        (
-                            metadata.name.as_str(),
-                            paths
-                                .cycle_through(
-                                    metadata.id.repr.as_str(),
-                                    &dependencies
-                                        .iter()
-                                        .copied()
-                                        .filter(|dependency| *dependency != metadata.id.repr)
-                                        .collect(),
-                                )
-                                .map(|cycle| {
-                                    cycle
-                                        .into_iter()
-                                        .filter_map(|package| packages_by_id.get(package))
-                                        .map(|package| package.versioned_name())
-                                        .collect::<Vec<String>>()
-                                })
-                                .map_or_else(
-                                    || PotentialOwner::Free {
-                                        package: metadata.name.to_string(),
-                                    },
-                                    |cycle| PotentialOwner::Blocked {
-                                        cycle,
-                                        package: metadata.name.to_string(),
-                                    },
-                                ),
-                        )
-                    })
-                    .collect();
+            .filter_map(|member| {
+                let manifest = member.relative_manifest(&workspace_path);
+                let package = member.metadata.name.to_string();
 
-                PackageViolation::TestsOnlyPackageWithoutTestLibraries {
-                    manifest: member.relative_manifest(&workspace_path),
-                    package: member.metadata.name.to_string(),
-                    potential_owners: potential_owners.into_values().collect(),
+                match self.composition(member) {
+                    PackageComposition::HoldsProductionCode => None,
+                    PackageComposition::WithoutLibrary(contents) => {
+                        Some(PackageViolation::WithoutLibrary(LibrarylessPackage {
+                            contents,
+                            manifest,
+                            package,
+                            potential_owners: potential_owners(member),
+                        }))
+                    }
                 }
             })
             .collect()

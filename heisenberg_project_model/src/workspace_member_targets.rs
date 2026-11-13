@@ -7,6 +7,7 @@ use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::cargo_target_kind::CargoTargetKind;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
+use crate::target_manifest_flags::TargetManifestFlags;
 
 pub struct WorkspaceMemberTargets<'workspace, 'context> {
     pub workspace: &'workspace Workspace<'context>,
@@ -48,6 +49,11 @@ impl WorkspaceMemberTargets<'_, '_> {
                                 } else {
                                     TestHarness::Absent
                                 },
+                            },
+                            manifest_flags: TargetManifestFlags {
+                                benched: target.benched(),
+                                harness: target.harness(),
+                                tested: target.tested(),
                             },
                             root,
                         })

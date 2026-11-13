@@ -4,7 +4,10 @@ use clap::ValueEnum;
 use clap::builder::PossibleValue;
 use humantime::format_duration;
 
+use heisenberg_module_graph::harness_violation::HarnessViolation;
+use heisenberg_module_graph::non_production_users::NonProductionUsers;
 use heisenberg_module_graph::violation_kind::ViolationKind;
+use heisenberg_project_model::benchmark_target_violation::BenchmarkTargetViolation;
 use heisenberg_project_model::confinement_violation::ConfinementViolation;
 use heisenberg_project_model::constants::CLIPPY_CONFIGURATION_FILE;
 use heisenberg_project_model::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
@@ -14,13 +17,22 @@ use heisenberg_project_model::constants::PANICKING_LINTS;
 use heisenberg_project_model::constants::REQUIRED_CLIPPY_SETTINGS;
 use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 use heisenberg_project_model::constants::RESTRICTING_CLIPPY_SETTINGS;
+use heisenberg_project_model::constants::VETTED_BENCHMARK_HARNESS_METHODS;
 use heisenberg_project_model::constants::VETTED_NEXTEST_PROFILE_SETTINGS;
 use heisenberg_project_model::constants::VETTED_NEXTEST_SETTINGS;
 use heisenberg_project_model::constants::VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS;
+use heisenberg_project_model::harness_methods::HarnessMethods;
+use heisenberg_project_model::libraryless_contents::LibrarylessContents;
+use heisenberg_project_model::libraryless_package::LibrarylessPackage;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::required_clippy_setting::RequiredClippySetting;
 
 use crate::constants::ADDITIONAL_PUBLIC_ITEM;
+use crate::constants::BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS;
+use crate::constants::BENCHMARK_TARGET_RUN_BY_TESTS;
+use crate::constants::BENCHMARK_TARGET_WITH_LIBTEST_HARNESS;
+use crate::constants::BENCHMARK_TARGET_WITHOUT_CRITERION_BENCHMARK;
+use crate::constants::BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES;
 use crate::constants::CLIPPY_CONFIGURATION_AMBIGUOUS;
 use crate::constants::CLIPPY_CONFIGURATION_MISSING;
 use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
@@ -32,6 +44,7 @@ use crate::constants::CONFINED_PACKAGE_USER_NOT_A_MEMBER;
 use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
 use crate::constants::DUPLICATED_FUNCTION_BODY;
 use crate::constants::FAILED_MACRO_EXPANSION;
+use crate::constants::FUNCTION_USED_ONLY_BY_BENCHMARKS;
 use crate::constants::FUNCTION_USED_ONLY_BY_TESTS;
 use crate::constants::GLOB_IMPORT;
 use crate::constants::IMPL_WITHOUT_LOCAL_TYPE;
@@ -48,10 +61,12 @@ use crate::constants::MISPLACED_TRAIT_OBJECT_IMPL;
 use crate::constants::MODULE_CYCLE;
 use crate::constants::MODULE_FILE_INSIDE_BLOCK;
 use crate::constants::MODULE_NOT_NAMED_AFTER_ITS_ITEM;
+use crate::constants::MUST_USE_BENCHMARK_OUTPUT;
 use crate::constants::NEGATED_CONFIGURATION;
 use crate::constants::NEXTEST_CONFIGURATION_MISSING;
 use crate::constants::NEXTEST_OVERRIDE;
 use crate::constants::NEXTEST_TIMEOUT_NOT_ENFORCED;
+use crate::constants::NON_BENCHMARK_ITEM_IN_BENCHMARK_TARGET;
 use crate::constants::NON_CONSTANT_IN_CONSTANTS_MODULE;
 use crate::constants::NON_DOC_COMMENT;
 use crate::constants::NON_TEST_ITEM_IN_TEST_TARGET;
@@ -75,6 +90,7 @@ use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
 use crate::constants::TUPLE_IN_SIGNATURE;
 use crate::constants::UNCOVERED_CODE;
 use crate::constants::UNDESTRUCTURED_PARAMETER;
+use crate::constants::UNDETERMINED_BENCHMARK_OUTPUT;
 use crate::constants::UNIMPLEMENTED_BUILTIN_MACRO;
 use crate::constants::UNKNOWN_CONFINED_PACKAGE;
 use crate::constants::UNMAPPED_ITEM;
@@ -87,12 +103,18 @@ use crate::constants::UNRESOLVED_MODULE;
 use crate::constants::UNRESOLVED_PATH;
 use crate::constants::UNSAFE_CODE;
 use crate::constants::UNVETTED_CLIPPY_SETTING;
+use crate::constants::UNVETTED_CRITERION_METHOD;
 use crate::constants::UNVETTED_NEXTEST_SETTING;
 use crate::issue_text::IssueText;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum IssueType {
     AdditionalPublicItem,
+    BenchmarkTargetExcludedFromBenchmarks,
+    BenchmarkTargetRunByTests,
+    BenchmarkTargetWithLibtestHarness,
+    BenchmarkTargetWithoutCriterionBenchmark,
+    BenchmarksOnlyPackageWithoutLibraries,
     ClippyConfigurationAmbiguous,
     ClippyConfigurationMissing,
     CodeActiveInNoConfiguration,
@@ -104,6 +126,7 @@ pub enum IssueType {
     ConfinedPackageUserNotReachingIt,
     DuplicatedFunctionBody,
     FailedMacroExpansion,
+    FunctionUsedOnlyByBenchmarks,
     FunctionUsedOnlyByTests,
     GlobImport,
     ImplWithoutLocalType,
@@ -120,10 +143,12 @@ pub enum IssueType {
     ModuleCycle,
     ModuleFileInsideBlock,
     ModuleNotNamedAfterItsItem,
+    MustUseBenchmarkOutput,
     NegatedConfiguration,
     NextestConfigurationMissing,
     NextestOverride,
     NextestTimeoutNotEnforced,
+    NonBenchmarkItemInBenchmarkTarget,
     NonConstantInConstantsModule,
     NonDocComment,
     NonTestItemInTestTarget,
@@ -147,6 +172,7 @@ pub enum IssueType {
     TupleInSignature,
     UncoveredCode,
     UndestructuredParameter,
+    UndeterminedBenchmarkOutput,
     UnimplementedBuiltinMacro,
     UnknownConfinedPackage,
     UnmappedItem,
@@ -159,6 +185,7 @@ pub enum IssueType {
     UnresolvedPath,
     UnsafeCode,
     UnvettedClippySetting,
+    UnvettedCriterionMethod,
     UnvettedNextestSetting,
 }
 
@@ -195,6 +222,17 @@ impl IssueType {
     pub const fn text(self) -> IssueText {
         match self {
             Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
+            Self::BenchmarkTargetExcludedFromBenchmarks => {
+                BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS
+            }
+            Self::BenchmarkTargetRunByTests => BENCHMARK_TARGET_RUN_BY_TESTS,
+            Self::BenchmarkTargetWithLibtestHarness => BENCHMARK_TARGET_WITH_LIBTEST_HARNESS,
+            Self::BenchmarkTargetWithoutCriterionBenchmark => {
+                BENCHMARK_TARGET_WITHOUT_CRITERION_BENCHMARK
+            }
+            Self::BenchmarksOnlyPackageWithoutLibraries => {
+                BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES
+            }
             Self::ClippyConfigurationAmbiguous => CLIPPY_CONFIGURATION_AMBIGUOUS,
             Self::ClippyConfigurationMissing => CLIPPY_CONFIGURATION_MISSING,
             Self::CodeActiveInNoConfiguration => CODE_ACTIVE_IN_NO_CONFIGURATION,
@@ -208,6 +246,7 @@ impl IssueType {
             Self::ConfinedPackageUserNotReachingIt => CONFINED_PACKAGE_USER_NOT_REACHING_IT,
             Self::DuplicatedFunctionBody => DUPLICATED_FUNCTION_BODY,
             Self::FailedMacroExpansion => FAILED_MACRO_EXPANSION,
+            Self::FunctionUsedOnlyByBenchmarks => FUNCTION_USED_ONLY_BY_BENCHMARKS,
             Self::FunctionUsedOnlyByTests => FUNCTION_USED_ONLY_BY_TESTS,
             Self::GlobImport => GLOB_IMPORT,
             Self::ImplWithoutLocalType => IMPL_WITHOUT_LOCAL_TYPE,
@@ -224,10 +263,12 @@ impl IssueType {
             Self::ModuleCycle => MODULE_CYCLE,
             Self::ModuleFileInsideBlock => MODULE_FILE_INSIDE_BLOCK,
             Self::ModuleNotNamedAfterItsItem => MODULE_NOT_NAMED_AFTER_ITS_ITEM,
+            Self::MustUseBenchmarkOutput => MUST_USE_BENCHMARK_OUTPUT,
             Self::NegatedConfiguration => NEGATED_CONFIGURATION,
             Self::NextestConfigurationMissing => NEXTEST_CONFIGURATION_MISSING,
             Self::NextestOverride => NEXTEST_OVERRIDE,
             Self::NextestTimeoutNotEnforced => NEXTEST_TIMEOUT_NOT_ENFORCED,
+            Self::NonBenchmarkItemInBenchmarkTarget => NON_BENCHMARK_ITEM_IN_BENCHMARK_TARGET,
             Self::NonConstantInConstantsModule => NON_CONSTANT_IN_CONSTANTS_MODULE,
             Self::NonDocComment => NON_DOC_COMMENT,
             Self::NonTestItemInTestTarget => NON_TEST_ITEM_IN_TEST_TARGET,
@@ -251,6 +292,7 @@ impl IssueType {
             Self::TupleInSignature => TUPLE_IN_SIGNATURE,
             Self::UncoveredCode => UNCOVERED_CODE,
             Self::UndestructuredParameter => UNDESTRUCTURED_PARAMETER,
+            Self::UndeterminedBenchmarkOutput => UNDETERMINED_BENCHMARK_OUTPUT,
             Self::UnimplementedBuiltinMacro => UNIMPLEMENTED_BUILTIN_MACRO,
             Self::UnknownConfinedPackage => UNKNOWN_CONFINED_PACKAGE,
             Self::UnmappedItem => UNMAPPED_ITEM,
@@ -263,6 +305,7 @@ impl IssueType {
             Self::UnresolvedPath => UNRESOLVED_PATH,
             Self::UnsafeCode => UNSAFE_CODE,
             Self::UnvettedClippySetting => UNVETTED_CLIPPY_SETTING,
+            Self::UnvettedCriterionMethod => UNVETTED_CRITERION_METHOD,
             Self::UnvettedNextestSetting => UNVETTED_NEXTEST_SETTING,
         }
     }
@@ -303,6 +346,17 @@ impl IssueType {
                 VETTED_NEXTEST_PROFILE_SETTINGS.join(", "),
                 VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS.join(", ")
             )],
+            Self::UnvettedCriterionMethod => vec![format!(
+                "Vetted methods: {}",
+                VETTED_BENCHMARK_HARNESS_METHODS
+                    .iter()
+                    .map(|HarnessMethods { methods, type_name }| format!(
+                        "{type_name}::{{{}}}",
+                        methods.join(", ")
+                    ))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )],
             _ => Vec::new(),
         }
     }
@@ -312,9 +366,29 @@ impl From<&ViolationKind> for IssueType {
     fn from(kind: &ViolationKind) -> Self {
         match kind {
             ViolationKind::AdditionalPublicItem => Self::AdditionalPublicItem,
+            ViolationKind::BenchmarkHarness(HarnessViolation::MustUseOutput { .. }) => {
+                Self::MustUseBenchmarkOutput
+            }
+            ViolationKind::BenchmarkHarness(HarnessViolation::TargetWithoutBenchmark) => {
+                Self::BenchmarkTargetWithoutCriterionBenchmark
+            }
+            ViolationKind::BenchmarkHarness(HarnessViolation::UndeterminedOutput { .. }) => {
+                Self::UndeterminedBenchmarkOutput
+            }
+            ViolationKind::BenchmarkHarness(HarnessViolation::UnvettedMethod { .. }) => {
+                Self::UnvettedCriterionMethod
+            }
+            ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Benchmarks) => {
+                Self::FunctionUsedOnlyByBenchmarks
+            }
+            ViolationKind::NonBenchmarkItemInBenchmarkTarget => {
+                Self::NonBenchmarkItemInBenchmarkTarget
+            }
             ViolationKind::ConfigurationSelectionMacro => Self::ConfigurationSelectionMacro,
             ViolationKind::FailedMacroExpansion => Self::FailedMacroExpansion,
-            ViolationKind::FunctionUsedOnlyByTests => Self::FunctionUsedOnlyByTests,
+            ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Tests) => {
+                Self::FunctionUsedOnlyByTests
+            }
             ViolationKind::GlobImport => Self::GlobImport,
             ViolationKind::ImplWithoutLocalType => Self::ImplWithoutLocalType,
             ViolationKind::ItemOutOfOrder { .. } => Self::ItemOutOfOrder,
@@ -360,6 +434,15 @@ impl From<&ViolationKind> for IssueType {
 impl From<&PackageViolation> for IssueType {
     fn from(violation: &PackageViolation) -> Self {
         match violation {
+            PackageViolation::BenchmarkTarget(
+                BenchmarkTargetViolation::ExcludedFromBenchmarks { .. },
+            ) => Self::BenchmarkTargetExcludedFromBenchmarks,
+            PackageViolation::BenchmarkTarget(BenchmarkTargetViolation::RunByTests { .. }) => {
+                Self::BenchmarkTargetRunByTests
+            }
+            PackageViolation::BenchmarkTarget(BenchmarkTargetViolation::WithLibtestHarness {
+                ..
+            }) => Self::BenchmarkTargetWithLibtestHarness,
             PackageViolation::Confinement(ConfinementViolation::UnknownPackage { .. }) => {
                 Self::UnknownConfinedPackage
             }
@@ -392,9 +475,14 @@ impl From<&PackageViolation> for IssueType {
             PackageViolation::TestCrateDeclaredTwice { .. } => Self::TestCrateDeclaredTwice,
             PackageViolation::TestCrateNotAMember { .. } => Self::TestCrateNotAMember,
             PackageViolation::TestCrateUsedByProduction { .. } => Self::TestCrateUsedByProduction,
-            PackageViolation::TestsOnlyPackageWithoutTestLibraries { .. } => {
-                Self::TestsOnlyPackageWithoutTestLibraries
-            }
+            PackageViolation::WithoutLibrary(LibrarylessPackage {
+                contents: LibrarylessContents::Benchmarks,
+                ..
+            }) => Self::BenchmarksOnlyPackageWithoutLibraries,
+            PackageViolation::WithoutLibrary(LibrarylessPackage {
+                contents: LibrarylessContents::Tests,
+                ..
+            }) => Self::TestsOnlyPackageWithoutTestLibraries,
             PackageViolation::RequiredLintNotDenied { .. } => Self::RequiredLintNotDenied,
             PackageViolation::RequiredClippySettingMissing { .. } => {
                 Self::RequiredClippySettingMissing
@@ -409,6 +497,11 @@ impl ValueEnum for IssueType {
     fn value_variants<'variants>() -> &'variants [Self] {
         &[
             Self::AdditionalPublicItem,
+            Self::BenchmarkTargetExcludedFromBenchmarks,
+            Self::BenchmarkTargetRunByTests,
+            Self::BenchmarkTargetWithLibtestHarness,
+            Self::BenchmarkTargetWithoutCriterionBenchmark,
+            Self::BenchmarksOnlyPackageWithoutLibraries,
             Self::ClippyConfigurationAmbiguous,
             Self::ClippyConfigurationMissing,
             Self::CodeActiveInNoConfiguration,
@@ -420,6 +513,7 @@ impl ValueEnum for IssueType {
             Self::ConfinedPackageUserNotReachingIt,
             Self::DuplicatedFunctionBody,
             Self::FailedMacroExpansion,
+            Self::FunctionUsedOnlyByBenchmarks,
             Self::FunctionUsedOnlyByTests,
             Self::GlobImport,
             Self::ImplWithoutLocalType,
@@ -436,10 +530,12 @@ impl ValueEnum for IssueType {
             Self::ModuleCycle,
             Self::ModuleFileInsideBlock,
             Self::ModuleNotNamedAfterItsItem,
+            Self::MustUseBenchmarkOutput,
             Self::NegatedConfiguration,
             Self::NextestConfigurationMissing,
             Self::NextestOverride,
             Self::NextestTimeoutNotEnforced,
+            Self::NonBenchmarkItemInBenchmarkTarget,
             Self::NonConstantInConstantsModule,
             Self::NonDocComment,
             Self::NonTestItemInTestTarget,
@@ -463,6 +559,7 @@ impl ValueEnum for IssueType {
             Self::TupleInSignature,
             Self::UncoveredCode,
             Self::UndestructuredParameter,
+            Self::UndeterminedBenchmarkOutput,
             Self::UnimplementedBuiltinMacro,
             Self::UnknownConfinedPackage,
             Self::UnmappedItem,
@@ -475,6 +572,7 @@ impl ValueEnum for IssueType {
             Self::UnresolvedPath,
             Self::UnsafeCode,
             Self::UnvettedClippySetting,
+            Self::UnvettedCriterionMethod,
             Self::UnvettedNextestSetting,
         ]
     }

@@ -3,15 +3,18 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use crate::constants::CONSTANTS_MODULE_NAME;
+use crate::harness_violation::HarnessViolation;
 use crate::item_placement::ItemPlacement;
 use crate::method_placement::MethodPlacement;
+use crate::non_production_users::NonProductionUsers;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ViolationKind {
     AdditionalPublicItem,
+    BenchmarkHarness(HarnessViolation),
     ConfigurationSelectionMacro,
     FailedMacroExpansion,
-    FunctionUsedOnlyByTests,
+    FunctionUsedOnlyBy(NonProductionUsers),
     GlobImport,
     InvalidMacroDefinition,
     ImplWithoutLocalType,
@@ -45,6 +48,7 @@ pub enum ViolationKind {
         trait_file: String,
     },
     NegatedConfiguration,
+    NonBenchmarkItemInBenchmarkTarget,
     NonConstantInConstantsModule,
     NonDocComment,
     NonTestItemInTestTarget,
@@ -79,11 +83,12 @@ impl Display for ViolationKind {
             Self::AdditionalPublicItem => {
                 formatter.write_str("Module already has a public item")
             }
+            Self::BenchmarkHarness(violation) => violation.fmt(formatter),
             Self::ConfigurationSelectionMacro => formatter.write_str(
                 "Configuration selection macro keeps the arms it does not select out of the analysis",
             ),
             Self::FailedMacroExpansion => formatter.write_str("Macro expansion failed"),
-            Self::FunctionUsedOnlyByTests => formatter.write_str("Function is used only by tests"),
+            Self::FunctionUsedOnlyBy(users) => users.fmt(formatter),
             Self::GlobImport => formatter.write_str("Glob import"),
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
@@ -123,6 +128,9 @@ impl Display for ViolationKind {
             }
             Self::NegatedConfiguration => formatter.write_str(
                 "Configuration predicate negates a feature, test or debug_assertions",
+            ),
+            Self::NonBenchmarkItemInBenchmarkTarget => formatter.write_str(
+                "Benchmark target holds an item that is neither its entry point, a constant, an import nor a private helper used only in its own file",
             ),
             Self::NonConstantInConstantsModule => {
                 formatter.write_str("Constants module holds a public item that is not a constant")

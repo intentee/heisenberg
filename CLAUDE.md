@@ -24,6 +24,6 @@ Heisenberg uses no heuristics and parses no code by hand. It never decides from 
 
 Heisenberg never detects the operating system or the host, and contains no OS-specific workaround. Every run is fully described by its declared inputs and explicit arguments; platform differences live only in its dependencies.
 
-Heisenberg never computes the same result twice. Work whose result already exists is reused, never redone or invalidated: it forces no rebuild and invalidates no cache of the tools it drives, and within a run each result is computed once and then shared. The only repeats are those a dependency's API imposes.
+Heisenberg computes nothing it does not use and nothing more than once. Within a run, each result is computed only when something consumes it, exactly once, and then shared, and a cheaper exact check runs first whenever it decides the outcome. Across runs, Heisenberg keeps no cache of its own: it reuses what the tools it drives already hold, forces no rebuild, and invalidates none of their caches. The only repeats are those a dependency's API imposes, and Heisenberg drives each dependency so that it repeats as little as its API allows.
 
 Heisenberg runs as a dependency graph of tasks on one bounded worker pool. A task starts when its inputs exist, runs exactly once, and produces the same results for every worker count; blocking work never occupies a pool worker.

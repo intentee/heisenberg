@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use humantime::format_duration;
 
+use crate::benchmark_target_violation::BenchmarkTargetViolation;
 use crate::confinement_violation::ConfinementViolation;
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
@@ -13,11 +14,13 @@ use crate::constants::MAXIMUM_SLOW_TEST_PERIOD;
 use crate::constants::MAXIMUM_TEST_DURATION;
 use crate::constants::NEXTEST_CONFIGURATION_DIRECTORY;
 use crate::constants::NEXTEST_CONFIGURATION_FILE;
+use crate::libraryless_package::LibrarylessPackage;
 use crate::lint_table::LintTable;
 use crate::potential_owner::PotentialOwner;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PackageViolation {
+    BenchmarkTarget(BenchmarkTargetViolation),
     ClippyConfigurationAmbiguous {
         file: String,
     },
@@ -94,11 +97,6 @@ pub enum PackageViolation {
         manifest: String,
         package: String,
     },
-    TestsOnlyPackageWithoutTestLibraries {
-        manifest: String,
-        package: String,
-        potential_owners: Vec<PotentialOwner>,
-    },
     UnvettedClippySetting {
         file: String,
         setting: String,
@@ -107,19 +105,21 @@ pub enum PackageViolation {
         file: String,
         setting: String,
     },
+    WithoutLibrary(LibrarylessPackage),
 }
 
 impl PackageViolation {
     #[must_use]
     pub fn details(&self) -> Vec<String> {
         match self {
-            Self::TestsOnlyPackageWithoutTestLibraries {
+            Self::WithoutLibrary(LibrarylessPackage {
                 potential_owners, ..
-            } => potential_owners
+            }) => potential_owners
                 .iter()
                 .map(PotentialOwner::to_string)
                 .collect(),
-            Self::ClippyConfigurationAmbiguous { .. }
+            Self::BenchmarkTarget(_)
+            | Self::ClippyConfigurationAmbiguous { .. }
             | Self::ClippyConfigurationMissing { .. }
             | Self::Confinement(_)
             | Self::LintAllowedInManifest { .. }
@@ -163,9 +163,10 @@ impl PackageViolation {
             | Self::PublishableTestCrate { manifest: file, .. }
             | Self::TestCrateDeclaredTwice { manifest: file, .. }
             | Self::TestCrateNotAMember { manifest: file, .. }
-            | Self::TestCrateUsedByProduction { manifest: file, .. }
-            | Self::TestsOnlyPackageWithoutTestLibraries { manifest: file, .. } => file,
+            | Self::TestCrateUsedByProduction { manifest: file, .. } => file,
+            Self::BenchmarkTarget(violation) => violation.manifest(),
             Self::Confinement(violation) => violation.manifest(),
+            Self::WithoutLibrary(LibrarylessPackage { manifest, .. }) => manifest,
             Self::LintAllowedInManifest { table, .. }
             | Self::RequiredLintNotDenied { table, .. } => table.manifest(),
         }
@@ -175,6 +176,7 @@ impl PackageViolation {
 impl Display for PackageViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::BenchmarkTarget(violation) => violation.fmt(formatter),
             Self::ClippyConfigurationAmbiguous { .. } => write!(
                 formatter,
                 "Directory holds both {CLIPPY_CONFIGURATION_FILE} and {CLIPPY_HIDDEN_CONFIGURATION_FILE}"
@@ -261,10 +263,6 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {dependent} depends on test crate {package} through a normal or build dependency"
             ),
-            Self::TestsOnlyPackageWithoutTestLibraries { package, .. } => write!(
-                formatter,
-                "Package {package} holds only tests and no test library of its own, so the package its tests verify must own them"
-            ),
             Self::UnvettedClippySetting { setting, .. } => write!(
                 formatter,
                 "Clippy configuration sets {setting}, which Heisenberg has not vetted"
@@ -273,6 +271,7 @@ impl Display for PackageViolation {
                 formatter,
                 "Nextest configuration sets {setting}, which Heisenberg has not vetted"
             ),
+            Self::WithoutLibrary(package) => package.fmt(formatter),
         }
     }
 }

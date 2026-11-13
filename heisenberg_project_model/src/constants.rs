@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crate::harness_methods::HarnessMethods;
 use crate::lint_tool::LintTool;
 use crate::required_clippy_setting::RequiredClippySetting;
 use crate::required_lint::RequiredLint;
@@ -9,6 +10,21 @@ pub const SUPPORTED_TARGETS: [SupportedTarget; 3] = [
     SupportedTarget::AArch64AppleDarwin,
     SupportedTarget::X86_64PcWindowsMsvc,
     SupportedTarget::X86_64UnknownLinuxGnu,
+];
+
+pub const BENCHMARK_HARNESS_PACKAGE: &str = "criterion";
+
+pub const BENCHMARK_LOOP_OUTPUT_PARAMETER: &str = "O";
+
+pub const BENCHMARK_REGISTRATIONS: [HarnessMethods; 2] = [
+    HarnessMethods {
+        methods: &["bench_function", "bench_with_input"],
+        type_name: "BenchmarkGroup",
+    },
+    HarnessMethods {
+        methods: &["bench_function", "bench_with_input"],
+        type_name: "Criterion",
+    },
 ];
 
 pub const CARGO_BUILD_JOBS_VARIABLE: &str = "CARGO_BUILD_JOBS";
@@ -67,6 +83,27 @@ pub const NIGHTLY_BOOTSTRAP_VARIABLE: &str = "RUSTC_BOOTSTRAP";
 pub const NIGHTLY_FEATURE_VARIABLES: [&str; 2] = [
     NIGHTLY_BOOTSTRAP_VARIABLE,
     "__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS",
+];
+
+pub const OUTPUT_DROPPING_BENCHMARK_LOOPS: [HarnessMethods; 2] = [
+    HarnessMethods {
+        methods: &[
+            "iter",
+            "iter_batched",
+            "iter_batched_ref",
+            "iter_with_large_drop",
+        ],
+        type_name: "AsyncBencher",
+    },
+    HarnessMethods {
+        methods: &[
+            "iter",
+            "iter_batched",
+            "iter_batched_ref",
+            "iter_with_large_drop",
+        ],
+        type_name: "Bencher",
+    },
 ];
 
 pub const PANICKING_LINTS: [RequiredLint; 10] = [
@@ -191,6 +228,59 @@ pub const RUST_WARNINGS_LINT: RequiredLint = RequiredLint {
 };
 
 pub const SYSROOT_BINARY_DIRECTORY: &str = "bin";
+
+pub const VETTED_BENCHMARK_HARNESS_METHODS: [HarnessMethods; 4] = [
+    HarnessMethods {
+        methods: &[
+            "iter",
+            "iter_batched",
+            "iter_batched_ref",
+            "iter_custom",
+            "iter_with_large_drop",
+        ],
+        type_name: "AsyncBencher",
+    },
+    HarnessMethods {
+        methods: &[
+            "iter",
+            "iter_batched",
+            "iter_batched_ref",
+            "iter_custom",
+            "iter_with_large_drop",
+            "to_async",
+        ],
+        type_name: "Bencher",
+    },
+    HarnessMethods {
+        methods: &[
+            "bench_function",
+            "bench_with_input",
+            "finish",
+            "plot_config",
+            "throughput",
+        ],
+        type_name: "BenchmarkGroup",
+    },
+    HarnessMethods {
+        methods: &[
+            "bench_function",
+            "bench_with_input",
+            "benchmark_group",
+            "configure_from_args",
+            "final_summary",
+            "output_directory",
+            "plotting_backend",
+            "retain_baseline",
+            "save_baseline",
+            "with_measurement",
+            "with_output_color",
+            "with_plots",
+            "with_profiler",
+            "without_plots",
+        ],
+        type_name: "Criterion",
+    },
+];
 
 pub const VETTED_NEXTEST_PROFILE_SETTINGS: [&str; 10] = [
     "fail-fast",

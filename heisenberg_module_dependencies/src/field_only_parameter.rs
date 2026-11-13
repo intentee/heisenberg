@@ -10,6 +10,7 @@ use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
 use ra_ap_ide_db::famous_defs::FamousDefs;
 use ra_ap_ide_db::search::FileReference;
+use ra_ap_ide_db::search::UsageSearchResult;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::ast;
 
@@ -29,14 +30,15 @@ impl<'database> FieldOnlyParameter<'_, 'database> {
             let declared = local.ty(database);
             let held = declared.strip_references();
 
-            Definition::Local(local)
-                .usages(self.semantics)
-                .all()
-                .references
-                .values()
-                .flatten()
-                .map(|reference| self.read_field_type(reference, &held))
-                .collect::<Option<Vec<Type<'database>>>>()
+            Self::is_struct_or_tuple(&held)
+                .then(|| Definition::Local(local).usages(self.semantics).all())
+                .and_then(|UsageSearchResult { references }| {
+                    references
+                        .values()
+                        .flatten()
+                        .map(|reference| self.read_field_type(reference, &held))
+                        .collect::<Option<Vec<Type<'database>>>>()
+                })
                 .filter(|read_field_types| {
                     !read_field_types.is_empty()
                         && (declared.is_reference()
@@ -90,6 +92,10 @@ impl<'database> FieldOnlyParameter<'_, 'database> {
                 )
                 .is_some()
         })
+    }
+
+    fn is_struct_or_tuple(held: &Type<'_>) -> bool {
+        held.is_tuple() || matches!(held.as_adt(), Some(Adt::Struct(_)))
     }
 
     fn read_field_type(

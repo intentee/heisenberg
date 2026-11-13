@@ -46,10 +46,14 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration with the standard\n\
     library of its target installed, Cargo.lock is up to date, the cargo home holds every package of\n\
     Cargo.lock (`cargo fetch`), the build runs from the workspace directory with the environment\n\
-    Heisenberg runs with and without --config arguments, clippy runs without command-line arguments, and\n\
+    Heisenberg runs with and without --config arguments, clippy runs without command-line arguments,\n\
     nextest runs without the command-line arguments that replace or extend its configuration, retry\n\
-    tests or disable timeouts (--config-file, --tool-config-file, --retries, --debugger and --tracer).\n\
-    An environment variable whose name or value is not UTF-8, CARGO_ENCODED_RUSTFLAGS, RUSTFLAGS, RUSTC,\n\
+    tests or disable timeouts (--config-file, --tool-config-file, --retries, --debugger and --tracer),\n\
+    the tests run without the target selections that build and run benchmarks (--benches, --bench and\n\
+    --all-targets), and benchmarks run without criterion's command-line arguments that change how it\n\
+    measures or judges them (--quick, --sample-size, --warm-up-time, --measurement-time, --nresamples,\n\
+    --noise-threshold, --confidence-level, --significance-level and --profile-time). An environment\n\
+    variable whose name or value is not UTF-8, CARGO_ENCODED_RUSTFLAGS, RUSTFLAGS, RUSTC,\n\
     RUSTC_WORKSPACE_WRAPPER, RUSTC_WRAPPER, CLIPPY_ARGS, CLIPPY_CONF_DIR, NEXTEST_RETRIES or\n\
     RUSTC_BOOTSTRAP, __CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS in the environment, a workspace\n\
     directory that is not the root of its cargo workspace, a workspace member or crate root outside the\n\
@@ -87,19 +91,22 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     a sysroot without the server, or whose server cannot start, fail the run. Every decision is\n\
     semantic, as rust-analyzer resolves the code. The analysis runs on --jobs worker threads and reports\n\
     the same issues for every count. Shared module files are analysed in every crate that includes them.\n\
-    The public item, constant, item order, method order and integration test target rules apply to items\n\
-    written in module files, including those that a macro_rules! macro of the crate writes, and the\n\
-    name, tuple and parameter rules to the text written in them; an item that an attribute macro\n\
-    rewrites is analysed through the items of its expansion that rust-analyzer maps back to it, and the\n\
-    rest of the expansion, like the items that procedural macros and the macros of other crates\n\
-    generate, is trusted. Derive macro output is analysed like any macro expansion, except that of the\n\
-    built-in derives that rust-analyzer records as impls of their trait without expanding them, which is\n\
-    trusted; text written outside a crate's module files, such as in other crates or in the build script\n\
-    output that include! brings in, is trusted, and results reflect the files on disk, including\n\
-    generated ones. Test code is every target of a test crate, every integration test target and every\n\
-    module that cfg(test) gates, inline or in its own file and under any name; a test crate is a\n\
-    workspace member that test_crates lists, whose package cannot be published (publish = false), and\n\
-    that no member other than a test crate depends on through a normal or build dependency.\n\
+    The public item, constant, item order, method order, integration test target and benchmark target\n\
+    rules apply to items written in module files, including those that a macro_rules! macro of the crate\n\
+    writes, and the name, tuple and parameter rules to the text written in them; an item that an\n\
+    attribute macro rewrites is analysed through the items of its expansion that rust-analyzer maps back\n\
+    to it, and the rest of the expansion, like the items that procedural macros and the macros of other\n\
+    crates generate, is trusted. Derive macro output is analysed like any macro expansion, except that\n\
+    of the built-in derives that rust-analyzer records as impls of their trait without expanding them,\n\
+    which is trusted; text written outside a crate's module files, such as in other crates or in the\n\
+    build script output that include! brings in, is trusted, and results reflect the files on disk,\n\
+    including generated ones. Test code is every integration test target, every target of a test crate\n\
+    other than a benchmark target and every module that cfg(test) gates, inline or in its own file and\n\
+    under any name, and benchmark code is every benchmark target, measured through criterion, the\n\
+    criterion package from crates.io, whose calls the criterion rules check wherever workspace code\n\
+    makes them; a test crate is a workspace member that test_crates lists, whose package cannot be\n\
+    published (publish = false), and that no member other than a test crate depends on through a normal\n\
+    or build dependency.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\
@@ -110,12 +117,17 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     in some of the crate targets or configurations that analyse its file, the message names them. A\n\
     cause and its direct consequences form one issue. A partial run, one that leaves out a declared\n\
     configuration, names the configurations it left out after the analysed ones and does not evaluate\n\
-    CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt or the empty-library check of\n\
-    TestsOnlyPackageWithoutTestLibraries, which hold only over every declared configuration; a partial\n\
-    run without issues exits as compliant.\n\
+    CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt or the empty-library checks of\n\
+    TestsOnlyPackageWithoutTestLibraries and BenchmarksOnlyPackageWithoutLibraries, which hold only over\n\
+    every declared configuration; a partial run without issues exits as compliant.\n\
     \n\
     Rules:\n  \
     AdditionalPublicItem: A module with more than one public item\n  \
+    BenchmarkTargetExcludedFromBenchmarks: A benchmark target that cargo bench never runs\n  \
+    BenchmarkTargetRunByTests: A benchmark target that the test run runs\n  \
+    BenchmarkTargetWithLibtestHarness: A benchmark target built with libtest's harness\n  \
+    BenchmarkTargetWithoutCriterionBenchmark: A benchmark target that registers no criterion benchmark\n  \
+    BenchmarksOnlyPackageWithoutLibraries: A package of benchmarks that holds no library of its own\n  \
     ClippyConfigurationAmbiguous: A directory that holds both clippy configuration files\n  \
     ClippyConfigurationMissing: A workspace member without a clippy configuration\n  \
     CodeActiveInNoConfiguration: Code that no declared configuration builds\n  \
@@ -127,6 +139,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ConfinedPackageUserNotReachingIt: A confined package user that never reaches the package\n  \
     DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n  \
     FailedMacroExpansion: A macro call that fails to expand\n  \
+    FunctionUsedOnlyByBenchmarks: A production function that only benchmarks use\n  \
     FunctionUsedOnlyByTests: A production function that only tests use\n  \
     GlobImport: A glob import\n  \
     ImplWithoutLocalType: An impl of another crate's trait with no home in this crate\n  \
@@ -143,10 +156,13 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ModuleCycle: Modules that depend on each other\n  \
     ModuleFileInsideBlock: A module file declared inside a block\n  \
     ModuleNotNamedAfterItsItem: A module that is not named after its public item\n  \
+    MustUseBenchmarkOutput: A measured routine whose must-use result criterion drops\n  \
     NegatedConfiguration: A cfg predicate that negates a feature, test or debug_assertions\n  \
     NextestConfigurationMissing: A workspace without a nextest configuration\n  \
     NextestOverride: A per-test override in the nextest configuration\n  \
     NextestTimeoutNotEnforced: A nextest profile whose slow-timeout exceeds the limits\n  \
+    NonBenchmarkItemInBenchmarkTarget: A benchmark target item that is neither its entry point nor a\n  \
+    file-local helper\n  \
     NonConstantInConstantsModule: A public item other than a constant in crate::constants\n  \
     NonDocComment: A comment that is not a doc comment\n  \
     NonTestItemInTestTarget: An integration test item that is neither a test nor a file-local helper\n  \
@@ -169,6 +185,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     TestsOnlyPackageWithoutTestLibraries: A package of tests that holds no test library of its own\n  \
     TupleInSignature: A tuple type in an item signature\n  \
     UndestructuredParameter: A parameter used only through its fields\n  \
+    UndeterminedBenchmarkOutput: A measured routine whose return type the analysis cannot determine\n  \
     UnimplementedBuiltinMacro: A built-in macro that rust-analyzer cannot expand\n  \
     UnknownConfinedPackage: A confined package that the workspace does not resolve\n  \
     UnmappedItem: An item that cannot be mapped to its definition\n  \
@@ -181,6 +198,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     UnresolvedPath: A path that rust-analyzer cannot resolve\n  \
     UnsafeCode: Unsafe code in a crate that integrates no foreign code\n  \
     UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n  \
+    UnvettedCriterionMethod: A criterion method that Heisenberg has not vetted\n  \
     UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n\
     \n\
     Run `heisenberg explain <ISSUE_TYPE>` for the definition of a rule, why it exists and how to satisfy\n\
@@ -209,8 +227,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Absolute path of the Cargo workspace directory that contains Cargo.toml\n\
     \n  \
     -h, --help\n          \
-    Print help (see a summary with '-h')\n\
-    ";
+    Print help (see a summary with '-h')\n";
 
 #[test]
 fn check_help_lists_every_rule() {

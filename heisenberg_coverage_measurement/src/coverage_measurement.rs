@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
@@ -8,6 +9,7 @@ use ra_ap_ide_db::FilePosition;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::SourceDatabase;
 use ra_ap_paths::AbsPath;
+use ra_ap_paths::AbsPathBuf;
 use ra_ap_vfs::FileId;
 use rayon::join;
 
@@ -15,9 +17,11 @@ use heisenberg_attached_work::attached_work::attached_work;
 use heisenberg_configured_code::test_module_code::TestModuleCode;
 use heisenberg_configured_code::test_modules::TestModules;
 use heisenberg_coverage_export::exported_coverage::ExportedCoverage;
+use heisenberg_coverage_export::exported_region::ExportedRegion;
 use heisenberg_member_crates::member_crates::member_crates;
 use heisenberg_member_crates::module_files::module_files;
 use heisenberg_member_crates::resolved_member_crate::ResolvedMemberCrate;
+use heisenberg_module_graph::code_category::CodeCategory;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::source_files::SourceFiles;
 use heisenberg_source_locator::source_locator::SourceLocator;
@@ -40,6 +44,15 @@ use crate::measurement_run::MeasurementRun;
 use crate::member_modules::MemberModules;
 use crate::source_freshness::SourceFreshness;
 use crate::unresolved_attributes::UnresolvedAttributes;
+
+fn exported_file<'paths>(
+    paths: BTreeSet<&'paths AbsPath>,
+    exported_files: &BTreeMap<AbsPathBuf, Vec<ExportedRegion>>,
+) -> Option<&'paths AbsPath> {
+    paths
+        .into_iter()
+        .find(|path| exported_files.contains_key(*path))
+}
 
 fn in_context<TItem: Sync, TResult: Send>(
     database: &RootDatabase,
@@ -151,7 +164,8 @@ impl CoverageMeasurement<'_, '_> {
                 let measured: Vec<&ResolvedMemberCrate> = members
                     .iter()
                     .filter(|ResolvedMemberCrate { crate_target, .. }| {
-                        !crate_target.is_test_code(&packages.test_crates)
+                        crate_target.code_category(&packages.test_crates)
+                            == CodeCategory::Production
                     })
                     .collect();
 
@@ -326,12 +340,13 @@ impl CoverageMeasurement<'_, '_> {
         locator: &SourceLocator<'_>,
         MemberModules {
             members,
-            module_files,
+            module_files: member_module_files,
         }: &MemberModules<'_>,
     ) -> Result<(), CoverageMeasurementError> {
         let LoadedProject {
             build_script_output_files,
             database,
+            packages,
             ..
         } = self.project;
         let ExportedCoverage {
@@ -358,21 +373,38 @@ impl CoverageMeasurement<'_, '_> {
                         .collect::<Vec<FileId>>()
                 })
                 .filter(|file_id| {
-                    !module_files.contains(file_id) && !build_script_output_files.contains(file_id)
+                    !member_module_files.contains(file_id)
+                        && !build_script_output_files.contains(file_id)
                 })
                 .map(|file_id| locator.path(file_id))
                 .collect::<Result<BTreeSet<&AbsPath>, CoverageMeasurementError>>()
         })
         .and_then(|unattributed| {
-            unattributed
-                .into_iter()
-                .find(|path| exported_files.contains_key(*path))
-                .map_or(Ok(()), |file| {
-                    Err(CoverageMeasurementError::RegionInFileOutsideModuleTrees {
-                        export: export.clone(),
-                        file: file.to_path_buf(),
-                    })
+            exported_file(unattributed, exported_files).map_or(Ok(()), |file| {
+                Err(CoverageMeasurementError::RegionInFileOutsideModuleTrees {
+                    export: export.clone(),
+                    file: file.to_path_buf(),
                 })
+            })
+        })
+        .and_then(|()| {
+            let benchmark = |ResolvedMemberCrate { crate_target, .. }: &&ResolvedMemberCrate| {
+                crate_target.code_category(&packages.test_crates) == CodeCategory::Benchmark
+            };
+            let other_files = module_files(members.iter().filter(|member| !benchmark(member)));
+
+            module_files(members.iter().filter(benchmark))
+                .difference(&other_files)
+                .map(|file_id| locator.path(*file_id))
+                .collect::<Result<BTreeSet<&AbsPath>, CoverageMeasurementError>>()
+        })
+        .and_then(|benchmark_only| {
+            exported_file(benchmark_only, exported_files).map_or(Ok(()), |file| {
+                Err(CoverageMeasurementError::RegionInBenchmarkTarget {
+                    export: export.clone(),
+                    file: file.to_path_buf(),
+                })
+            })
         })
     }
 }

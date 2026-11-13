@@ -12,7 +12,6 @@ use heisenberg_project_model::loaded_workspace::LoadedWorkspace;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::project_model_error::ProjectModelError;
 use heisenberg_project_model::resolved_project::ResolvedProject;
-use heisenberg_project_model::target_model::TargetModel;
 use heisenberg_workspace_build::build_outputs::BuildOutputs;
 
 use crate::heisenberg_command_error::HeisenbergCommandError;
@@ -35,10 +34,9 @@ fn project_model_failure(error: ProjectModelError) -> Vec<HeisenbergCommandError
 fn loaded<'resolved>(
     project: &'resolved ResolvedProject<'_>,
     configuration: &Configuration,
-    target: &Arc<TargetModel>,
 ) -> Result<LoadedWorkspace<'resolved>, HeisenbergCommandError> {
     project
-        .load(configuration, target)
+        .load(configuration)
         .map_err(configuration_failure(configuration))
 }
 
@@ -114,19 +112,17 @@ pub trait ConfigurationPipeline: Sync {
 
         let project = model.resolve().map_err(project_model_failure)?;
         let project = &project;
-        let targets = project.target_models();
 
         scope(|scope| {
             let threads = AnalysisThreads { scope };
-            let loading = targets
-                .iter()
-                .flatten()
-                .map(|(configuration, target)| {
+            let loading = project
+                .configurations
+                .keys()
+                .map(|configuration| {
                     let owned_configuration = configuration.clone();
-                    let target = Arc::clone(target);
 
                     configuration_thread(&threads, configuration, move || {
-                        loaded(project, &owned_configuration, &target)
+                        loaded(project, &owned_configuration)
                     })
                 })
                 .collect();
@@ -138,7 +134,7 @@ pub trait ConfigurationPipeline: Sync {
             let loads = joined(loading);
 
             builds
-                .and_then(|outputs| targets.map(|_| outputs))
+                .and_then(|outputs| project.resolve_standard_libraries().map(|()| outputs))
                 .map_err(project_model_failure)
                 .and_then(|outputs| {
                     prerequisite

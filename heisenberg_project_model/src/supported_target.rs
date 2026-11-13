@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SupportedTarget {
     AArch64AppleDarwin,
     X86_64PcWindowsMsvc,

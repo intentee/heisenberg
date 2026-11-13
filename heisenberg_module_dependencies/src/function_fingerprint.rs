@@ -29,6 +29,7 @@ use heisenberg_source_locator::original_file_id::original_file_id;
 use heisenberg_source_locator::source_locator::SourceLocator;
 
 use crate::module_dependencies_error::ModuleDependenciesError;
+use crate::path_resolutions::PathResolutions;
 use crate::template_captures::TemplateCaptures;
 
 fn shorthand_path(token: &SyntaxToken) -> Option<ast::Path> {
@@ -52,6 +53,7 @@ fn spelling(token: &SyntaxToken) -> TokenSpelling {
 pub struct FunctionFingerprint<'fingerprint, 'database> {
     pub function: &'fingerprint ast::Fn,
     pub locator: &'fingerprint SourceLocator<'fingerprint>,
+    pub paths: &'fingerprint PathResolutions<'fingerprint, 'database>,
     pub semantics: &'fingerprint Semantics<'database, RootDatabase>,
     pub template_captures: &'fingerprint TemplateCaptures<'fingerprint, 'database>,
 }
@@ -131,15 +133,12 @@ impl<'database> FunctionFingerprint<'_, 'database> {
                 .collect();
 
             match shorthand_path(token).filter(|_| is_field) {
-                Some(path) => self
-                    .semantics
-                    .resolve_path(&path)
-                    .map_or_else(Vec::new, |value| {
-                        definitions
-                            .into_iter()
-                            .chain(iter::once(Definition::from(value)))
-                            .collect()
-                    }),
+                Some(path) => self.paths.resolve(&path).map_or_else(Vec::new, |value| {
+                    definitions
+                        .into_iter()
+                        .chain(iter::once(Definition::from(value)))
+                        .collect()
+                }),
                 None => definitions,
             }
         })

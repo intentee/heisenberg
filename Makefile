@@ -84,7 +84,7 @@ export HEISENBERG_SYSROOT := $(RUST_SYSROOT)
 
 $(COVERAGE_FIXTURE_DIRECTORY)/%/target/llvm-cov.json: $(COVERAGE_FIXTURE_DIRECTORY)/%/Cargo.toml $(COVERAGE_FIXTURE_DIRECTORY)/%/Cargo.lock rust-toolchain.toml $$(wildcard $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*.rs $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*/*.rs $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*/*/*.rs $(COVERAGE_FIXTURE_DIRECTORY)/$$*/*/Cargo.toml)
 	cargo llvm-cov clean --manifest-path $< --workspace
-	cargo llvm-cov test --manifest-path $< --no-report --workspace --all-targets
+	cargo llvm-cov test --manifest-path $< --no-report --workspace --lib --bins --tests --examples
 	cargo llvm-cov report --manifest-path $< --json --include-build-script --output-path $@
 
 $(COVERAGE_DIVERGENT_MACRO_EXPORTS): $(RUST_ANALYZER_DIVERGENT_MACROS)/Cargo.toml $(RUST_ANALYZER_DIVERGENT_MACROS)/src/lib.rs
@@ -116,6 +116,17 @@ clippy: $(TARGET_CFG_TABLES)
 .PHONY: fetch
 fetch:
 	cargo fetch
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmark_in_a_package_with_a_library/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmark_target_excluded_from_benchmarks/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmark_target_run_by_tests/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmarks_package_without_libraries/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/every_target_kind/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/function_used_only_by_benchmarks/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/must_use_benchmark_output/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/non_benchmark_item_in_benchmark_target/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/tests_and_benchmarks_package_without_libraries/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/undetermined_benchmark_output/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/unvetted_criterion_method/Cargo.toml
 
 .PHONY: fmt
 fmt:
@@ -132,7 +143,7 @@ test: fetch $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_CFG_TABLES)
 .PHONY: test.coverage
 test.coverage: fetch target/release/heisenberg $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_CFG_TABLES)
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest --no-report --workspace --all-targets
+	cargo llvm-cov nextest --no-report --workspace --lib --bins --tests --examples
 	cargo llvm-cov report --json --include-build-script --output-path target/llvm-cov.json
 	cargo llvm-cov report --include-build-script
 	target/release/heisenberg coverage-check $(HEISENBERG_ARGUMENTS) --coverage-export "$(CURDIR)/target/llvm-cov.json"

@@ -1,0 +1,42 @@
+[package]
+name = "benchmark_target_without_criterion_benchmark"
+edition = "2024"
+version = "0.1.0"
+
+[[bench]]
+name = "measurement"
+harness = false
+
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+arithmetic_side_effects = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+panic_in_result_fn = "deny"
+string_slice = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+unwrap_used = "deny"
+
+[workspace]
+
+[workspace.metadata.heisenberg]
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

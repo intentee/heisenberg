@@ -44,16 +44,28 @@ const fn build_script(message: &Message) -> Option<&BuildScript> {
     }
 }
 
-fn build_script_outputs(messages: &[Message]) -> BTreeMap<String, BuildScriptOutput> {
-    messages
+fn build_scripts(host: &[Message], target: &[Message]) -> BTreeMap<String, BuildScriptOutput> {
+    let host_runs: BTreeSet<&Utf8PathBuf> = host
         .iter()
         .filter_map(build_script)
-        .map(|executed| {
-            (
-                executed.package_id.repr.clone(),
-                BuildScriptOutput::from(executed),
-            )
-        })
+        .map(|BuildScript { out_dir, .. }| out_dir)
+        .collect();
+    let latest_runs: BTreeMap<&Utf8PathBuf, &BuildScript> = host
+        .iter()
+        .chain(target)
+        .filter_map(build_script)
+        .map(|run| (&run.out_dir, run))
+        .collect();
+
+    latest_runs
+        .values()
+        .filter(|BuildScript { out_dir, .. }| host_runs.contains(out_dir))
+        .chain(
+            latest_runs
+                .values()
+                .filter(|BuildScript { out_dir, .. }| !host_runs.contains(out_dir)),
+        )
+        .map(|run| (run.package_id.repr.clone(), BuildScriptOutput::from(*run)))
         .collect()
 }
 
@@ -210,21 +222,9 @@ impl WorkspaceBuild<'_> {
             .and_then(|host| {
                 self.messages(plan, &graph, is_run_for_the_target, captured)
                     .and_then(|target| {
-                        proc_macro_dylibs(&host).map(|proc_macro_dylibs| {
-                            let host_scripts = build_script_outputs(&host);
-
-                            BuildOutputs {
-                                build_scripts: host_scripts
-                                    .clone()
-                                    .into_iter()
-                                    .chain(build_script_outputs(&target).into_iter().filter(
-                                        |(package, output)| {
-                                            host_scripts.get(package) != Some(output)
-                                        },
-                                    ))
-                                    .collect(),
-                                proc_macro_dylibs,
-                            }
+                        proc_macro_dylibs(&host).map(|proc_macro_dylibs| BuildOutputs {
+                            build_scripts: build_scripts(&host, &target),
+                            proc_macro_dylibs,
                         })
                     })
             })
@@ -285,5 +285,82 @@ impl WorkspaceBuild<'_> {
                         )
                 })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::io;
+
+    use cargo_metadata::Message;
+    use cargo_metadata::camino::Utf8PathBuf;
+
+    use super::build_scripts;
+    use crate::build_script_output::BuildScriptOutput;
+
+    const HOST_RUN: &str = r#"{"reason":"build-script-executed","package_id":"path+file:///workspace/generated#0.1.0","linked_libs":[],"linked_paths":[],"cfgs":["host"],"env":[["GENERATED","host"]],"out_dir":"/workspace/target/debug/build/generated-host/out"}"#;
+    const HOST_RUN_REPEATED_WITH_A_NEW_OUTPUT: &str = r#"{"reason":"build-script-executed","package_id":"path+file:///workspace/generated#0.1.0","linked_libs":[],"linked_paths":[],"cfgs":["host"],"env":[["GENERATED","repeated"]],"out_dir":"/workspace/target/debug/build/generated-host/out"}"#;
+    const PACKAGE: &str = "path+file:///workspace/generated#0.1.0";
+    const TARGET_RUN: &str = r#"{"reason":"build-script-executed","package_id":"path+file:///workspace/generated#0.1.0","linked_libs":[],"linked_paths":[],"cfgs":["target"],"env":[["GENERATED","target"]],"out_dir":"/workspace/target/x86_64-unknown-linux-gnu/debug/build/generated-target/out"}"#;
+
+    fn attributed(host: &[&str], target: &[&str]) -> Option<BTreeMap<String, BuildScriptOutput>> {
+        messages(host)
+            .and_then(|host| messages(target).map(|target| build_scripts(&host, &target)))
+            .ok()
+    }
+
+    fn messages(lines: &[&str]) -> Result<Vec<Message>, io::Error> {
+        Message::parse_stream(lines.join("\n").as_bytes()).collect()
+    }
+
+    fn output(cfg: &str, generated: &str, out_dir: &str) -> BTreeMap<String, BuildScriptOutput> {
+        BTreeMap::from([(
+            PACKAGE.to_owned(),
+            BuildScriptOutput {
+                cfgs: vec![cfg.to_owned()],
+                env: BTreeMap::from([("GENERATED".to_owned(), generated.to_owned())]),
+                out_dir: Utf8PathBuf::from(out_dir),
+            },
+        )])
+    }
+
+    #[test]
+    fn target_run_of_a_build_script_wins_over_its_host_run_reported_after_it() {
+        assert_eq!(
+            attributed(&[HOST_RUN], &[TARGET_RUN, HOST_RUN]),
+            Some(output(
+                "target",
+                "target",
+                "/workspace/target/x86_64-unknown-linux-gnu/debug/build/generated-target/out"
+            ))
+        );
+    }
+
+    #[test]
+    fn target_run_of_a_build_script_wins_over_its_host_run_repeated_with_a_new_output() {
+        assert_eq!(
+            attributed(
+                &[HOST_RUN],
+                &[TARGET_RUN, HOST_RUN_REPEATED_WITH_A_NEW_OUTPUT]
+            ),
+            Some(output(
+                "target",
+                "target",
+                "/workspace/target/x86_64-unknown-linux-gnu/debug/build/generated-target/out"
+            ))
+        );
+    }
+
+    #[test]
+    fn host_run_repeated_with_a_new_output_replaces_its_earlier_output() {
+        assert_eq!(
+            attributed(&[HOST_RUN], &[HOST_RUN_REPEATED_WITH_A_NEW_OUTPUT]),
+            Some(output(
+                "host",
+                "repeated",
+                "/workspace/target/debug/build/generated-host/out"
+            ))
+        );
     }
 }

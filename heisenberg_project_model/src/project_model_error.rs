@@ -328,10 +328,10 @@ pub enum ProjectModelError {
     ProcMacroServerUnavailable(Arc<Self>),
     #[error(transparent)]
     BuildScriptOutputUnavailable(Arc<Self>),
+    #[error(transparent)]
+    TargetModelUnavailable(Arc<Self>),
     #[error("the standard library resolution thread cannot be started")]
     LibraryResolutionThread(#[source] AnalysisThreadsError),
-    #[error("the source text check thread cannot be started")]
-    SourceTextCheckThread(#[source] AnalysisThreadsError),
     #[error("the declared out-dir `{}` cannot be read", .0.context.display())]
     UnreadableOutDir(#[source] ContextualError<PathBuf, io::Error>),
     #[error("the dependency sources of `{manifest_path}` cannot be loaded")]

@@ -15,21 +15,25 @@ use ra_ap_vfs::FileId;
 use heisenberg_expanded_code::covering_ancestors::CoveringAncestors;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::crate_target::CrateTarget;
+use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
 use heisenberg_module_graph::folded_finding_kind::FoldedFindingKind;
+use heisenberg_module_graph::harness_violation::HarnessViolation;
 use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_module_graph::test_harness::TestHarness;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_source_locator::source_locator::SourceLocator;
 
+use crate::constants::UNRESOLVED_CODE_KINDS;
 use crate::crate_findings::CrateFindings;
 use crate::diagnostic_site::DiagnosticSite;
+use crate::file_start::file_start;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
-use crate::module_paths::ModulePaths;
 use crate::token_origin::TokenOrigin;
 use crate::walked_module::WalkedModule;
 
@@ -39,7 +43,6 @@ pub struct CrateExtraction<'extraction, 'database> {
     pub files: &'extraction BTreeSet<FileId>,
     pub krate: Crate,
     pub locator: &'extraction SourceLocator<'extraction>,
-    pub module_paths: &'extraction ModulePaths,
     pub modules: &'extraction [Module],
     pub semantics: &'extraction Semantics<'database, RootDatabase>,
     pub workspace_files: &'extraction BTreeSet<FileId>,
@@ -78,6 +81,8 @@ impl CrateExtraction<'_, '_> {
                 )
             })
             .and_then(|()| {
+                let registers_benchmark = crate_findings.registers_benchmark;
+
                 crate_findings.fold(&mut findings);
 
                 self.diagnostics
@@ -122,21 +127,49 @@ impl CrateExtraction<'_, '_> {
                             })
                         },
                     )
+                    .map(|()| registers_benchmark)
+            })
+            .and_then(|registers_benchmark| {
+                self.benchmark_without_harness(registers_benchmark, &findings)
+                    .map(|unregistered| findings.violations.extend(unregistered))
             })
             .map(|()| CrateModuleGraph {
                 crate_target: self.crate_target.clone(),
                 findings,
                 function_bodies,
-                modules: self
-                    .modules
-                    .iter()
-                    .map(|module| self.module_paths.path(database, *module))
-                    .collect(),
+                module_count: self.modules.len(),
                 root_module_is_empty: root.declarations(database).is_empty()
                     && root.impl_defs(database).is_empty()
                     && root.legacy_macros(database).is_empty()
                     && root.scope(database, None).is_empty(),
             })
+    }
+
+    fn benchmark_without_harness(
+        &self,
+        registers_benchmark: bool,
+        ModuleFindings {
+            unresolved_foreign_references,
+            violations,
+            ..
+        }: &ModuleFindings,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        (self.crate_target.kind == CrateTargetKind::Benchmark
+            && self.crate_target.test_harness == TestHarness::Absent
+            && !registers_benchmark
+            && unresolved_foreign_references.is_empty()
+            && !violations
+                .iter()
+                .any(|(Violation { kind, .. }, _)| UNRESOLVED_CODE_KINDS.contains(kind)))
+        .then(|| {
+            file_start(self.locator, self.krate.root_file(self.semantics.db)).map(|location| {
+                Violation {
+                    kind: ViolationKind::BenchmarkHarness(HarnessViolation::TargetWithoutBenchmark),
+                    location,
+                }
+            })
+        })
+        .transpose()
     }
 
     fn written_call(

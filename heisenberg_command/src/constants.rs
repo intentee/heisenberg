@@ -18,6 +18,41 @@ pub const ADDITIONAL_PUBLIC_ITEM: IssueText = IssueText {
     summary: "A module with more than one public item",
 };
 
+pub const BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES: IssueText = IssueText {
+    definition: "A benchmarks package, whose targets are benchmark targets beside an absent or empty library, a library being empty when it defines nothing in any declared configuration, and whose benchmark targets hold nothing but their entry points, constants, imports, modules and file-local private items, so that it holds no library of its own. Benchmarks belong to the package whose code they measure, in its benches directory, and may use any dev-dependency, test crates included; a helper used beyond its own benchmark file belongs in a library crate; a separate package exists only to hold a library of its own, such as helpers that need the measured package, which that package cannot dev-depend on without a package cycle. The issue lists every workspace member the package depends on, either as a package that could take its benchmarks or with the dependency cycle that moving them there would close, as guidance, not as the owner.",
+    name: "BenchmarksOnlyPackageWithoutLibraries",
+    purpose: "Benchmarks belong to the package whose code they measure, in its benches directory, and a benchmark that needs a library which depends on that package, such as a test harness, belongs beside that library in its package. Heisenberg cannot tell from the code which package the benchmarks measure, so it lists every workspace member they use, either as a package that could take them or with the dependency cycle that moving them there would close; the right owner is the package they measure.",
+    summary: "A package of benchmarks that holds no library of its own",
+};
+
+pub const BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS: IssueText = IssueText {
+    definition: "A benchmark target whose manifest sets bench = false, so cargo bench never runs it.",
+    name: "BenchmarkTargetExcludedFromBenchmarks",
+    purpose: "Every benchmark runs under cargo bench. Remove bench = false, or remove the benchmark target.",
+    summary: "A benchmark target that cargo bench never runs",
+};
+
+pub const BENCHMARK_TARGET_RUN_BY_TESTS: IssueText = IssueText {
+    definition: "A benchmark target whose manifest sets test = true, so cargo test and nextest build and run it with the tests.",
+    name: "BenchmarkTargetRunByTests",
+    purpose: "Benchmarks measure, and the test run never runs them. Remove test = true, and verify the behaviour that a benchmark relies on in a test.",
+    summary: "A benchmark target that the test run runs",
+};
+
+pub const BENCHMARK_TARGET_WITHOUT_CRITERION_BENCHMARK: IssueText = IssueText {
+    definition: "A benchmark target with harness = false whose module files call none of criterion's benchmark registrations, Criterion::bench_function, Criterion::bench_with_input, BenchmarkGroup::bench_function and BenchmarkGroup::bench_with_input, criterion being the criterion package from crates.io, so that a path, git or alternative registry package named criterion is not criterion. It is reported at the start of the target's crate root, and not when the target's code holds an unresolved path, method call, macro call or macro expansion, whose issue is reported instead.",
+    name: "BenchmarkTargetWithoutCriterionBenchmark",
+    purpose: "Heisenberg analyses benchmarks through criterion, the benchmark harness whose measurement it understands, so a benchmark measured any other way escapes its rules. Register every benchmark of the target with criterion in the target's own module files.",
+    summary: "A benchmark target that registers no criterion benchmark",
+};
+
+pub const BENCHMARK_TARGET_WITH_LIBTEST_HARNESS: IssueText = IssueText {
+    definition: "A benchmark target built with libtest's harness, harness = true, including a file of the benches directory that cargo discovers without a [[bench]] table. libtest's #[bench] is available only on the nightly channel, so on stable Rust such a target holds no benchmark, only tests that the test run never builds.",
+    name: "BenchmarkTargetWithLibtestHarness",
+    purpose: "A benchmark target measures through criterion from its own entry point. Declare the target in a [[bench]] table with harness = false and register its benchmarks with criterion, and move its tests into a tests directory.",
+    summary: "A benchmark target built with libtest's harness",
+};
+
 pub const CLIPPY_CONFIGURATION_AMBIGUOUS: IssueText = IssueText {
     definition: "A directory that holds both clippy configuration files and is the nearest one with a clippy configuration for a workspace member, within the workspace.",
     name: "ClippyConfigurationAmbiguous",
@@ -95,8 +130,15 @@ pub const FAILED_MACRO_EXPANSION: IssueText = IssueText {
     summary: "A macro call that fails to expand",
 };
 
+pub const FUNCTION_USED_ONLY_BY_BENCHMARKS: IssueText = IssueText {
+    definition: "A free or inherent function outside test and benchmark code whose references all lie in test or benchmark code, at least one of them in benchmark code, benchmark code being every benchmark target. Every function of a package with publish = false is checked; in a package that can be published, only those its crate does not expose to other crates.",
+    name: "FunctionUsedOnlyByBenchmarks",
+    purpose: "Production code holds only what production uses. Move a function that only benchmarks use, or benchmarks and tests, into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.",
+    summary: "A production function that only benchmarks use",
+};
+
 pub const FUNCTION_USED_ONLY_BY_TESTS: IssueText = IssueText {
-    definition: "A free or inherent function outside test code whose references all lie in test code. Every function of a package with publish = false is checked; in a package that can be published, only those its crate does not expose to other crates.",
+    definition: "A free or inherent function outside test and benchmark code whose references all lie in test code. Every function of a package with publish = false is checked; in a package that can be published, only those its crate does not expose to other crates.",
     name: "FunctionUsedOnlyByTests",
     purpose: "Production code holds only what production uses. Move a function that only tests use into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.",
     summary: "A production function that only tests use",
@@ -207,6 +249,13 @@ pub const MODULE_NOT_NAMED_AFTER_ITS_ITEM: IssueText = IssueText {
     summary: "A module that is not named after its public item",
 };
 
+pub const MUST_USE_BENCHMARK_OUTPUT: IssueText = IssueText {
+    definition: "A call or reference, in the code of a workspace member, to one of criterion's measurement loops that black-box and drop what the measured routine returns, Bencher::iter, Bencher::iter_batched, Bencher::iter_batched_ref, Bencher::iter_with_large_drop and their AsyncBencher counterparts, whose routine returns a must-use value: a value of a type whose definition carries #[must_use], such as Result, of an impl Trait or dyn Trait type whose trait or one of its supertraits carries #[must_use], such as Future or Iterator, a closure, or a Box, Pin, tuple or non-empty array holding one. The returned type is the loop's output type parameter as rust-analyzer infers it at the call, and it is reported at the name of the loop.",
+    name: "MustUseBenchmarkOutput",
+    purpose: "A must-use value that criterion drops hides an error or work that never ran, so the benchmark can measure a failure path or the construction of lazy work instead of the code. Handle the outcome inside the routine, for example by recording errors and failing the benchmark after measuring, or validate the input before measuring.",
+    summary: "A measured routine whose must-use result criterion drops",
+};
+
 pub const NEGATED_CONFIGURATION: IssueText = IssueText {
     definition: "A cfg or cfg_attr predicate that negates a feature, test or debug_assertions. Code that the predicate leaves active in no declared configuration is listed within its issue, and the predicate of a module file that its own attributes configure out is reported at the declaration unless an analysis of that same declaration reports it where it is written.",
     name: "NegatedConfiguration",
@@ -233,6 +282,13 @@ pub const NEXTEST_TIMEOUT_NOT_ENFORCED: IssueText = IssueText {
     name: "NextestTimeoutNotEnforced",
     purpose: "A test that runs longer than the limits shows slow code or a slow test. Make the code and the test faster instead of relaxing the timeout.",
     summary: "A nextest profile whose slow-timeout exceeds the limits",
+};
+
+pub const NON_BENCHMARK_ITEM_IN_BENCHMARK_TARGET: IssueText = IssueText {
+    definition: "An item of a benchmark target other than its entry point, a test, a constant, an import, a module or a private item that only the file defining it uses, among the items of module files, including those that a macro_rules! macro of the crate writes: a macro call is judged by the items it expands to, and the items that procedural macros and the macros of other crates generate are trusted. A target with harness = false enters through the main function of its crate root. The impl blocks of a flagged type are listed within the type's issue.",
+    name: "NonBenchmarkItemInBenchmarkTarget",
+    purpose: "A helper used beyond its own benchmark file is a library, and libraries never live in a benches directory. Move it into a library crate, a test crate when only tests and benchmarks use it; when that crate depends on the package the benchmarks measure, move the benchmarks that use it there too, so package dependencies never form a cycle.",
+    summary: "A benchmark target item that is neither its entry point nor a file-local helper",
 };
 
 pub const NON_CONSTANT_IN_CONSTANTS_MODULE: IssueText = IssueText {
@@ -369,7 +425,7 @@ pub const TEST_ONLY_CODE_IN_PRODUCTION: IssueText = IssueText {
 };
 
 pub const TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES: IssueText = IssueText {
-    definition: "A tests package, whose targets are integration tests beside an absent or empty library, a library being empty when it defines nothing in any declared configuration, and whose integration test targets hold nothing but tests, constants, imports, modules and file-local private items, so that it holds no test library of its own. Integration tests belong to the package whose behaviour they verify, in its tests directory, and may use any dev-dependency; a helper used beyond its own test file is a test library, which belongs in a library crate; a separate tests package exists only to hold test libraries of its own, such as helpers that need the package under test, which that package cannot dev-depend on without a package cycle. The issue lists every workspace member the package depends on, either as a package that could take its tests or with the dependency cycle that moving them there would close, as guidance, not as the owner.",
+    definition: "A tests package, whose targets are integration tests, possibly with benchmark targets, beside an absent or empty library, a library being empty when it defines nothing in any declared configuration, and whose integration test and benchmark targets hold nothing but tests, entry points, constants, imports, modules and file-local private items, so that it holds no test library of its own. Integration tests belong to the package whose behaviour they verify, in its tests directory, and may use any dev-dependency; a helper used beyond its own test file is a test library, which belongs in a library crate; a separate tests package exists only to hold test libraries of its own, such as helpers that need the package under test, which that package cannot dev-depend on without a package cycle. The issue lists every workspace member the package depends on, either as a package that could take its tests or with the dependency cycle that moving them there would close, as guidance, not as the owner.",
     name: "TestsOnlyPackageWithoutTestLibraries",
     purpose: "Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so it lists every workspace member the tests use, either as a package that could take them or with the dependency cycle that moving them there would close; the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.",
     summary: "A package of tests that holds no test library of its own",
@@ -383,7 +439,7 @@ pub const TUPLE_IN_SIGNATURE: IssueText = IssueText {
 };
 
 pub const UNCOVERED_CODE: IssueText = IssueText {
-    definition: "A region of production code that the coverage export records and that no test executed. A function that no test executes is reported at its name, a function that tests execute in part once at its name with every unexecuted region, and a region outside every function, such as one in a macro_rules! definition that only test code calls, at the region itself. A region counts as executed when any instrumented build executed it, whichever instantiation, crate type or function written from the same text it belongs to. Production code is the text written in the module files of every crate target that is neither an integration test target nor a target of a test crate, active in the measured configuration and outside the modules that cfg(test) gates.",
+    definition: "A region of production code that the coverage export records and that no test executed. A function that no test executes is reported at its name, a function that tests execute in part once at its name with every unexecuted region, and a region outside every function, such as one in a macro_rules! definition that only test code calls, at the region itself. A region counts as executed when any instrumented build executed it, whichever instantiation, crate type or function written from the same text it belongs to. Production code is the text written in the module files of every crate target that is neither an integration test target, a benchmark target nor a target of a test crate, active in the measured configuration and outside the modules that cfg(test) gates.",
     name: "UncoveredCode",
     purpose: "Every line of production code runs under the tests. Add tests that execute the code, or remove the code that nothing needs.",
     summary: "Production code that no test executes",
@@ -394,6 +450,13 @@ pub const UNDESTRUCTURED_PARAMETER: IssueText = IssueText {
     name: "UndestructuredParameter",
     purpose: "A parameter used only through its fields reads better as a pattern that names those fields. Destructure the parameter in its pattern.",
     summary: "A parameter used only through its fields",
+};
+
+pub const UNDETERMINED_BENCHMARK_OUTPUT: IssueText = IssueText {
+    definition: "A call or reference to one of the measurement loops that MustUseBenchmarkOutput checks, whose routine returns a type that leaves undetermined whether it is a must-use value: a type parameter, or a type that rust-analyzer cannot infer, alone or where the must-use rule looks into it, such as inside a Box or a tuple.",
+    name: "UndeterminedBenchmarkOutput",
+    purpose: "Whether criterion drops a must-use value is decided where the routine is measured. Write the measured routine where it is measured, so that the type it returns is concrete.",
+    summary: "A measured routine whose return type the analysis cannot determine",
 };
 
 pub const UNIMPLEMENTED_BUILTIN_MACRO: IssueText = IssueText {
@@ -482,6 +545,13 @@ pub const UNVETTED_CLIPPY_SETTING: IssueText = IssueText {
     name: "UnvettedClippySetting",
     purpose: "A clippy setting can silence or relax the lints that Heisenberg requires, so a clippy configuration holds only the required settings and settings that only add restrictions. Remove the setting.",
     summary: "A clippy configuration setting that Heisenberg has not vetted",
+};
+
+pub const UNVETTED_CRITERION_METHOD: IssueText = IssueText {
+    definition: "A call or reference, in the code of a workspace member, to an inherent method of criterion's Criterion, BenchmarkGroup, Bencher or AsyncBencher that Heisenberg has not vetted: one that changes how long or how many samples it measures, how it judges results or which benchmarks run, a method that criterion hides from its documentation, or a method that Heisenberg does not know. criterion is the criterion package from crates.io, and the methods of traits that these types implement are not inherent methods.",
+    name: "UnvettedCriterionMethod",
+    purpose: "Every benchmark is measured with criterion's defaults, the same way every time. Remove the call, and make the benchmark that needed it faster instead of shortening, weakening or skipping its measurement.",
+    summary: "A criterion method that Heisenberg has not vetted",
 };
 
 pub const UNVETTED_NEXTEST_SETTING: IssueText = IssueText {

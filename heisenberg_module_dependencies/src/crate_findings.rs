@@ -5,6 +5,7 @@ use crate::unsafe_code_findings::UnsafeCodeFindings;
 
 #[derive(Default)]
 pub struct CrateFindings {
+    pub registers_benchmark: bool,
     pub test_target: TestTargetFindings,
     pub unsafe_code: UnsafeCodeFindings,
 }
@@ -14,6 +15,7 @@ impl CrateFindings {
         let Self {
             test_target,
             unsafe_code,
+            ..
         } = self;
 
         test_target.fold(module_findings);
@@ -23,10 +25,12 @@ impl CrateFindings {
     pub fn merge(
         &mut self,
         Self {
+            registers_benchmark,
             test_target,
             unsafe_code,
         }: Self,
     ) {
+        self.registers_benchmark |= registers_benchmark;
         self.test_target.merge(test_target);
         self.unsafe_code.merge(unsafe_code);
     }

@@ -25,6 +25,7 @@ use crate::analysis_contexts::AnalysisContexts;
 use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::configuration_fingerprint::ConfigurationFingerprint;
 use crate::configuration_function_body::ConfigurationFunctionBody;
+use crate::constants::BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES;
 use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
 use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
 use crate::constants::SUPPORTED_RUST_VERSION;
@@ -89,7 +90,7 @@ impl CheckReport {
                         graphs.len(),
                         graphs
                             .iter()
-                            .map(|CrateModuleGraph { modules, .. }| modules.len())
+                            .map(|CrateModuleGraph { module_count, .. }| module_count)
                             .sum::<usize>()
                     )
                 },
@@ -384,10 +385,11 @@ impl CheckReport {
                 }
             ),
             format!(
-                "Not evaluated in a partial run: {}, {}, the empty-library check of {}",
+                "Not evaluated in a partial run: {}, {}, the empty-library checks of {} and {}",
                 CODE_ACTIVE_IN_NO_CONFIGURATION.name,
                 CONFINED_PACKAGE_USER_NOT_REACHING_IT.name,
-                TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name
+                TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name,
+                BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES.name
             ),
             format!(
                 "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in every analysed configuration"
