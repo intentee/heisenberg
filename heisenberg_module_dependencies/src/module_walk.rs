@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter;
+use std::sync::Arc;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
@@ -114,6 +115,7 @@ use crate::covered_code::CoveredCode;
 use crate::crate_findings::CrateFindings;
 use crate::defined_items::DefinedItems;
 use crate::definition_usages::DefinitionUsages;
+use crate::derived_sources::DerivedSources;
 use crate::error_derive::ErrorDerive;
 use crate::error_discards::ErrorDiscards;
 use crate::error_types::ErrorTypes;
@@ -197,6 +199,7 @@ pub struct ModuleWalk<'walk, 'database> {
     pub test_assertions: &'walk TestAssertions,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub token_origin: &'walk TokenOrigin<'walk, 'database>,
+    pub trait_result_errors: &'walk OnceMap<Trait, Arc<HashSet<Name>>>,
     pub unpublished_packages: &'walk BTreeSet<String>,
     pub usages: &'walk DefinitionUsages<'walk, 'database>,
 }
@@ -634,11 +637,13 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         match derive.syntax().ancestors().find_map(ast::Enum::cast) {
             Some(written) if error_derive.generates(expansion) => {
-                let sources = error_derive.sources(&written);
+                let DerivedSources {
+                    outside_chain,
+                    sources,
+                } = error_derive.sources(&written);
                 let expansion_origin = origin.expansion_of(derive.syntax());
 
-                error_derive
-                    .sources_outside_chain(&written, &sources)
+                outside_chain
                     .iter()
                     .try_for_each(|field| {
                         self.locate_focus(field, origin).map(|location| {
@@ -1697,26 +1702,34 @@ impl<'database> ModuleWalk<'_, 'database> {
         {
             Some(AssocItemContainer::Impl(implementation)) => {
                 implementation.trait_(database).is_some_and(|declaring| {
-                    let items = declaring.items(database);
+                    self.trait_result_errors
+                        .get_or_init(declaring, || {
+                            let items = declaring.items(database);
+                            let result_errors: HashSet<TypeAlias> = items
+                                .iter()
+                                .flat_map(|item| match item {
+                                    AssocItem::Function(function) => {
+                                        self.result_errors_of(*function)
+                                    }
+                                    _ => Vec::new(),
+                                })
+                                .collect();
 
-                    items
-                        .iter()
-                        .find_map(|item| match item {
-                            AssocItem::TypeAlias(declared)
-                                if declared.name(database) == definition.name(database) =>
-                            {
-                                Some(*declared)
-                            }
-                            _ => None,
+                            Arc::new(
+                                items
+                                    .into_iter()
+                                    .filter_map(|item| match item {
+                                        AssocItem::TypeAlias(declared)
+                                            if result_errors.contains(&declared) =>
+                                        {
+                                            Some(declared.name(database))
+                                        }
+                                        _ => None,
+                                    })
+                                    .collect(),
+                            )
                         })
-                        .is_some_and(|declared| {
-                            items.iter().any(|item| match item {
-                                AssocItem::Function(function) => {
-                                    self.result_errors_of(*function).contains(&declared)
-                                }
-                                _ => false,
-                            })
-                        })
+                        .contains(&definition.name(database))
                 })
             }
             _ => false,
@@ -2497,9 +2510,13 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         self.semantics
             .to_def(alias)
-            .filter(|definition| self.names_a_result_error_of_its_trait(*definition))
-            .map(|definition| definition.ty(database))
-            .filter(|chosen| !self.error_types().is_error_type(chosen))
+            .and_then(|definition| {
+                let chosen = definition.ty(database);
+
+                (!self.error_types().is_error_type(&chosen)
+                    && self.names_a_result_error_of_its_trait(definition))
+                .then_some(chosen)
+            })
             .map_or(Ok(None), |chosen| {
                 alias.ty().map_or(Ok(None), |written| {
                     self.own_violation(
@@ -2527,8 +2544,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                 .resolve_type(&ast::Type::PathType(written.clone()))
         })
         .flatten()
-        .filter(|resolved| resolved.as_adt() == Some(Adt::Enum(self.standard_items.result)))
-        .and_then(|resolved| resolved.type_arguments().nth(1))
+        .and_then(|resolved| self.error_types().result_error(&resolved))
         .filter(|error| {
             error.as_type_param(database).is_none()
                 && error.as_associated_type_parent_trait(database).is_none()

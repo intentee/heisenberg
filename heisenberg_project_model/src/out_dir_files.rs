@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fs;
+use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -32,42 +33,49 @@ use crate::project_model_error::ProjectModelError;
 
 fn directory_files(out_dir: &AbsPath, package: &str) -> Result<Vec<AbsPathBuf>, ProjectModelError> {
     let depth = AsRef::<Path>::as_ref(out_dir).components().count();
+    let unlistable = |source: io::Error| ProjectModelError::UnwalkableBuildScriptOutput {
+        out_dir: out_dir.to_path_buf(),
+        source,
+    };
 
-    WalkDir::new(out_dir)
-        .sort_by_file_name()
-        .into_iter()
-        .map(|entry| {
-            entry
-                .map_err(|source| ProjectModelError::UnwalkableBuildScriptOutput {
-                    out_dir: out_dir.to_path_buf(),
-                    source,
-                })
-                .and_then(|entry| {
-                    let is_directory = entry.file_type().is_dir();
-
-                    if entry.depth() == 0 && !is_directory {
-                        Err(ProjectModelError::BuildScriptOutputNotADirectory {
-                            out_dir: out_dir.to_path_buf(),
-                        })
-                    } else {
-                        Utf8PathBuf::from_path_buf(entry.path().components().skip(depth).collect())
+    fs::metadata(out_dir).map_err(unlistable).and_then(|root| {
+        if root.is_dir() {
+            WalkDir::new(out_dir)
+                .min_depth(1)
+                .sort_by_file_name()
+                .into_iter()
+                .map(|entry| {
+                    entry
+                        .map_err(io::Error::from)
+                        .map_err(unlistable)
+                        .and_then(|entry| {
+                            Utf8PathBuf::from_path_buf(
+                                entry.path().components().skip(depth).collect(),
+                            )
                             .map(|relative| {
-                                if is_directory {
+                                if entry.file_type().is_dir() {
                                     Vec::new()
                                 } else {
                                     vec![out_dir.join(relative)]
                                 }
                             })
-                            .map_err(|name| ProjectModelError::NonUtf8BuildScriptOutputName {
-                                name,
-                                out_dir: out_dir.to_path_buf(),
-                                package: package.to_owned(),
+                            .map_err(|name| {
+                                ProjectModelError::NonUtf8BuildScriptOutputName {
+                                    name,
+                                    out_dir: out_dir.to_path_buf(),
+                                    package: package.to_owned(),
+                                }
                             })
-                    }
+                        })
                 })
-        })
-        .collect::<Result<Vec<Vec<AbsPathBuf>>, ProjectModelError>>()
-        .map(|files| files.into_iter().flatten().collect())
+                .collect::<Result<Vec<Vec<AbsPathBuf>>, ProjectModelError>>()
+                .map(|files| files.into_iter().flatten().collect())
+        } else {
+            Err(ProjectModelError::BuildScriptOutputNotADirectory {
+                out_dir: out_dir.to_path_buf(),
+            })
+        }
+    })
 }
 
 fn out_dir_contents(
@@ -224,9 +232,14 @@ mod tests {
     use std::error::Error;
     use std::fs;
     #[cfg(unix)]
+    use std::os::unix::fs::symlink as symlink_dir;
+    #[cfg(unix)]
     use std::os::unix::fs::symlink as symlink_file;
     #[cfg(windows)]
+    use std::os::windows::fs::symlink_dir;
+    #[cfg(windows)]
     use std::os::windows::fs::symlink_file;
+    use std::process;
 
     use ra_ap_paths::AbsPathBuf;
 
@@ -245,36 +258,75 @@ mod tests {
         chain
     }
 
+    fn scratch(name: &str) -> AbsPathBuf {
+        AbsPathBuf::assert_utf8(
+            env::temp_dir().join(format!("heisenberg_project_model_{}_{name}", process::id())),
+        )
+    }
+
     #[test]
-    fn missing_out_dir_fails_its_listing() {
-        let missing = AbsPathBuf::assert_utf8(
-            env::temp_dir().join("heisenberg_project_model_missing_out_dir"),
-        );
-        let reason = fs::symlink_metadata(&missing)
+    fn dangling_link_in_an_out_dir_fails_its_reading() {
+        let out_dir = scratch("dangling_out_dir");
+        let link = out_dir.join("dangling.rs");
+
+        fs::create_dir_all(&out_dir)
+            .and_then(|()| symlink_file(out_dir.join("absent.rs"), &link))
+            .expect("the out-dir must hold a dangling link");
+
+        let reason = fs::read(&link)
             .err()
-            .map(|error| error.to_string());
-        let failure = directory_files(&missing, "generator")
-            .err()
-            .map(|error| failure_chain(&error))
-            .map(|chain| [chain.first().cloned(), chain.last().cloned()]);
+            .map(|error| error.to_string())
+            .expect("a dangling link cannot be read");
 
         assert_eq!(
-            failure,
-            reason.map(|reason| {
-                [
-                    Some(format!(
-                        "the build script output in `{missing}` cannot be listed"
-                    )),
-                    Some(reason),
-                ]
-            })
+            out_dir_contents(&out_dir, "generator")
+                .err()
+                .map(|error| failure_chain(&error)),
+            Some(vec![
+                format!("the build script output `{link}` cannot be read"),
+                reason
+            ])
+        );
+    }
+
+    #[test]
+    fn missing_out_dir_fails_its_listing() {
+        let missing = scratch("missing_out_dir");
+        let reason = fs::metadata(&missing)
+            .err()
+            .map(|error| error.to_string())
+            .expect("the out-dir must be missing");
+
+        assert_eq!(
+            directory_files(&missing, "generator")
+                .err()
+                .map(|error| failure_chain(&error)),
+            Some(vec![
+                format!("the build script output in `{missing}` cannot be listed"),
+                reason
+            ])
+        );
+    }
+
+    #[test]
+    fn out_dir_linked_to_a_directory_lists_its_files() {
+        let target = scratch("linked_target");
+        let link = scratch("linked_out_dir");
+
+        fs::create_dir_all(&target)
+            .and_then(|()| fs::write(target.join("generated.rs"), b""))
+            .and_then(|()| symlink_dir(&target, &link))
+            .expect("the out-dir must link to a directory with one file");
+
+        assert_eq!(
+            directory_files(&link, "generator").map_err(|error| error.to_string()),
+            Ok(vec![link.join("generated.rs")])
         );
     }
 
     #[test]
     fn out_dir_that_is_a_file_fails_its_listing() {
-        let file =
-            AbsPathBuf::assert_utf8(env::temp_dir().join("heisenberg_project_model_out_dir_file"));
+        let file = scratch("out_dir_file");
 
         fs::write(&file, b"").expect("the out-dir must be a file");
 
@@ -285,33 +337,6 @@ mod tests {
             Some(vec![format!(
                 "the build script output `{file}` is not a directory"
             )])
-        );
-    }
-
-    #[test]
-    fn dangling_link_in_an_out_dir_fails_its_reading() {
-        let out_dir = AbsPathBuf::assert_utf8(
-            env::temp_dir().join("heisenberg_project_model_dangling_out_dir"),
-        );
-        let link = out_dir.join("dangling.rs");
-
-        fs::create_dir_all(&out_dir)
-            .and_then(|()| fs::remove_dir_all(&out_dir))
-            .and_then(|()| fs::create_dir_all(&out_dir))
-            .and_then(|()| symlink_file(out_dir.join("absent.rs"), &link))
-            .expect("the out-dir must hold a dangling link");
-
-        let reason = fs::read(&link).err().map(|error| error.to_string());
-        let failure = out_dir_contents(&out_dir, "generator")
-            .err()
-            .map(|error| failure_chain(&error));
-
-        assert_eq!(
-            failure,
-            reason.map(|reason| vec![
-                format!("the build script output `{link}` cannot be read"),
-                reason
-            ])
         );
     }
 }

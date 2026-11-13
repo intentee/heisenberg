@@ -23,6 +23,7 @@ use ra_ap_vfs::VfsPath;
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use heisenberg_analysis_threads::joined::joined;
 
+use crate::keyed_proc_macros::KeyedProcMacros;
 use crate::proc_macro_loading::ProcMacroLoading;
 use crate::project_model_error::ProjectModelError;
 
@@ -81,6 +82,7 @@ impl LoadedProcMacros<'_> {
                                     .and_then(|dylib| {
                                         ProcMacroLoading {
                                             dylib,
+                                            key: *krate,
                                             server,
                                             threads,
                                         }
@@ -90,11 +92,11 @@ impl LoadedProcMacros<'_> {
                         })
                         .collect();
 
-                    servers
-                        .iter()
-                        .flat_map(|_| proc_macro_crates.iter().copied())
-                        .zip(joined(loading))
-                        .map(|(krate, loaded)| loaded.map(|macros| (krate, Ok(macros))))
+                    joined(loading)
+                        .into_iter()
+                        .map(|loaded| {
+                            loaded.map(|KeyedProcMacros { key, macros }| (key, Ok(macros)))
+                        })
                         .collect::<Result<Vec<_>, ProjectModelError>>()
                 })
             })

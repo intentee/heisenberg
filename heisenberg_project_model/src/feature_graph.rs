@@ -29,7 +29,6 @@ use crate::feature_selection::FeatureSelection;
 use crate::package_edge::PackageEdge;
 use crate::resolved_build::ResolvedBuild;
 use crate::resolved_packages::ResolvedPackages;
-use crate::versioned_name::versioned_name;
 
 fn build_link(
     link: &PackageLink<'_>,
@@ -40,14 +39,16 @@ fn build_link(
     BuildLink {
         development_only,
         from: BuildUnit {
-            name: versioned_name(link.from().name(), link.from().version()),
+            name: link.from().name().to_owned(),
             package: link.from().id().repr().to_owned(),
             side: from,
+            version: link.from().version().clone(),
         },
         to: BuildUnit {
-            name: versioned_name(link.to().name(), link.to().version()),
+            name: link.to().name().to_owned(),
             package: link.to().id().repr().to_owned(),
             side: to,
+            version: link.to().version().clone(),
         },
     }
 }

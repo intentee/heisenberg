@@ -25,7 +25,9 @@ use crate::constants::ERROR_MESSAGE_HELPER;
 use crate::constants::ERROR_SOURCE_FIELD;
 use crate::constants::ERROR_SOURCE_HELPERS;
 use crate::constants::TRANSPARENT_ERROR_MESSAGE;
+use crate::derived_sources::DerivedSources;
 use crate::error_types::ErrorTypes;
+use crate::local_binding::local_binding;
 use crate::method_call_resolutions::MethodCallResolutions;
 use crate::path_resolutions::PathResolutions;
 use crate::substituted_resolution::SubstitutedResolution;
@@ -34,6 +36,16 @@ struct VariantField {
     attributes: Vec<ast::Attr>,
     definition: Field,
     node: SyntaxNode,
+}
+
+impl VariantField {
+    fn new(definition: Field, field: &impl HasAttrs) -> Self {
+        Self {
+            attributes: field.attrs().collect(),
+            definition,
+            node: field.syntax().clone(),
+        }
+    }
 }
 
 pub struct ErrorDerive<'derive, 'database> {
@@ -45,7 +57,7 @@ pub struct ErrorDerive<'derive, 'database> {
     pub semantics: &'derive Semantics<'database, RootDatabase>,
 }
 
-impl ErrorDerive<'_, '_> {
+impl<'database> ErrorDerive<'_, 'database> {
     pub fn generates(&self, expansion: MacroCallId) -> bool {
         let definition = expansion.lookup(self.semantics.db).def;
 
@@ -55,12 +67,28 @@ impl ErrorDerive<'_, '_> {
         ) && self.derive_crates.contains(&Crate::from(definition.krate))
     }
 
-    pub fn sources(&self, written: &ast::Enum) -> HashSet<Field> {
+    pub fn sources(&self, written: &ast::Enum) -> DerivedSources {
+        let database = self.semantics.db;
         let transparent = self.is_transparent(written);
+        let mut derived = DerivedSources::default();
 
-        Self::variants(written)
-            .filter_map(|variant| self.source(&variant, transparent))
-            .collect()
+        for variant in Self::variants(written) {
+            let fields = self.fields(&variant);
+            let source = self.source(&variant, &fields, transparent);
+
+            derived.outside_chain.extend(
+                fields
+                    .iter()
+                    .filter(|VariantField { definition, .. }| {
+                        source != Some(*definition)
+                            && self.error_types.implements_error(&definition.ty(database))
+                    })
+                    .map(|VariantField { node, .. }| node.clone()),
+            );
+            derived.sources.extend(source);
+        }
+
+        derived
     }
 
     pub fn sources_in_messages(
@@ -89,69 +117,52 @@ impl ErrorDerive<'_, '_> {
             .collect()
     }
 
-    pub fn sources_outside_chain(
+    fn binds_source(
         &self,
-        written: &ast::Enum,
+        root: &SyntaxNode,
+        local: Local<'database>,
         sources: &HashSet<Field>,
-    ) -> Vec<SyntaxNode> {
-        let database = self.semantics.db;
-
-        Self::variants(written)
-            .flat_map(|variant| self.fields(&variant))
-            .filter(|VariantField { definition, .. }| {
-                !sources.contains(definition)
-                    && self.error_types.implements_error(&definition.ty(database))
-            })
-            .map(|VariantField { node, .. }| node)
-            .collect()
-    }
-
-    fn binds_source(&self, root: &SyntaxNode, local: Local<'_>, sources: &HashSet<Field>) -> bool {
-        root.descendants()
-            .filter_map(ast::IdentPat::cast)
-            .find(|bound| self.semantics.to_def(bound) == Some(local))
-            .is_some_and(|bound| {
-                bound.syntax().parent().is_some_and(|parent| {
-                    ast::RecordPatField::cast(parent.clone())
-                        .and_then(|field| self.semantics.resolve_record_pat_field(&field))
-                        .or_else(|| {
-                            ast::TupleStructPat::cast(parent.clone()).and_then(|pattern| {
+    ) -> bool {
+        local_binding(self.semantics, root, local).is_some_and(|bound| {
+            bound.syntax().parent().is_some_and(|parent| {
+                ast::RecordPatField::cast(parent.clone())
+                    .and_then(|field| self.semantics.resolve_record_pat_field(&field))
+                    .or_else(|| {
+                        ast::TupleStructPat::cast(parent.clone()).and_then(|pattern| {
+                            pattern
+                                .fields()
+                                .position(|field| field.syntax() == bound.syntax())
+                                .and_then(|position| {
+                                    self.semantics
+                                        .resolve_tuple_struct_pat_fields(&pattern)
+                                        .and_then(|fields| fields.into_iter().nth(position))
+                                })
+                        })
+                    })
+                    .map_or_else(
+                        || {
+                            ast::TuplePat::cast(parent).is_some_and(|pattern| {
                                 pattern
                                     .fields()
                                     .position(|field| field.syntax() == bound.syntax())
                                     .and_then(|position| {
-                                        self.semantics
-                                            .resolve_tuple_struct_pat_fields(&pattern)
-                                            .and_then(|fields| fields.into_iter().nth(position))
+                                        pattern
+                                            .syntax()
+                                            .ancestors()
+                                            .find_map(ast::MatchExpr::cast)
+                                            .and_then(|matched| matched.expr())
+                                            .and_then(|scrutinee| {
+                                                ast::TupleExpr::cast(scrutinee.syntax().clone())
+                                            })
+                                            .and_then(|values| values.fields().nth(position))
                                     })
+                                    .is_some_and(|value| self.displays_source(root, value, sources))
                             })
-                        })
-                        .map_or_else(
-                            || {
-                                ast::TuplePat::cast(parent).is_some_and(|pattern| {
-                                    pattern
-                                        .fields()
-                                        .position(|field| field.syntax() == bound.syntax())
-                                        .and_then(|position| {
-                                            pattern
-                                                .syntax()
-                                                .ancestors()
-                                                .find_map(ast::MatchExpr::cast)
-                                                .and_then(|matched| matched.expr())
-                                                .and_then(|scrutinee| {
-                                                    ast::TupleExpr::cast(scrutinee.syntax().clone())
-                                                })
-                                                .and_then(|values| values.fields().nth(position))
-                                        })
-                                        .is_some_and(|value| {
-                                            self.displays_source(root, value, sources)
-                                        })
-                                })
-                            },
-                            |(field, _)| sources.contains(&field),
-                        )
-                })
+                        },
+                        |(field, _)| sources.contains(&field),
+                    )
             })
+        })
     }
 
     fn captures_source(
@@ -221,11 +232,7 @@ impl ErrorDerive<'_, '_> {
                 .filter_map(|field| {
                     self.semantics
                         .to_def(&field)
-                        .map(|definition| VariantField {
-                            attributes: field.attrs().collect(),
-                            definition,
-                            node: field.syntax().clone(),
-                        })
+                        .map(|definition| VariantField::new(definition, &field))
                 })
                 .collect(),
             Some(ast::FieldList::TupleFieldList(list)) => list
@@ -233,11 +240,7 @@ impl ErrorDerive<'_, '_> {
                 .filter_map(|field| {
                     self.semantics
                         .to_def(&field)
-                        .map(|definition| VariantField {
-                            attributes: field.attrs().collect(),
-                            definition,
-                            node: field.syntax().clone(),
-                        })
+                        .map(|definition| VariantField::new(definition, &field))
                 })
                 .collect(),
             None => Vec::new(),
@@ -292,13 +295,16 @@ impl ErrorDerive<'_, '_> {
                     .and_then(|meta| ast::TokenTreeMeta::cast(meta.syntax().clone()))
                     .and_then(|meta| meta.token_tree())
                     .is_some_and(|arguments| {
+                        let delimiters = [
+                            arguments.left_delimiter_token(),
+                            arguments.right_delimiter_token(),
+                        ];
                         let tokens: Vec<_> = arguments
                             .token_trees_and_tokens()
                             .filter_map(NodeOrToken::into_token)
                             .filter(|token| {
                                 !token.kind().is_trivia()
-                                    && token.kind() != SyntaxKind::L_PAREN
-                                    && token.kind() != SyntaxKind::R_PAREN
+                                    && !delimiters.contains(&Some(token.clone()))
                             })
                             .collect();
 
@@ -311,9 +317,13 @@ impl ErrorDerive<'_, '_> {
         })
     }
 
-    fn source(&self, variant: &ast::Variant, enum_is_transparent: bool) -> Option<Field> {
+    fn source(
+        &self,
+        variant: &ast::Variant,
+        fields: &[VariantField],
+        enum_is_transparent: bool,
+    ) -> Option<Field> {
         let database = self.semantics.db;
-        let fields = self.fields(variant);
         let transparent = self.is_transparent(variant)
             || (enum_is_transparent
                 && !self.has_helper(

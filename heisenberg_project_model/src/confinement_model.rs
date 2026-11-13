@@ -14,6 +14,7 @@ use crate::confinement_violation::ConfinementViolation;
 use crate::declared_names::DeclaredNames;
 use crate::package_violation::PackageViolation;
 use crate::resolved_build::ResolvedBuild;
+use crate::versioned_name::versioned_name;
 
 pub struct ConfinementModel {
     pub confined: BTreeMap<String, ConfinedPackage>,
@@ -86,7 +87,9 @@ impl ConfinementModel {
                                 reach.breaches.insert(
                                     confined,
                                     path.into_iter()
-                                        .map(|BuildUnit { name, .. }| name.clone())
+                                        .map(|BuildUnit { name, version, .. }| {
+                                            versioned_name(name, version)
+                                        })
                                         .collect(),
                                 );
                             }

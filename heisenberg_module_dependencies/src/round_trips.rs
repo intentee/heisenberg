@@ -19,6 +19,8 @@ use ra_ap_syntax::ast::HasArgList;
 
 use crate::constants::ROUND_TRIP_TRANSPARENT_METHODS;
 use crate::constants::TEXT_DECODING_METHOD;
+use crate::is_trait_item::is_trait_item;
+use crate::local_binding::local_binding;
 use crate::method_call_resolutions::MethodCallResolutions;
 use crate::path_resolutions::PathResolutions;
 use crate::serialization_traits::SerializationTraits;
@@ -53,9 +55,7 @@ impl<'database> RoundTrips<'_, 'database> {
     }
 
     fn bound(&self, local: Local<'database>, body: &SyntaxNode) -> Trace<'database> {
-        body.descendants()
-            .filter_map(ast::IdentPat::cast)
-            .find(|binding| self.semantics.to_def(binding) == Some(local))
+        local_binding(self.semantics, body, local)
             .and_then(|binding| binding.syntax().parent().and_then(ast::LetStmt::cast))
             .and_then(|statement| statement.initializer())
             .and_then(|initializer| self.trace(initializer, body))
@@ -76,7 +76,7 @@ impl<'database> RoundTrips<'_, 'database> {
             .and_then(|written| self.paths.resolve(&written))
         {
             Some(PathResolution::Def(ModuleDef::Function(function))) => {
-                if self.is_trait_method(function, self.standard_items.from_str)
+                if is_trait_item(self.semantics.db, function, self.standard_items.from_str)
                     || self.returns_a_deserialized_value(function)
                 {
                     arguments
@@ -132,15 +132,6 @@ impl<'database> RoundTrips<'_, 'database> {
             )
     }
 
-    fn is_trait_method(&self, method: Function, owner: Trait) -> bool {
-        let database = self.semantics.db;
-
-        method
-            .as_assoc_item(database)
-            .and_then(|item| item.container_or_implemented_trait(database))
-            == Some(owner)
-    }
-
     fn is_transparent(&self, method: Function) -> bool {
         ROUND_TRIP_TRANSPARENT_METHODS.contains(&method.name(self.semantics.db).as_str())
             && self.is_standard(method)
@@ -160,7 +151,11 @@ impl<'database> RoundTrips<'_, 'database> {
                     .and_then(|receiver| {
                         if self.is_transparent(method) {
                             Some(receiver)
-                        } else if self.is_trait_method(method, self.standard_items.to_string) {
+                        } else if is_trait_item(
+                            self.semantics.db,
+                            method,
+                            self.standard_items.to_string,
+                        ) {
                             receiver.encoded()
                         } else if self.is_text_decoding(method) {
                             receiver.decoded()

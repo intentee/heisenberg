@@ -19,7 +19,7 @@ fn discarded_error_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok([
-            "DiscardedError: 18 violations\n\
+            "DiscardedError: 20 violations\n\
             A dropped error hides the failure that caused it, so the program continues on a state it never checked and nothing explains what went wrong. Handle the error: return it, wrap it as the source of a more specific error, or match its variants.\n\
             \n\
             - src/attempt.rs:11:27: Error is dropped without being handled\n            \
@@ -38,8 +38,12 @@ fn discarded_error_is_a_violation() {
             .filter_map(Result::ok)\n\
             - src/iterated_result.rs:5:18: Error is dropped without being handled\n        \
             for value in text.parse::<u8>() {\n\
+            - src/omitted_array_elements.rs:6:17: Error is dropped without being handled\n        \
+            let [first, ..] = parsed;\n\
             - src/omitted_error.rs:5:13: Error is dropped without being handled\n            \
             Err(..) => 0,\n\
+            - src/omitted_field.rs:15:25: Error is dropped without being handled\n            \
+            let Self(value, ..) = self;\n\
             - src/omitted_tuple_element.rs:3:17: Error is dropped without being handled\n        \
             let (value, ..) = (1, text.parse::<u8>());\n\
             - src/optional_value.rs:3:24: Error is dropped without being handled\n        \
@@ -65,9 +69,9 @@ fn discarded_error_is_a_violation() {
             - Cargo.toml: Package discarded_errors allows for_loops_over_fallibles in its rust lints\n\
             \n\
             ------------------------------\n\
-            19 errors found\n\
+            21 errors found\n\
             ------------------------------\n",
-            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 20).as_str()
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 24).as_str()
         ]
         .concat()
         .as_str())

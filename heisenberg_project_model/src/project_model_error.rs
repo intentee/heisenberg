@@ -16,7 +16,6 @@ use ra_ap_vfs::VfsPath;
 use serde_json::error;
 use thiserror::Error;
 use toml::de;
-use walkdir::Error as WalkError;
 
 use heisenberg_analysis_threads::analysis_threads_error::AnalysisThreadsError;
 use heisenberg_module_graph::crate_target::CrateTarget;
@@ -321,7 +320,7 @@ pub enum ProjectModelError {
     UnwalkableBuildScriptOutput {
         out_dir: AbsPathBuf,
         #[source]
-        source: WalkError,
+        source: io::Error,
     },
     #[error("the build script output `{}` cannot be read", .path.display())]
     UnreadableBuildScriptOutput {

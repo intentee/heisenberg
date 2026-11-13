@@ -1,3 +1,5 @@
+use std::iter;
+
 use ra_ap_hir::Adt;
 use ra_ap_hir::AsAssocItem;
 use ra_ap_hir::AssocItemContainer;
@@ -22,6 +24,7 @@ use crate::constants::ERROR_DROPPING_RESULT_METHODS;
 use crate::constants::RESULT_ERROR_VARIANT;
 use crate::constants::RESULT_VALUE_VARIANT;
 use crate::error_types::ErrorTypes;
+use crate::is_trait_item::is_trait_item;
 use crate::method_call_resolutions::MethodCallResolutions;
 use crate::path_resolutions::PathResolutions;
 use crate::standard_items::StandardItems;
@@ -36,6 +39,28 @@ fn is_bodiless_parameter(node: &SyntaxNode) -> bool {
             ast::FnPtrType::can_cast(owner.kind())
                 || ast::Fn::cast(owner).is_some_and(|function| function.body().is_none())
         })
+}
+
+fn omitted_elements(
+    fields: impl Iterator<Item = ast::Pat> + Clone,
+    elements: Vec<Type<'_>>,
+) -> Vec<Type<'_>> {
+    let before = fields
+        .clone()
+        .take_while(|field| !matches!(field, ast::Pat::RestPat(_)))
+        .count();
+    let after = fields
+        .skip_while(|field| !matches!(field, ast::Pat::RestPat(_)))
+        .skip(1)
+        .count();
+
+    elements
+        .into_iter()
+        .skip(before)
+        .rev()
+        .skip(after)
+        .rev()
+        .collect()
 }
 
 pub struct ErrorDiscards<'discards, 'database> {
@@ -109,10 +134,7 @@ impl<'database> ErrorDiscards<'_, 'database> {
         let database = self.semantics.db;
 
         function.name(database).as_str() == name
-            && function
-                .as_assoc_item(database)
-                .and_then(|item| item.container_or_implemented_trait(database))
-                == Some(self.standard_items.iterator)
+            && is_trait_item(database, function, self.standard_items.iterator)
     }
 
     fn is_place(&self, expression: &ast::Expr) -> bool {
@@ -227,35 +249,45 @@ impl<'database> ErrorDiscards<'_, 'database> {
 
         ast::TupleStructPat::cast(parent.clone())
             .map(|pattern| {
-                (self.is_result_variant(&pattern, RESULT_ERROR_VARIANT)
-                    && !self.is_behind_a_reference(&ast::Pat::TupleStructPat(pattern.clone())))
-                .then(|| {
-                    self.semantics
-                        .type_of_pat(&ast::Pat::TupleStructPat(pattern))
-                })
-                .flatten()
-                .and_then(|TypeInfo { original, .. }| self.error_types.result_error(&original))
-                .into_iter()
-                .collect()
+                (!self.is_behind_a_reference(&ast::Pat::TupleStructPat(pattern.clone())))
+                    .then(|| self.semantics.resolve_tuple_struct_pat_fields(&pattern))
+                    .flatten()
+                    .map(|fields| {
+                        omitted_elements(
+                            pattern.fields(),
+                            fields.into_iter().map(|(_, field)| field).collect(),
+                        )
+                    })
+                    .unwrap_or_default()
             })
             .or_else(|| {
                 ast::TuplePat::cast(parent.clone()).map(|pattern| {
-                    let written = pattern.fields().count();
-                    let before = pattern
-                        .fields()
-                        .take_while(|field| !matches!(field, ast::Pat::RestPat(_)))
-                        .count();
-                    let after = written.saturating_sub(before).saturating_sub(1);
-
                     (!self.is_behind_a_reference(&ast::Pat::TuplePat(pattern.clone())))
-                        .then(|| self.semantics.type_of_pat(&ast::Pat::TuplePat(pattern)))
+                        .then(|| {
+                            self.semantics
+                                .type_of_pat(&ast::Pat::TuplePat(pattern.clone()))
+                        })
                         .flatten()
                         .map(|TypeInfo { original, .. }| {
-                            let elements = original.tuple_fields(database);
-                            let omitted =
-                                elements.len().saturating_sub(before).saturating_sub(after);
-
-                            elements.into_iter().skip(before).take(omitted).collect()
+                            omitted_elements(pattern.fields(), original.tuple_fields(database))
+                        })
+                        .unwrap_or_default()
+                })
+            })
+            .or_else(|| {
+                ast::SlicePat::cast(parent.clone()).map(|pattern| {
+                    (!self.is_behind_a_reference(&ast::Pat::SlicePat(pattern.clone())))
+                        .then(|| {
+                            self.semantics
+                                .type_of_pat(&ast::Pat::SlicePat(pattern.clone()))
+                        })
+                        .flatten()
+                        .and_then(|TypeInfo { original, .. }| original.as_array(database))
+                        .map(|(element, length)| {
+                            omitted_elements(
+                                pattern.pats(),
+                                iter::repeat_n(element, length).collect(),
+                            )
                         })
                         .unwrap_or_default()
                 })

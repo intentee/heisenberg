@@ -48,7 +48,9 @@ pub const ROUND_TRIP_TRANSPARENT_METHODS: [&str; 5] =
 
 pub const SERIALIZE_TRAIT_PATH: [&str; 2] = ["ser", "Serialize"];
 
-pub const STANDARD_SLEEP_FUNCTIONS: [&[&str]; 2] = [&["thread", "sleep"], &["thread", "sleep_ms"]];
+pub const STANDARD_SLEEP_MS_PATH: [&str; 2] = ["thread", "sleep_ms"];
+
+pub const STANDARD_SLEEP_PATH: [&str; 2] = ["thread", "sleep"];
 
 pub const TEXT_DECODING_METHOD: &str = "parse";
 

@@ -3,7 +3,10 @@ use ra_ap_hir::Impl;
 use thiserror::Error;
 
 use heisenberg_member_crates::member_crates_error::MemberCratesError;
+use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_source_locator::source_locator_error::SourceLocatorError;
+
+use crate::required_standard_item::RequiredStandardItem;
 
 #[derive(Debug, Error)]
 pub enum ModuleDependenciesError {
@@ -16,8 +19,11 @@ pub enum ModuleDependenciesError {
     #[error(transparent)]
     SourceLocator(#[from] SourceLocatorError),
     #[error(
-        "the standard library lacks the items that the analysis relies on: {}",
-        items.join(", ")
+        "the standard library of the crate target `{crate_target}` lacks the items that the analysis relies on: {}",
+        items.iter().map(ToString::to_string).collect::<Vec<String>>().join(", ")
     )]
-    StandardItemsMissing { items: Vec<&'static str> },
+    StandardItemsMissing {
+        crate_target: CrateTarget,
+        items: Vec<RequiredStandardItem>,
+    },
 }

@@ -12,7 +12,8 @@ fn thread_without_a_reservable_stack_fails_to_start() {
             .stack_size(UNRESERVABLE_STACK_SIZE)
             .spawn_scoped(scope, || ())
             .err()
-            .map(|error| error.to_string());
+            .map(|error| error.to_string())
+            .expect("the operating system must refuse a stack it cannot reserve");
         let failure = AnalysisThreads {
             scope,
             stack_size: UNRESERVABLE_STACK_SIZE,
@@ -28,9 +29,9 @@ fn thread_without_a_reservable_stack_fails_to_start() {
 
         assert_eq!(
             failure,
-            refused.map(|reason| [
+            Some([
                 "the operating system cannot start a thread".to_owned(),
-                reason
+                refused
             ])
         );
     });

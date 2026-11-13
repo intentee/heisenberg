@@ -31,7 +31,7 @@ pub enum HeisenbergCommandError {
     ModuleDependencies {
         configuration: Configuration,
         #[source]
-        source: ModuleDependenciesError,
+        source: Box<ModuleDependenciesError>,
     },
     #[error("the input that every analysed configuration shares cannot be read on its own thread")]
     PrerequisiteThread(#[source] AnalysisThreadsError),

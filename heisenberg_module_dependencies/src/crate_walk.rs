@@ -1,11 +1,15 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_hir::Crate;
 use ra_ap_hir::InFile;
 use ra_ap_hir::Module;
 use ra_ap_hir::Semantics;
+use ra_ap_hir::Trait;
+use ra_ap_hir_expand::name::Name;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_syntax::SyntaxNodePtr;
 use ra_ap_vfs::FileId;
@@ -48,6 +52,7 @@ pub struct CrateWalk<'walk> {
     pub standard_items: &'walk StandardItems,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub test_modules: &'walk TestModules,
+    pub trait_result_errors: &'walk OnceMap<Trait, Arc<HashSet<Name>>>,
     pub unpublished_packages: &'walk BTreeSet<String>,
     pub vetted_crates: &'walk VettedCrates,
     pub workspace_files: &'walk BTreeSet<FileId>,
@@ -99,6 +104,7 @@ impl CrateWalk<'_> {
             serialization_traits: self.serialization_traits,
             template_captures: &template_captures,
             test_gated_code: self.test_gated_code,
+            trait_result_errors: self.trait_result_errors,
             token_origin: &TokenOrigin {
                 own_files: self.files,
                 semantics: &semantics,

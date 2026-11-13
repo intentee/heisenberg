@@ -24,7 +24,6 @@ use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::test_harness::TestHarness;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
-use heisenberg_project_model::source_file::SourceFile;
 use heisenberg_source_locator::source_locator::SourceLocator;
 
 use crate::constants::UNRESOLVED_CODE_KINDS;
@@ -140,11 +139,7 @@ impl CrateExtraction<'_, '_> {
             .and_then(|()| {
                 self.files
                     .iter()
-                    .map(|file| {
-                        self.locator
-                            .source_file::<ModuleDependenciesError>(*file)
-                            .map(|SourceFile { relative_path, .. }| relative_path.clone())
-                    })
+                    .map(|file| self.locator.file::<ModuleDependenciesError>(*file))
                     .collect::<Result<BTreeSet<String>, ModuleDependenciesError>>()
             })
             .map(|module_files| CrateModuleGraph {

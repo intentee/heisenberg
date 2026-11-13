@@ -51,6 +51,7 @@ pub fn proc_macro_library(
 mod tests {
     use std::env;
     use std::fs;
+    use std::process;
     use std::slice;
 
     use cargo_metadata::camino::Utf8PathBuf;
@@ -66,9 +67,10 @@ mod tests {
     #[test]
     fn listed_directory_and_relocatable_object_are_not_libraries_of_a_proc_macro() {
         let directory = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let relocatable = Utf8PathBuf::from_path_buf(
-            env::temp_dir().join("heisenberg_workspace_build_relocatable_object.o"),
-        )
+        let relocatable = Utf8PathBuf::from_path_buf(env::temp_dir().join(format!(
+            "heisenberg_workspace_build_{}_relocatable_object.o",
+            process::id()
+        )))
         .expect("the temporary directory must be a UTF-8 path");
 
         fs::write(&relocatable, RELOCATABLE_ELF_HEADER)
@@ -102,19 +104,19 @@ mod tests {
     #[test]
     fn proc_macro_without_a_dynamic_library_fails_its_library_lookup() {
         let manifest = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
-        let expected = fs::read(&manifest)
-            .map(|contents| {
-                object::File::parse(contents.as_slice()).err().map(|reason| format!(
-                    "the files that cargo lists for the procedural macro `injected` hold 0 dynamic libraries instead of one: []; the files that are not object files: [{manifest}: {reason}]"
-                ))
-            })
-            .map_err(|error| error.to_string());
+        let contents = fs::read(&manifest).expect("the manifest must be readable");
+        let reason = object::File::parse(contents.as_slice())
+            .err()
+            .map(|reason| reason.to_string())
+            .expect("the manifest must not be an object file");
 
         assert_eq!(
-            expected,
-            Ok(proc_macro_library("injected", slice::from_ref(&manifest))
+            proc_macro_library("injected", slice::from_ref(&manifest))
                 .err()
-                .map(|error| error.to_string()))
+                .map(|error| error.to_string()),
+            Some(format!(
+                "the files that cargo lists for the procedural macro `injected` hold 0 dynamic libraries instead of one: []; the files that are not object files: [{manifest}: {reason}]"
+            ))
         );
     }
 }

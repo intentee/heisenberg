@@ -111,6 +111,7 @@ impl ModuleDependencies<'_, '_> {
         let module_paths = ModulePaths::default();
         let test_gated_code = OnceMap::default();
         let test_modules = TestModules::default();
+        let trait_result_errors = OnceMap::default();
 
         members
             .par_iter()
@@ -132,7 +133,7 @@ impl ModuleDependencies<'_, '_> {
                             .collect()
                     });
                     attach_db(database, || {
-                        StandardItems::new(&Semantics::new(database), *krate)
+                        StandardItems::new(&Semantics::new(database), *krate, crate_target)
                     })
                     .and_then(|standard_items| {
                         let diagnostics = attached_work(
@@ -156,6 +157,7 @@ impl ModuleDependencies<'_, '_> {
                             standard_items: &standard_items,
                             test_gated_code: &test_gated_code,
                             test_modules: &test_modules,
+                            trait_result_errors: &trait_result_errors,
                             serialization_traits,
                             unpublished_packages,
                             vetted_crates,

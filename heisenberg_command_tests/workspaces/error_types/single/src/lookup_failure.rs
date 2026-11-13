@@ -47,4 +47,6 @@ pub enum LookupFailure {
     },
     #[error("the context is lost")]
     Context { context: io::Error },
+    #[error[transparent]]
+    Bracketed(ParseIntError),
 }

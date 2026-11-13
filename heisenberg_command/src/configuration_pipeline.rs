@@ -11,6 +11,7 @@ use heisenberg_project_model::loaded_workspace::LoadedWorkspace;
 use heisenberg_project_model::project_model::ProjectModel;
 use heisenberg_project_model::project_model_error::ProjectModelError;
 use heisenberg_project_model::resolved_project::ResolvedProject;
+use heisenberg_project_model::run_scope::RunScope;
 use heisenberg_workspace_build::build_outputs::BuildOutputs;
 
 use crate::heisenberg_command_error::HeisenbergCommandError;
@@ -40,13 +41,14 @@ fn analysed<TPipeline: ConfigurationPipeline + ?Sized>(
     configuration: &Configuration,
     workspace: LoadedWorkspace<'_>,
     outputs: &BuildOutputs,
+    scope: &RunScope,
     prerequisite: &TPipeline::Prerequisite,
 ) -> Result<TPipeline::Analysis, HeisenbergCommandError> {
     workspace
         .built(outputs)
         .map_err(configuration_failure(configuration))
         .and_then(|mut project| {
-            let analysis = pipeline.analysis(configuration, &mut project, prerequisite);
+            let analysis = pipeline.analysis(configuration, &mut project, scope, prerequisite);
             let LoadedProject { database, .. } = project;
 
             WorkerPool::release(database);
@@ -98,6 +100,7 @@ pub trait ConfigurationPipeline: Sync {
         &self,
         configuration: &Configuration,
         project: &mut LoadedProject<'_>,
+        scope: &RunScope,
         prerequisite: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError>;
 
@@ -165,6 +168,7 @@ pub trait ConfigurationPipeline: Sync {
                                                     &configuration,
                                                     workspace,
                                                     &build,
+                                                    &project.scope,
                                                     &shared,
                                                 )
                                             },
@@ -213,7 +217,8 @@ mod tests {
                 .stack_size(UNRESERVABLE_STACK_SIZE)
                 .spawn_scoped(scope, || ())
                 .err()
-                .map(|error| error.to_string());
+                .map(|error| error.to_string())
+                .expect("the operating system must refuse a stack it cannot reserve");
             let failure = configuration_thread(
                 &AnalysisThreads {
                     scope,
@@ -231,11 +236,11 @@ mod tests {
 
             assert_eq!(
                 failure,
-                refused.map(|reason| vec![
+                Some(vec![
                     "the analysis thread for the configuration `unstartable` cannot be started"
                         .to_owned(),
                     "the operating system cannot start a thread".to_owned(),
-                    reason,
+                    refused,
                 ])
             );
         });

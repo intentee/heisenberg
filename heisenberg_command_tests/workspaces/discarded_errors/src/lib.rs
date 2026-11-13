@@ -1,13 +1,17 @@
 pub mod attempt;
+pub mod borrowed_array_elements;
 pub mod constant_check;
 pub mod dropped;
+pub mod error_bound_beside_rest;
 pub mod error_variant_ignored;
 pub mod errors_read_or_exempt;
 pub mod flat_mapped;
 pub mod flattened;
 pub mod function_value;
 pub mod iterated_result;
+pub mod omitted_array_elements;
 pub mod omitted_error;
+pub mod omitted_field;
 pub mod omitted_tuple_element;
 pub mod optional_value;
 pub mod temporary_check;

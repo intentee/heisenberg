@@ -29,6 +29,7 @@ fn library_that_the_server_cannot_load_fails_its_loading() {
         joined(vec![
             ProcMacroLoading {
                 dylib: &dylib,
+                key: (),
                 server: &server,
                 threads: &AnalysisThreads::new(scope),
             }
@@ -59,9 +60,11 @@ fn library_whose_thread_cannot_start_fails_its_loading() {
             .stack_size(UNRESERVABLE_STACK_SIZE)
             .spawn_scoped(scope, || ())
             .err()
-            .map(|error| error.to_string());
+            .map(|error| error.to_string())
+            .expect("the operating system must refuse a stack it cannot reserve");
         let failure = ProcMacroLoading {
             dylib: &dylib,
+            key: (),
             server: &server,
             threads: &AnalysisThreads {
                 scope,
@@ -74,12 +77,12 @@ fn library_whose_thread_cannot_start_fails_its_loading() {
 
         assert_eq!(
             failure,
-            refused.map(|reason| vec![
+            Some(vec![
                 format!(
                     "the procedural macros of `{dylib}` cannot be loaded on a thread of their own"
                 ),
                 "the operating system cannot start a thread".to_owned(),
-                reason,
+                refused,
             ])
         );
     });

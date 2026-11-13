@@ -44,10 +44,12 @@ const fn build_script(message: &Message) -> Option<&BuildScript> {
     }
 }
 
+fn build_messages(captured: &[u8]) -> Result<Vec<Message>, io::Error> {
+    Message::parse_stream(captured).collect()
+}
+
 fn build_output(captured: &[u8]) -> Result<String, io::Error> {
-    Message::parse_stream(captured)
-        .collect::<Result<Vec<Message>, io::Error>>()
-        .map(|messages| messages.into_iter().filter_map(diagnostic).collect())
+    build_messages(captured).map(|messages| messages.into_iter().filter_map(diagnostic).collect())
 }
 
 fn build_scripts(host: &[Message], target: &[Message]) -> BTreeMap<String, BuildScriptOutput> {
@@ -207,8 +209,7 @@ impl WorkspaceBuild<'_> {
                         .map_err(WorkspaceBuildError::BuildMessages)
                 })
                 .and_then(|()| {
-                    Message::parse_stream(captured.take().as_slice())
-                        .collect::<Result<Vec<Message>, io::Error>>()
+                    build_messages(captured.take().as_slice())
                         .map_err(WorkspaceBuildError::BuildMessages)
                 })
         })
@@ -294,12 +295,12 @@ impl WorkspaceBuild<'_> {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::io;
     use std::io::BufRead;
 
     use cargo_metadata::Message;
     use cargo_metadata::camino::Utf8PathBuf;
 
+    use super::build_messages;
     use super::build_output;
     use super::build_scripts;
     use crate::build_script_output::BuildScriptOutput;
@@ -315,8 +316,7 @@ mod tests {
     }
 
     fn messages(lines: &[&str]) -> Vec<Message> {
-        Message::parse_stream(lines.join("\n").as_bytes())
-            .collect::<Result<Vec<Message>, io::Error>>()
+        build_messages(lines.join("\n").as_bytes())
             .expect("the build messages of a test are cargo's own JSON lines")
     }
 

@@ -46,6 +46,7 @@ pub mod feature_selection;
 pub mod harness_methods;
 mod heisenberg_settings;
 pub mod integration_test_violation;
+pub mod keyed_proc_macros;
 mod library_crate;
 mod library_directory;
 mod library_project_json;

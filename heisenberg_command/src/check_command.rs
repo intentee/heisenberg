@@ -21,6 +21,7 @@ use heisenberg_project_model::nextest_requirements::NextestRequirements;
 use heisenberg_project_model::nextest_review::NextestReview;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::resolved_project::ResolvedProject;
+use heisenberg_project_model::run_scope::RunScope;
 
 use crate::check_report::CheckReport;
 use crate::configuration_analysis::ConfigurationAnalysis;
@@ -107,16 +108,21 @@ impl ConfigurationPipeline for CheckCommand {
         &self,
         configuration: &Configuration,
         project: &mut LoadedProject<'_>,
+        scope: &RunScope,
         _: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError> {
-        let test_directory_files = project.files.under(&project.packages.test_directories);
+        let test_directory_files = if scope.is_partial() {
+            BTreeSet::new()
+        } else {
+            project.files.under(&project.packages.test_directories)
+        };
         let confinement = project.packages.confinement.reach(&project.build);
 
         ModuleDependencies { project }
             .extract()
             .map_err(|source| HeisenbergCommandError::ModuleDependencies {
                 configuration: configuration.clone(),
-                source,
+                source: Box::new(source),
             })
             .map(|graphs| ConfigurationAnalysis {
                 configuration: configuration.clone(),
