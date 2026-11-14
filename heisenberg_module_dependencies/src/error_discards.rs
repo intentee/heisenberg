@@ -90,37 +90,26 @@ impl<'database> ErrorDiscards<'_, 'database> {
         &self,
         node: &SyntaxNode,
     ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
-        ast::MethodCallExpr::cast(node.clone()).map_or_else(
-            || {
-                ast::PathExpr::cast(node.clone()).map_or_else(
-                    || {
-                        Ok(ast::WildcardPat::cast(node.clone())
-                            .and_then(|wildcard| self.wildcard(&ast::Pat::WildcardPat(wildcard)))
-                            .or_else(|| {
-                                ast::RestPat::cast(node.clone()).and_then(|rest| self.rest(&rest))
-                            })
-                            .or_else(|| {
-                                ast::UnderscoreExpr::cast(node.clone())
-                                    .and_then(|underscore| self.underscore(&underscore))
-                            })
-                            .or_else(|| {
-                                ast::TupleStructPat::cast(node.clone())
-                                    .and_then(|pattern| self.value_only(&pattern))
-                            })
-                            .or_else(|| {
-                                ast::ForExpr::cast(node.clone())
-                                    .and_then(|repetition| self.iterated(&repetition))
-                            })
-                            .or_else(|| {
-                                ast::IdentPat::cast(node.clone())
-                                    .and_then(|binding| self.unread(&binding))
-                            }))
-                    },
-                    |path| self.function_value(&path),
-                )
-            },
-            |call| self.method_call(&call),
-        )
+        ast::MethodCallExpr::cast(node.clone())
+            .map(|call| self.method_call(&call))
+            .or_else(|| ast::PathExpr::cast(node.clone()).map(|path| self.function_value(&path)))
+            .or_else(|| {
+                ast::ForExpr::cast(node.clone()).map(|repetition| self.iterated(&repetition))
+            })
+            .or_else(|| {
+                ast::WildcardPat::cast(node.clone())
+                    .map(|wildcard| self.wildcard(&ast::Pat::WildcardPat(wildcard)))
+            })
+            .or_else(|| {
+                ast::UnderscoreExpr::cast(node.clone())
+                    .map(|underscore| self.underscore(&underscore))
+            })
+            .or_else(|| {
+                ast::TupleStructPat::cast(node.clone()).map(|pattern| self.value_only(&pattern))
+            })
+            .or_else(|| ast::RestPat::cast(node.clone()).map(|rest| Ok(self.rest(&rest))))
+            .or_else(|| ast::IdentPat::cast(node.clone()).map(|binding| Ok(self.unread(&binding))))
+            .unwrap_or(Ok(None))
     }
 
     fn classified(
@@ -188,9 +177,7 @@ impl<'database> ErrorDiscards<'_, 'database> {
                 if self.owns_a_result_error(receiver) {
                     Ok(true)
                 } else {
-                    self.lender(receiver.clone()).map(|lender| {
-                        lender.syntax() != receiver.syntax() && self.is_owned_temporary(&lender)
-                    })
+                    self.lends_a_temporary(receiver)
                 }
             }
             ResultMethodEffect::DropsATemporaryError => self
@@ -327,11 +314,22 @@ impl<'database> ErrorDiscards<'_, 'database> {
         })
     }
 
-    fn iterated(&self, repetition: &ast::ForExpr) -> Option<SyntaxNode> {
+    fn iterated(
+        &self,
+        repetition: &ast::ForExpr,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
         repetition
             .iterable()
-            .filter(|iterable| self.owns_a_result_error(iterable))
-            .map(|iterable| iterable.syntax().clone())
+            .map(|iterable| {
+                if self.owns_a_result_error(&iterable) {
+                    Ok(true)
+                } else {
+                    self.lends_a_temporary(&iterable)
+                }
+                .map(|drops| drops.then(|| iterable.syntax().clone()))
+            })
+            .transpose()
+            .map(Option::flatten)
     }
 
     fn lender(&self, expression: ast::Expr) -> Result<ast::Expr, ModuleDependenciesError> {
@@ -350,6 +348,12 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .transpose()
             .map(Option::flatten)
             .and_then(|receiver| receiver.map_or(Ok(expression), |receiver| self.lender(receiver)))
+    }
+
+    fn lends_a_temporary(&self, expression: &ast::Expr) -> Result<bool, ModuleDependenciesError> {
+        self.lender(expression.clone()).map(|lender| {
+            lender.syntax() != expression.syntax() && self.is_owned_temporary(&lender)
+        })
     }
 
     fn method_call(
@@ -524,11 +528,25 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .map(|_| rest.syntax().clone())
     }
 
-    fn underscore(&self, underscore: &ast::UnderscoreExpr) -> Option<SyntaxNode> {
-        self.semantics
+    fn underscore(
+        &self,
+        underscore: &ast::UnderscoreExpr,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
+        if self
+            .semantics
             .type_of_expr(&ast::Expr::UnderscoreExpr(underscore.clone()))
-            .filter(|TypeInfo { original, .. }| self.error_types.is_discardable(original))
-            .map(|_| underscore.syntax().clone())
+            .is_some_and(|TypeInfo { original, .. }| self.error_types.is_discardable(&original))
+        {
+            Ok(true)
+        } else {
+            underscore
+                .syntax()
+                .parent()
+                .and_then(ast::BinExpr::cast)
+                .and_then(|assignment| assignment.rhs())
+                .map_or(Ok(false), |assigned| self.lends_a_temporary(&assigned))
+        }
+        .map(|drops| drops.then(|| underscore.syntax().clone()))
     }
 
     fn unread(&self, binding: &ast::IdentPat) -> Option<SyntaxNode> {
@@ -551,7 +569,10 @@ impl<'database> ErrorDiscards<'_, 'database> {
         .map(|name| name.syntax().clone())
     }
 
-    fn value_only(&self, pattern: &ast::TupleStructPat) -> Option<SyntaxNode> {
+    fn value_only(
+        &self,
+        pattern: &ast::TupleStructPat,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
         let top = pattern
             .syntax()
             .parent()
@@ -577,19 +598,58 @@ impl<'database> ErrorDiscards<'_, 'database> {
             && refutably_matched
             && !self.is_behind_a_reference(&ast::Pat::TupleStructPat(pattern.clone())))
         .then(|| {
-            self.semantics
+            if self
+                .semantics
                 .type_of_pat(&ast::Pat::TupleStructPat(pattern.clone()))
+                .is_some_and(|TypeInfo { original, .. }| {
+                    self.error_types.owned_result_error(&original).is_some()
+                })
+            {
+                Ok(true)
+            } else {
+                top.parent()
+                    .and_then(|owner| {
+                        ast::LetExpr::cast(owner.clone())
+                            .and_then(|condition| condition.expr())
+                            .or_else(|| {
+                                ast::LetStmt::cast(owner)
+                                    .and_then(|statement| statement.initializer())
+                            })
+                    })
+                    .map_or(Ok(false), |matched| self.lends_a_temporary(&matched))
+            }
         })
-        .flatten()
-        .filter(|TypeInfo { original, .. }| self.error_types.owned_result_error(original).is_some())
-        .map(|_| pattern.syntax().clone())
+        .transpose()
+        .map(|drops| {
+            drops
+                .filter(|drops| *drops)
+                .map(|_| pattern.syntax().clone())
+        })
     }
 
-    fn wildcard(&self, wildcard: &ast::Pat) -> Option<SyntaxNode> {
+    fn wildcard(&self, wildcard: &ast::Pat) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
         (!self.is_behind_a_reference(wildcard) && !is_bodiless_parameter(wildcard.syntax()))
-            .then(|| self.semantics.type_of_pat(wildcard))
-            .flatten()
-            .filter(|TypeInfo { original, .. }| self.error_types.is_discardable(original))
-            .map(|_| wildcard.syntax().clone())
+            .then(|| {
+                if self.semantics.type_of_pat(wildcard).is_some_and(
+                    |TypeInfo { original, .. }| self.error_types.is_discardable(&original),
+                ) {
+                    Ok(true)
+                } else {
+                    wildcard
+                        .syntax()
+                        .parent()
+                        .and_then(ast::LetStmt::cast)
+                        .and_then(|statement| statement.initializer())
+                        .map_or(Ok(false), |initializer| {
+                            self.lends_a_temporary(&initializer)
+                        })
+                }
+            })
+            .transpose()
+            .map(|drops| {
+                drops
+                    .filter(|drops| *drops)
+                    .map(|_| wildcard.syntax().clone())
+            })
     }
 }
