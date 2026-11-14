@@ -202,7 +202,8 @@ pub struct ModuleWalk<'walk, 'database> {
     pub test_assertions: &'walk TestAssertions,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub token_origin: &'walk TokenOrigin<'walk, 'database>,
-    pub trait_result_errors: &'walk OnceMap<Trait, Arc<HashSet<Name>>>,
+    pub trait_result_errors:
+        &'walk OnceMap<Trait, Result<Arc<HashSet<Name>>, Arc<ModuleDependenciesError>>>,
     pub unpublished_packages: &'walk BTreeSet<String>,
     pub usages: &'walk DefinitionUsages<'walk, 'database>,
 }
@@ -1699,46 +1700,56 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
     }
 
-    fn names_a_result_error_of_its_trait(&self, definition: TypeAlias) -> bool {
+    fn names_a_result_error_of_its_trait(
+        &self,
+        definition: TypeAlias,
+    ) -> Result<bool, ModuleDependenciesError> {
         let database = self.semantics.db;
 
         match definition
             .as_assoc_item(database)
             .map(|item| item.container(database))
         {
-            Some(AssocItemContainer::Impl(implementation)) => {
-                implementation.trait_(database).is_some_and(|declaring| {
+            Some(AssocItemContainer::Impl(implementation)) => implementation
+                .trait_(database)
+                .map_or(Ok(false), |declaring| {
                     self.trait_result_errors
                         .get_or_init(declaring, || {
                             let items = declaring.items(database);
-                            let result_errors: HashSet<TypeAlias> = items
-                                .iter()
-                                .flat_map(|item| match item {
-                                    AssocItem::Function(function) => {
-                                        self.result_errors_of(*function)
-                                    }
-                                    _ => Vec::new(),
-                                })
-                                .collect();
 
-                            Arc::new(
-                                items
-                                    .into_iter()
-                                    .filter_map(|item| match item {
-                                        AssocItem::TypeAlias(declared)
-                                            if result_errors.contains(&declared) =>
-                                        {
-                                            Some(declared.name(database))
-                                        }
-                                        _ => None,
-                                    })
-                                    .collect(),
-                            )
+                            items
+                                .iter()
+                                .filter_map(|item| match item {
+                                    AssocItem::Function(function) => {
+                                        Some(self.result_errors_of(*function))
+                                    }
+                                    _ => None,
+                                })
+                                .collect::<Result<Vec<Vec<TypeAlias>>, ModuleDependenciesError>>()
+                                .map(|errors| {
+                                    let result_errors: HashSet<TypeAlias> =
+                                        errors.into_iter().flatten().collect();
+
+                                    Arc::new(
+                                        items
+                                            .into_iter()
+                                            .filter_map(|item| match item {
+                                                AssocItem::TypeAlias(declared)
+                                                    if result_errors.contains(&declared) =>
+                                                {
+                                                    Some(declared.name(database))
+                                                }
+                                                _ => None,
+                                            })
+                                            .collect(),
+                                    )
+                                })
+                                .map_err(Arc::new)
                         })
-                        .contains(&definition.name(database))
-                })
-            }
-            _ => false,
+                        .map(|names| names.contains(&definition.name(database)))
+                        .map_err(ModuleDependenciesError::TraitResultErrorsUnavailable)
+                }),
+            _ => Ok(false),
         }
     }
 
@@ -2126,9 +2137,13 @@ impl<'database> ModuleWalk<'_, 'database> {
             .transpose()
     }
 
-    fn result_errors_of(&self, function: Function) -> Vec<TypeAlias> {
+    fn result_errors_of(
+        &self,
+        function: Function,
+    ) -> Result<Vec<TypeAlias>, ModuleDependenciesError> {
         self.semantics
             .source(function)
+            .ok_or(ModuleDependenciesError::TraitMethodWithoutSource(function))
             .map(
                 |InFile {
                      value: declared, ..
@@ -2171,7 +2186,6 @@ impl<'database> ModuleWalk<'_, 'database> {
                         .collect()
                 },
             )
-            .unwrap_or_default()
     }
 
     const fn round_trips(&self) -> RoundTrips<'_, 'database> {
@@ -2516,20 +2530,25 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         self.semantics
             .to_def(alias)
-            .and_then(|definition| {
-                let chosen = definition.ty(database);
-
-                (!self.error_types().is_error_type(&chosen)
-                    && self.names_a_result_error_of_its_trait(definition))
-                .then_some(chosen)
+            .map(|definition| {
+                self.names_a_result_error_of_its_trait(definition)
+                    .map(|names| {
+                        names
+                            .then(|| definition.ty(database))
+                            .filter(|chosen| !self.error_types().is_error_type(chosen))
+                    })
             })
-            .map_or(Ok(None), |chosen| {
-                alias.ty().map_or(Ok(None), |written| {
-                    self.own_violation(
-                        self.untyped_result_violation(&chosen),
-                        written.syntax(),
-                        origin,
-                    )
+            .transpose()
+            .map(Option::flatten)
+            .and_then(|chosen| {
+                chosen.map_or(Ok(None), |chosen| {
+                    alias.ty().map_or(Ok(None), |written| {
+                        self.own_violation(
+                            self.untyped_result_violation(&chosen),
+                            written.syntax(),
+                            origin,
+                        )
+                    })
                 })
             })
     }

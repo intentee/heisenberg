@@ -2,7 +2,8 @@ use std::iter;
 use std::sync::Arc;
 
 use ra_ap_hir::Access;
-use ra_ap_hir::Adt;
+use ra_ap_hir::Adjust;
+use ra_ap_hir::Adjustment;
 use ra_ap_hir::AsAssocItem;
 use ra_ap_hir::AssocItemContainer;
 use ra_ap_hir::Function;
@@ -49,10 +50,10 @@ fn is_bodiless_parameter(node: &SyntaxNode) -> bool {
         })
 }
 
-fn omitted_elements(
+fn omitted_elements<'database>(
     fields: impl Iterator<Item = ast::Pat> + Clone,
-    elements: Vec<Type<'_>>,
-) -> Vec<Type<'_>> {
+    elements: impl DoubleEndedIterator<Item = Type<'database>> + ExactSizeIterator,
+) -> impl Iterator<Item = Type<'database>> {
     let before = fields
         .clone()
         .take_while(|field| !matches!(field, ast::Pat::RestPat(_)))
@@ -62,13 +63,7 @@ fn omitted_elements(
         .skip(1)
         .count();
 
-    elements
-        .into_iter()
-        .skip(before)
-        .rev()
-        .skip(after)
-        .rev()
-        .collect()
+    elements.skip(before).rev().skip(after)
 }
 
 pub struct ErrorDiscards<'discards, 'database> {
@@ -84,8 +79,9 @@ pub struct ErrorDiscards<'discards, 'database> {
 impl<'database> ErrorDiscards<'_, 'database> {
     /// # Errors
     ///
-    /// Returns [`ModuleDependenciesError::ResultMethodWithoutSource`] when rust-analyzer gives
-    /// no source for a method of `Result`, whose signature decides whether it drops the error.
+    /// Returns [`ModuleDependenciesError::ResultMethodUnavailable`], which holds
+    /// [`ModuleDependenciesError::ResultMethodWithoutSource`], when rust-analyzer gives no source
+    /// for a method of `Result`, whose signature decides whether it drops the error.
     pub fn discarded(
         &self,
         node: &SyntaxNode,
@@ -123,44 +119,47 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .map(|item| item.container(database))
         {
             Some(AssocItemContainer::Impl(implementation)) => {
-                let implemented = implementation.self_ty(database);
                 let declaring = implementation.trait_(database);
 
-                if implemented.as_adt() != Some(Adt::Enum(self.standard_items.result)) {
-                    Ok(ResultMethodEffect::NotAResultMethod)
-                } else if declaring == Some(self.standard_items.into_iterator) {
-                    Ok(ResultMethodEffect::DropsTheError)
-                } else if declaring.is_some() {
-                    Ok(ResultMethodEffect::NotAResultMethod)
-                } else {
-                    function
+                match self
+                    .error_types
+                    .result_error(&implementation.self_ty(database))
+                {
+                    None => Ok(ResultMethodEffect::NotAResultMethod),
+                    Some(_) if declaring == Some(self.standard_items.into_iterator) => {
+                        Ok(ResultMethodEffect::DropsTheError)
+                    }
+                    Some(_) if declaring.is_some() => Ok(ResultMethodEffect::NotAResultMethod),
+                    Some(error) => function
                         .self_param(database)
                         .and_then(|parameter| {
-                            implemented
-                                .type_arguments()
-                                .nth(1)
-                                .and_then(|error| error.as_type_param(database))
-                                .map(|error| {
-                                    self.names_the_error(function, error).map(|names| {
-                                        match parameter.access(database) {
-                                            Access::Owned if names => {
-                                                ResultMethodEffect::KeepsTheError
-                                            }
-                                            Access::Owned => ResultMethodEffect::DropsTheError,
-                                            Access::Shared | Access::Exclusive if names => {
-                                                ResultMethodEffect::LendsTheError
-                                            }
-                                            Access::Shared | Access::Exclusive => {
-                                                ResultMethodEffect::DropsATemporaryError
-                                            }
+                            error.as_type_param(database).map(|error| {
+                                self.names_the_error(function, error).map(|names| {
+                                    match parameter.access(database) {
+                                        Access::Owned if names => ResultMethodEffect::KeepsTheError,
+                                        Access::Owned => ResultMethodEffect::DropsTheError,
+                                        Access::Shared | Access::Exclusive if names => {
+                                            ResultMethodEffect::LendsTheError
                                         }
-                                    })
+                                        Access::Shared | Access::Exclusive => {
+                                            ResultMethodEffect::DropsATemporaryError
+                                        }
+                                    }
                                 })
+                            })
                         })
-                        .unwrap_or(Ok(ResultMethodEffect::NotAResultMethod))
+                        .unwrap_or(Ok(ResultMethodEffect::NotAResultMethod)),
                 }
             }
             _ => Ok(ResultMethodEffect::NotAResultMethod),
+        }
+    }
+
+    fn drops_an_error_of(&self, expression: &ast::Expr) -> Result<bool, ModuleDependenciesError> {
+        if self.owns_a_result_error(expression) {
+            Ok(true)
+        } else {
+            self.lends_a_temporary(expression)
         }
     }
 
@@ -173,13 +172,7 @@ impl<'database> ErrorDiscards<'_, 'database> {
         let database = self.semantics.db;
 
         self.effect(function).and_then(|effect| match effect {
-            ResultMethodEffect::DropsTheError => {
-                if self.owns_a_result_error(receiver) {
-                    Ok(true)
-                } else {
-                    self.lends_a_temporary(receiver)
-                }
-            }
+            ResultMethodEffect::DropsTheError => self.drops_an_error_of(receiver),
             ResultMethodEffect::DropsATemporaryError => self
                 .lender(receiver.clone())
                 .map(|lender| self.is_owned_temporary(&lender)),
@@ -245,6 +238,22 @@ impl<'database> ErrorDiscards<'_, 'database> {
             })
     }
 
+    fn is_behind_a_pointer(&self, owner: &ast::Expr) -> bool {
+        self.semantics
+            .type_of_expr(owner)
+            .is_some_and(|TypeInfo { original, .. }| {
+                original.is_reference() || original.is_raw_ptr()
+            })
+            || self
+                .semantics
+                .expr_adjustments(owner)
+                .is_some_and(|adjustments| {
+                    adjustments
+                        .iter()
+                        .any(|Adjustment { kind, .. }| matches!(kind, Adjust::Deref(_)))
+                })
+    }
+
     fn is_behind_a_reference(&self, pattern: &ast::Pat) -> bool {
         pattern
             .syntax()
@@ -294,7 +303,9 @@ impl<'database> ErrorDiscards<'_, 'database> {
                     Some(PathResolution::Local(_) | PathResolution::Def(ModuleDef::Static(_)))
                 )
             }),
-            ast::Expr::FieldExpr(field) => field.expr().is_some_and(|owner| self.is_place(&owner)),
+            ast::Expr::FieldExpr(field) => field
+                .expr()
+                .is_some_and(|owner| self.is_place(&owner) || self.is_behind_a_pointer(&owner)),
             ast::Expr::IndexExpr(_) => true,
             ast::Expr::PrefixExpr(prefix) => prefix.op_kind() == Some(ast::UnaryOp::Deref),
             _ => false,
@@ -321,12 +332,8 @@ impl<'database> ErrorDiscards<'_, 'database> {
         repetition
             .iterable()
             .map(|iterable| {
-                if self.owns_a_result_error(&iterable) {
-                    Ok(true)
-                } else {
-                    self.lends_a_temporary(&iterable)
-                }
-                .map(|drops| drops.then(|| iterable.syntax().clone()))
+                self.drops_an_error_of(&iterable)
+                    .map(|drops| drops.then(|| iterable.syntax().clone()))
             })
             .transpose()
             .map(Option::flatten)
@@ -436,8 +443,9 @@ impl<'database> ErrorDiscards<'_, 'database> {
                     .map(|fields| {
                         omitted_elements(
                             pattern.fields(),
-                            fields.into_iter().map(|(_, field)| field).collect(),
+                            fields.into_iter().map(|(_, field)| field),
                         )
+                        .collect()
                     })
                     .unwrap_or_default()
             })
@@ -450,7 +458,11 @@ impl<'database> ErrorDiscards<'_, 'database> {
                         })
                         .flatten()
                         .map(|TypeInfo { original, .. }| {
-                            omitted_elements(pattern.fields(), original.tuple_fields(database))
+                            omitted_elements(
+                                pattern.fields(),
+                                original.tuple_fields(database).into_iter(),
+                            )
+                            .collect()
                         })
                         .unwrap_or_default()
                 })
@@ -465,10 +477,9 @@ impl<'database> ErrorDiscards<'_, 'database> {
                         .flatten()
                         .and_then(|TypeInfo { original, .. }| original.as_array(database))
                         .map(|(element, length)| {
-                            omitted_elements(
-                                pattern.pats(),
-                                iter::repeat_n(element, length).collect(),
-                            )
+                            omitted_elements(pattern.pats(), iter::repeat_n(element, length))
+                                .take(1)
+                                .collect()
                         })
                         .unwrap_or_default()
                 })

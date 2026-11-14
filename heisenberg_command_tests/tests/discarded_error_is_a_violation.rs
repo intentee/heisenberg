@@ -19,7 +19,7 @@ fn discarded_error_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok([
-            "DiscardedError: 29 violations\n\
+            "DiscardedError: 30 violations\n\
             A dropped error hides the failure that caused it, so the program continues on a state it never checked and nothing explains what went wrong. Handle the error: return it, wrap it as the source of a more specific error, or match its variants.\n\
             \n\
             - src/adapted_copied_value.rs:3:42: Error is dropped without being handled\n        \
@@ -36,6 +36,8 @@ fn discarded_error_is_a_violation() {
             drop(text.parse::<u8>());\n\
             - src/error_variant_ignored.rs:5:13: Error is dropped without being handled\n            \
             Err(_) => 0,\n\
+            - src/field_holder.rs:32:40: Error is dropped without being handled\n            \
+            Self::parsed_from(text).parsed.is_ok()\n\
             - src/flat_mapped.rs:3:18: Error is dropped without being handled\n        \
             texts.iter().flat_map(|text| text.parse::<u8>()).count()\n\
             - src/flattened.rs:5:24: Error is dropped without being handled\n        \
@@ -87,9 +89,9 @@ fn discarded_error_is_a_violation() {
             - Cargo.toml: Package discarded_errors allows for_loops_over_fallibles in its rust lints\n\
             \n\
             ------------------------------\n\
-            30 errors found\n\
+            31 errors found\n\
             ------------------------------\n",
-            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 38).as_str()
+            NextestPresenceEvaluation::NotEvaluated.host_footer(1, 39).as_str()
         ]
         .concat()
         .as_str())

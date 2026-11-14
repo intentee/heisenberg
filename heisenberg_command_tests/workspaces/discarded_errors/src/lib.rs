@@ -9,6 +9,7 @@ pub mod dropped;
 pub mod error_bound_beside_rest;
 pub mod error_variant_ignored;
 pub mod errors_read_or_exempt;
+pub mod field_holder;
 pub mod flat_mapped;
 pub mod flattened;
 pub mod function_value;

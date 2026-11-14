@@ -24,6 +24,12 @@ pub enum ModuleDependenciesError {
     ResultMethodWithoutSource(Function),
     #[error(transparent)]
     ResultMethodUnavailable(Arc<Self>),
+    #[error(
+        "rust-analyzer gives no source for the trait method {0:?}, whose signature names the associated types that are Result errors"
+    )]
+    TraitMethodWithoutSource(Function),
+    #[error(transparent)]
+    TraitResultErrorsUnavailable(Arc<Self>),
     #[error("rust-analyzer gives no source for the impl {0:?} that a `Self` resolves to")]
     SelfTypeWithoutSource(Impl),
     #[error(transparent)]

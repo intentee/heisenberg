@@ -76,10 +76,14 @@ mod tests {
         fs::write(&relocatable, RELOCATABLE_ELF_HEADER)
             .expect("the relocatable object must be written");
 
+        let failure = proc_macro_library("injected", &[directory, relocatable.clone()])
+            .err()
+            .map(|error| error.to_string());
+
+        fs::remove_file(&relocatable).expect("the relocatable object must be removed");
+
         assert_eq!(
-            proc_macro_library("injected", &[directory, relocatable])
-                .err()
-                .map(|error| error.to_string()),
+            failure,
             Some(
                 "the files that cargo lists for the procedural macro `injected` hold 0 dynamic libraries instead of one: []; the files that are not object files: []"
                     .to_owned()

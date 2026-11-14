@@ -56,7 +56,8 @@ pub struct CrateWalk<'walk> {
     pub standard_items: &'walk StandardItems,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub test_modules: &'walk TestModules,
-    pub trait_result_errors: &'walk OnceMap<Trait, Arc<HashSet<Name>>>,
+    pub trait_result_errors:
+        &'walk OnceMap<Trait, Result<Arc<HashSet<Name>>, Arc<ModuleDependenciesError>>>,
     pub unpublished_packages: &'walk BTreeSet<String>,
     pub vetted_crates: &'walk VettedCrates,
     pub workspace_files: &'walk BTreeSet<FileId>,

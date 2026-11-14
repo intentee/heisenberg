@@ -20,7 +20,7 @@ fn serialization_crate_without_its_traits_fails_the_analysis() {
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the module dependencies cannot be extracted for the configuration `{HOST_CONFIGURATION}`\n\
-             error: the serialization crates serde_core that the analysis vets lack the traits that the serialization rule relies on: ser::Serialize, de::Deserialize, de::DeserializeOwned\n"
+             error: the serialization crates serde_core that the analysis vets lack the traits that the serialization rule relies on: de::Deserialize, de::DeserializeOwned\n"
         )
         .as_str())
     );

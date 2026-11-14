@@ -88,8 +88,8 @@ pub enum HeisenbergCheckError {
         #[source]
         source: io::Error,
     },
-    #[error("the host-only fixture directory `{}` cannot be created", .path.display())]
-    FixtureDirectoryCreate {
+    #[error("`{}` cannot be created to be cleared", .path.display())]
+    ClearedPathCreate {
         path: PathBuf,
         #[source]
         source: io::Error,
@@ -126,8 +126,8 @@ pub enum HeisenbergCheckError {
         #[source]
         source: de::Error,
     },
-    #[error("the previous host-only fixture `{}` cannot be removed", .path.display())]
-    FixtureReset {
+    #[error("`{}` cannot be cleared", .path.display())]
+    ClearedPathRemoval {
         path: PathBuf,
         #[source]
         source: io::Error,

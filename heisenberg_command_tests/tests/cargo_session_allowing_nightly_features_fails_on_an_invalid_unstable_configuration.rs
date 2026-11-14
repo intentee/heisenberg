@@ -1,7 +1,6 @@
-use std::error::Error;
-
 use cargo::util::data_structures::HashMap;
 
+use heisenberg_command_tests::error_chain::error_chain;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_workspace_build::cargo_session::CargoSession;
 use heisenberg_workspace_build::configured_context::ConfiguredContext;
@@ -34,13 +33,8 @@ fn cargo_session_allowing_nightly_features_fails_on_an_invalid_unstable_configur
             if matches!(&**context, WorkspaceBuildError::CargoContext(_))
     ));
     assert_eq!(
-        failure.map(|error| {
-            [
-                error.to_string(),
-                error.source().map_or_else(String::new, ToString::to_string),
-            ]
-        }),
-        Some([
+        failure.map(|error| error_chain(&error)),
+        Some(vec![
             "the cargo configuration of the build cannot be read".to_owned(),
             format!(
                 "error in {}: `unstable.mtime-on-use` expected true/false, but found a string",
