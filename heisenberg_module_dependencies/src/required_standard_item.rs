@@ -9,6 +9,7 @@ use crate::constants::STANDARD_SLEEP_PATH;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RequiredStandardItem {
+    Destruct,
     Drop,
     ErrorTrait,
     FromStr,
@@ -24,6 +25,7 @@ pub enum RequiredStandardItem {
 impl Display for RequiredStandardItem {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Destruct => write!(formatter, "core::marker::Destruct"),
             Self::Drop => write!(formatter, "core::mem::drop"),
             Self::ErrorTrait => write!(formatter, "core::{}", ERROR_TRAIT_PATH.join("::")),
             Self::FromStr => write!(formatter, "core::str::FromStr"),

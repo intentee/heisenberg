@@ -26,7 +26,7 @@ impl Display for IntegrationTestViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Discovered { .. } => formatter.write_str(
-                "Package discovers its integration test targets instead of setting autotests = false",
+                "Package builds integration test targets with libtest's harness without setting autotests = false",
             ),
             Self::Split { targets, .. } => write!(
                 formatter,

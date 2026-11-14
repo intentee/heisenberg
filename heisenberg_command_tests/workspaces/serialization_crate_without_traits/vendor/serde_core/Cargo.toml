@@ -1,0 +1,4 @@
+[package]
+name = "serde_core"
+version = "1.0.229"
+edition = "2021"

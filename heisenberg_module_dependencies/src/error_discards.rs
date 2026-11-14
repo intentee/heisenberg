@@ -1,14 +1,18 @@
 use std::iter;
+use std::sync::Arc;
 
+use ra_ap_hir::Access;
 use ra_ap_hir::Adt;
 use ra_ap_hir::AsAssocItem;
 use ra_ap_hir::AssocItemContainer;
 use ra_ap_hir::Function;
+use ra_ap_hir::InFile;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::PathResolution;
 use ra_ap_hir::Semantics;
 use ra_ap_hir::Type;
 use ra_ap_hir::TypeInfo;
+use ra_ap_hir::TypeParam;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
 use ra_ap_ide_db::search::FileReference;
@@ -17,16 +21,20 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 use ra_ap_syntax::ast::HasArgList;
+use ra_ap_syntax::ast::HasGenericParams;
 use ra_ap_syntax::ast::HasName;
+use ra_ap_syntax::ast::HasTypeBounds;
 
-use crate::constants::BORROWING_RESULT_METHODS;
-use crate::constants::ERROR_DROPPING_RESULT_METHODS;
+use heisenberg_task_graph::once_map::OnceMap;
+
 use crate::constants::RESULT_ERROR_VARIANT;
 use crate::constants::RESULT_VALUE_VARIANT;
 use crate::error_types::ErrorTypes;
 use crate::is_trait_item::is_trait_item;
 use crate::method_call_resolutions::MethodCallResolutions;
+use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::path_resolutions::PathResolutions;
+use crate::result_method_effect::ResultMethodEffect;
 use crate::standard_items::StandardItems;
 use crate::substituted_resolution::SubstitutedResolution;
 
@@ -67,36 +75,159 @@ pub struct ErrorDiscards<'discards, 'database> {
     pub error_types: &'discards ErrorTypes<'discards, 'database>,
     pub method_calls: &'discards MethodCallResolutions<'discards, 'database>,
     pub paths: &'discards PathResolutions<'discards, 'database>,
+    pub result_method_effects:
+        &'discards OnceMap<Function, Result<ResultMethodEffect, Arc<ModuleDependenciesError>>>,
     pub semantics: &'discards Semantics<'database, RootDatabase>,
     pub standard_items: &'discards StandardItems,
 }
 
 impl<'database> ErrorDiscards<'_, 'database> {
-    pub fn discarded(&self, node: &SyntaxNode) -> Option<SyntaxNode> {
-        ast::WildcardPat::cast(node.clone())
-            .and_then(|wildcard| self.wildcard(&ast::Pat::WildcardPat(wildcard)))
-            .or_else(|| ast::RestPat::cast(node.clone()).and_then(|rest| self.rest(&rest)))
-            .or_else(|| {
-                ast::UnderscoreExpr::cast(node.clone())
-                    .and_then(|underscore| self.underscore(&underscore))
-            })
-            .or_else(|| {
-                ast::TupleStructPat::cast(node.clone())
-                    .and_then(|pattern| self.value_only(&pattern))
-            })
-            .or_else(|| {
-                ast::MethodCallExpr::cast(node.clone()).and_then(|call| self.method_call(&call))
-            })
-            .or_else(|| {
-                ast::PathExpr::cast(node.clone()).and_then(|path| self.function_value(&path))
-            })
-            .or_else(|| {
-                ast::ForExpr::cast(node.clone()).and_then(|repetition| self.iterated(&repetition))
-            })
-            .or_else(|| ast::IdentPat::cast(node.clone()).and_then(|binding| self.unread(&binding)))
+    /// # Errors
+    ///
+    /// Returns [`ModuleDependenciesError::ResultMethodWithoutSource`] when rust-analyzer gives
+    /// no source for a method of `Result`, whose signature decides whether it drops the error.
+    pub fn discarded(
+        &self,
+        node: &SyntaxNode,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
+        ast::MethodCallExpr::cast(node.clone()).map_or_else(
+            || {
+                ast::PathExpr::cast(node.clone()).map_or_else(
+                    || {
+                        Ok(ast::WildcardPat::cast(node.clone())
+                            .and_then(|wildcard| self.wildcard(&ast::Pat::WildcardPat(wildcard)))
+                            .or_else(|| {
+                                ast::RestPat::cast(node.clone()).and_then(|rest| self.rest(&rest))
+                            })
+                            .or_else(|| {
+                                ast::UnderscoreExpr::cast(node.clone())
+                                    .and_then(|underscore| self.underscore(&underscore))
+                            })
+                            .or_else(|| {
+                                ast::TupleStructPat::cast(node.clone())
+                                    .and_then(|pattern| self.value_only(&pattern))
+                            })
+                            .or_else(|| {
+                                ast::ForExpr::cast(node.clone())
+                                    .and_then(|repetition| self.iterated(&repetition))
+                            })
+                            .or_else(|| {
+                                ast::IdentPat::cast(node.clone())
+                                    .and_then(|binding| self.unread(&binding))
+                            }))
+                    },
+                    |path| self.function_value(&path),
+                )
+            },
+            |call| self.method_call(&call),
+        )
     }
 
-    fn function_value(&self, path: &ast::PathExpr) -> Option<SyntaxNode> {
+    fn classified(
+        &self,
+        function: Function,
+    ) -> Result<ResultMethodEffect, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        match function
+            .as_assoc_item(database)
+            .map(|item| item.container(database))
+        {
+            Some(AssocItemContainer::Impl(implementation)) => {
+                let implemented = implementation.self_ty(database);
+                let declaring = implementation.trait_(database);
+
+                if implemented.as_adt() != Some(Adt::Enum(self.standard_items.result)) {
+                    Ok(ResultMethodEffect::NotAResultMethod)
+                } else if declaring == Some(self.standard_items.into_iterator) {
+                    Ok(ResultMethodEffect::DropsTheError)
+                } else if declaring.is_some() {
+                    Ok(ResultMethodEffect::NotAResultMethod)
+                } else {
+                    function
+                        .self_param(database)
+                        .and_then(|parameter| {
+                            implemented
+                                .type_arguments()
+                                .nth(1)
+                                .and_then(|error| error.as_type_param(database))
+                                .map(|error| {
+                                    self.names_the_error(function, error).map(|names| {
+                                        match parameter.access(database) {
+                                            Access::Owned if names => {
+                                                ResultMethodEffect::KeepsTheError
+                                            }
+                                            Access::Owned => ResultMethodEffect::DropsTheError,
+                                            Access::Shared | Access::Exclusive if names => {
+                                                ResultMethodEffect::LendsTheError
+                                            }
+                                            Access::Shared | Access::Exclusive => {
+                                                ResultMethodEffect::DropsATemporaryError
+                                            }
+                                        }
+                                    })
+                                })
+                        })
+                        .unwrap_or(Ok(ResultMethodEffect::NotAResultMethod))
+                }
+            }
+            _ => Ok(ResultMethodEffect::NotAResultMethod),
+        }
+    }
+
+    fn drops_through(
+        &self,
+        function: Function,
+        call: &ast::MethodCallExpr,
+        receiver: &ast::Expr,
+    ) -> Result<bool, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        self.effect(function).and_then(|effect| match effect {
+            ResultMethodEffect::DropsTheError => {
+                if self.owns_a_result_error(receiver) {
+                    Ok(true)
+                } else {
+                    self.lender(receiver.clone()).map(|lender| {
+                        lender.syntax() != receiver.syntax() && self.is_owned_temporary(&lender)
+                    })
+                }
+            }
+            ResultMethodEffect::DropsATemporaryError => self
+                .lender(receiver.clone())
+                .map(|lender| self.is_owned_temporary(&lender)),
+            ResultMethodEffect::KeepsTheError | ResultMethodEffect::LendsTheError => Ok(false),
+            ResultMethodEffect::NotAResultMethod => Ok((self
+                .is_iterator_method(function, "flatten")
+                && self
+                    .semantics
+                    .type_of_expr(receiver)
+                    .and_then(|TypeInfo { original, .. }| original.iterator_item(database))
+                    .is_some_and(|item| self.error_types.owned_result_error(&item).is_some()))
+                || (self.is_iterator_method(function, "flat_map")
+                    && call
+                        .arg_list()
+                        .and_then(|arguments| arguments.args().next())
+                        .and_then(|mapping| self.semantics.type_of_expr(&mapping))
+                        .and_then(|TypeInfo { original, .. }| original.as_callable(database))
+                        .is_some_and(|mapping| {
+                            self.error_types
+                                .owned_result_error(&mapping.return_type())
+                                .is_some()
+                        }))),
+        })
+    }
+
+    fn effect(&self, function: Function) -> Result<ResultMethodEffect, ModuleDependenciesError> {
+        self.result_method_effects
+            .get_or_init(function, || self.classified(function).map_err(Arc::new))
+            .map_err(ModuleDependenciesError::ResultMethodUnavailable)
+    }
+
+    fn function_value(
+        &self,
+        path: &ast::PathExpr,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
         let database = self.semantics.db;
 
         path.path()
@@ -104,19 +235,27 @@ impl<'database> ErrorDiscards<'_, 'database> {
                 Some(PathResolution::Def(ModuleDef::Function(function))) => Some(function),
                 _ => None,
             })
-            .filter(|function| {
-                *function == self.standard_items.drop
-                    || self.is_result_method(*function, &ERROR_DROPPING_RESULT_METHODS)
-                    || self.is_result_into_iter(*function)
+            .map(|function| {
+                if function == self.standard_items.drop {
+                    Ok(true)
+                } else {
+                    self.effect(function)
+                        .map(|effect| effect == ResultMethodEffect::DropsTheError)
+                }
             })
-            .and_then(|_| {
-                self.semantics
-                    .type_of_expr(&ast::Expr::PathExpr(path.clone()))
+            .transpose()
+            .map(|drops| {
+                drops
+                    .filter(|drops| *drops)
+                    .and_then(|_| {
+                        self.semantics
+                            .type_of_expr(&ast::Expr::PathExpr(path.clone()))
+                    })
+                    .and_then(|TypeInfo { original, .. }| original.as_callable(database))
+                    .and_then(|callable| callable.params().into_iter().next())
+                    .filter(|parameter| self.error_types.is_discardable(parameter.ty()))
+                    .map(|_| path.syntax().clone())
             })
-            .and_then(|TypeInfo { original, .. }| original.as_callable(database))
-            .and_then(|callable| callable.params().into_iter().next())
-            .filter(|parameter| self.error_types.is_discardable(parameter.ty()))
-            .map(|_| path.syntax().clone())
     }
 
     fn is_behind_a_reference(&self, pattern: &ast::Pat) -> bool {
@@ -130,11 +269,33 @@ impl<'database> ErrorDiscards<'_, 'database> {
             })
     }
 
+    fn is_drop_bound(&self, predicate: &ast::WherePred) -> bool {
+        predicate.type_bound_list().is_some_and(|bounds| {
+            bounds.bounds().all(|bound| {
+                bound
+                    .ty()
+                    .and_then(|bounding| ast::PathType::cast(bounding.syntax().clone()))
+                    .and_then(|written| written.path())
+                    .is_some_and(|path| {
+                        matches!(
+                            self.semantics.resolve_path(&path),
+                            Some(PathResolution::Def(ModuleDef::Trait(bounding)))
+                                if bounding == self.standard_items.destruct
+                        )
+                    })
+            })
+        })
+    }
+
     fn is_iterator_method(&self, function: Function, name: &str) -> bool {
         let database = self.semantics.db;
 
         function.name(database).as_str() == name
             && is_trait_item(database, function, self.standard_items.iterator)
+    }
+
+    fn is_owned_temporary(&self, expression: &ast::Expr) -> bool {
+        !self.is_place(expression) && self.owns_a_result_error(expression)
     }
 
     fn is_place(&self, expression: &ast::Expr) -> bool {
@@ -151,31 +312,6 @@ impl<'database> ErrorDiscards<'_, 'database> {
             ast::Expr::PrefixExpr(prefix) => prefix.op_kind() == Some(ast::UnaryOp::Deref),
             _ => false,
         }
-    }
-
-    fn is_result_into_iter(&self, function: Function) -> bool {
-        let database = self.semantics.db;
-
-        matches!(
-            function.as_assoc_item(database).map(|item| item.container(database)),
-            Some(AssocItemContainer::Impl(implementation))
-                if implementation.trait_(database) == Some(self.standard_items.into_iterator)
-                    && implementation.self_ty(database).as_adt()
-                        == Some(Adt::Enum(self.standard_items.result))
-        )
-    }
-
-    fn is_result_method(&self, function: Function, names: &[&str]) -> bool {
-        let database = self.semantics.db;
-
-        names.contains(&function.name(database).as_str())
-            && matches!(
-                function.as_assoc_item(database).map(|item| item.container(database)),
-                Some(AssocItemContainer::Impl(implementation))
-                    if implementation.trait_(database).is_none()
-                        && implementation.self_ty(database).as_adt()
-                            == Some(Adt::Enum(self.standard_items.result))
-            )
     }
 
     fn is_result_variant(&self, pattern: &ast::TupleStructPat, name: &str) -> bool {
@@ -198,50 +334,91 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .map(|iterable| iterable.syntax().clone())
     }
 
-    fn method_call(&self, call: &ast::MethodCallExpr) -> Option<SyntaxNode> {
-        let database = self.semantics.db;
+    fn lender(&self, expression: ast::Expr) -> Result<ast::Expr, ModuleDependenciesError> {
+        ast::MethodCallExpr::cast(expression.syntax().clone())
+            .and_then(|call| {
+                self.method_calls.resolve(&call).map(
+                    |SubstitutedResolution {
+                         resolution: function,
+                         ..
+                     }| {
+                        self.passes_the_borrow_on(function, &call)
+                            .map(|passes| passes.then(|| call.receiver()).flatten())
+                    },
+                )
+            })
+            .transpose()
+            .map(Option::flatten)
+            .and_then(|receiver| receiver.map_or(Ok(expression), |receiver| self.lender(receiver)))
+    }
 
-        self.method_calls.resolve(call).and_then(
-            |SubstitutedResolution {
-                 resolution: function,
-                 ..
-             }| {
-                call.receiver()
-                    .filter(|receiver| {
-                        ((self.is_result_method(function, &ERROR_DROPPING_RESULT_METHODS)
-                            || self.is_result_into_iter(function))
-                            && self.owns_a_result_error(receiver))
-                            || (self.is_result_method(function, &BORROWING_RESULT_METHODS)
-                                && !self.is_place(receiver)
-                                && self.owns_a_result_error(receiver))
-                            || (self.is_iterator_method(function, "flatten")
-                                && self
-                                    .semantics
-                                    .type_of_expr(receiver)
-                                    .and_then(|TypeInfo { original, .. }| {
-                                        original.iterator_item(database)
-                                    })
-                                    .is_some_and(|item| {
-                                        self.error_types.owned_result_error(&item).is_some()
-                                    }))
-                            || (self.is_iterator_method(function, "flat_map")
-                                && call
-                                    .arg_list()
-                                    .and_then(|arguments| arguments.args().next())
-                                    .and_then(|mapping| self.semantics.type_of_expr(&mapping))
-                                    .and_then(|TypeInfo { original, .. }| {
-                                        original.as_callable(database)
-                                    })
-                                    .is_some_and(|mapping| {
-                                        self.error_types
-                                            .owned_result_error(&mapping.return_type())
-                                            .is_some()
-                                    }))
-                    })
+    fn method_call(
+        &self,
+        call: &ast::MethodCallExpr,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
+        self.method_calls
+            .resolve(call)
+            .and_then(
+                |SubstitutedResolution {
+                     resolution: function,
+                     ..
+                 }| {
+                    call.receiver()
+                        .map(|receiver| self.drops_through(function, call, &receiver))
+                },
+            )
+            .transpose()
+            .map(|drops| {
+                drops
+                    .filter(|drops| *drops)
                     .and_then(|_| call.name_ref())
                     .map(|name| name.syntax().clone())
-            },
-        )
+            })
+    }
+
+    fn names_the_error(
+        &self,
+        function: Function,
+        error: TypeParam,
+    ) -> Result<bool, ModuleDependenciesError> {
+        self.semantics
+            .source(function)
+            .ok_or(ModuleDependenciesError::ResultMethodWithoutSource(function))
+            .map(
+                |InFile {
+                     value: declared, ..
+                 }| {
+                    declared
+                        .generic_param_list()
+                        .map(|parameters| parameters.syntax().clone())
+                        .into_iter()
+                        .chain(
+                            declared
+                                .param_list()
+                                .map(|parameters| parameters.syntax().clone()),
+                        )
+                        .chain(
+                            declared
+                                .ret_type()
+                                .map(|returned| returned.syntax().clone()),
+                        )
+                        .chain(
+                            declared
+                                .where_clause()
+                                .into_iter()
+                                .flat_map(|clause| clause.predicates())
+                                .filter(|predicate| !self.is_drop_bound(predicate))
+                                .map(|predicate| predicate.syntax().clone()),
+                        )
+                        .flat_map(|signature| signature.descendants())
+                        .filter_map(ast::Path::cast)
+                        .any(|written| match self.semantics.resolve_path(&written) {
+                            Some(PathResolution::TypeParam(named)) => named == error,
+                            Some(PathResolution::SelfType(_)) => true,
+                            _ => false,
+                        })
+                },
+            )
     }
 
     fn omitted_by(&self, parent: &SyntaxNode) -> Vec<Type<'database>> {
@@ -316,6 +493,24 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .is_some_and(|TypeInfo { original, .. }| {
                 self.error_types.owned_result_error(&original).is_some()
             })
+    }
+
+    fn passes_the_borrow_on(
+        &self,
+        function: Function,
+        call: &ast::MethodCallExpr,
+    ) -> Result<bool, ModuleDependenciesError> {
+        self.effect(function).map(|effect| match effect {
+            ResultMethodEffect::LendsTheError => true,
+            ResultMethodEffect::KeepsTheError => self
+                .semantics
+                .type_of_expr(&ast::Expr::MethodCallExpr(call.clone()))
+                .and_then(|TypeInfo { original, .. }| self.error_types.result_error(&original))
+                .is_some_and(|error| error.is_reference()),
+            ResultMethodEffect::DropsATemporaryError
+            | ResultMethodEffect::DropsTheError
+            | ResultMethodEffect::NotAResultMethod => false,
+        })
     }
 
     fn rest(&self, rest: &ast::RestPat) -> Option<SyntaxNode> {

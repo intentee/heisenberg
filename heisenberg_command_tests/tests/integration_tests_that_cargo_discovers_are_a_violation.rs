@@ -22,7 +22,7 @@ fn integration_tests_that_cargo_discovers_are_a_violation() {
             "SplitIntegrationTests: 1 violation\n\
             Every integration test target is its own binary, linked and started separately, which slows every test run and multiplies the long paths of build artifacts, and automatic discovery builds every file in tests/ as a target, including files that are meant to be modules. Set autotests = false, declare one [[test]] target, and include the other test files as its modules.\n\
             \n\
-            - Cargo.toml: Package discovers its integration test targets instead of setting autotests = false\n\
+            - Cargo.toml: Package builds integration test targets with libtest's harness without setting autotests = false\n\
             \n\
             ------------------------------\n\
             1 errors found\n\

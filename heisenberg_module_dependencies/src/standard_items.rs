@@ -2,6 +2,7 @@ use ra_ap_hir::Adt;
 use ra_ap_hir::Crate;
 use ra_ap_hir::Enum;
 use ra_ap_hir::Function;
+use ra_ap_hir::LangItem;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::Semantics;
 use ra_ap_hir::Trait;
@@ -33,6 +34,7 @@ fn standard_function(database: &RootDatabase, krate: Crate, path: &[&str]) -> Op
 }
 
 pub struct StandardItems {
+    pub destruct: Trait,
     pub drop: Function,
     pub error_trait: Trait,
     pub from_str: Trait,
@@ -55,6 +57,7 @@ impl StandardItems {
         let famous = FamousDefs(semantics, krate);
         let core = famous.core();
         let std = famous.std();
+        let destruct = Trait::lang(database, krate, LangItem::Destruct);
         let drop = famous.core_mem_drop();
         let error_trait =
             core.and_then(
@@ -89,7 +92,8 @@ impl StandardItems {
             .flatten()
             .collect();
 
-        if let Some(drop) = drop
+        if let Some(destruct) = destruct
+            && let Some(drop) = drop
             && let Some(error_trait) = error_trait
             && let Some(from_str) = from_str
             && let Some(infallible) = infallible
@@ -100,6 +104,7 @@ impl StandardItems {
             && missing_sleeps.is_empty()
         {
             Ok(Self {
+                destruct,
                 drop,
                 error_trait,
                 from_str,
@@ -115,6 +120,7 @@ impl StandardItems {
             Err(ModuleDependenciesError::StandardItemsMissing {
                 crate_target: crate_target.clone(),
                 items: [
+                    missing(destruct.as_ref(), RequiredStandardItem::Destruct),
                     missing(drop.as_ref(), RequiredStandardItem::Drop),
                     missing(error_trait.as_ref(), RequiredStandardItem::ErrorTrait),
                     missing(from_str.as_ref(), RequiredStandardItem::FromStr),

@@ -109,7 +109,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     or build dependency. The error type rules count every implementation of std::error::Error in a crate\n\
     target, those that macros generate included, and accept only those that the Error derive of\n\
     thiserror, the thiserror-impl package from crates.io, generates for an enum, and the serialization\n\
-    rule recognizes serde, the serde and serde_core packages from crates.io.\n\
+    rule recognizes serde, the serde and serde_core packages from crates.io. A standard library without\n\
+    the items that the analysis relies on, and serde packages that leave one of ser::Serialize,\n\
+    de::Deserialize and de::DeserializeOwned undeclared, fail the run.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\

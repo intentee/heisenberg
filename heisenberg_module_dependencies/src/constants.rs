@@ -9,23 +9,13 @@ pub const ASSERTION_MACROS: [&str; 6] = [
     "debug_assert_ne",
 ];
 
-pub const BORROWING_RESULT_METHODS: [&str; 3] = ["is_err", "is_ok", "iter"];
+pub const DESERIALIZE_OWNED_TRAIT_PATH: [&str; 2] = ["de", "DeserializeOwned"];
 
-pub const DESERIALIZE_TRAIT_PATHS: [[&str; 2]; 2] =
-    [["de", "Deserialize"], ["de", "DeserializeOwned"]];
+pub const DESERIALIZE_TRAIT_PATH: [&str; 2] = ["de", "Deserialize"];
 
 pub const EQUALITY_ASSERTION_MACROS: [&str; 2] = ["assert_eq", "debug_assert_eq"];
 
 pub const ERROR_DISPLAY_METHOD: &str = "as_display";
-
-pub const ERROR_DROPPING_RESULT_METHODS: [&str; 6] = [
-    "is_ok_and",
-    "map_or",
-    "ok",
-    "or",
-    "unwrap_or",
-    "unwrap_or_default",
-];
 
 pub const ERROR_MESSAGE_HELPER: &str = "error";
 

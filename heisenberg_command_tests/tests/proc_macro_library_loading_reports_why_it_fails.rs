@@ -1,5 +1,3 @@
-use std::error::Error;
-use std::iter;
 use std::path::Path;
 use std::thread;
 use std::thread::Builder;
@@ -10,15 +8,10 @@ use ra_ap_paths::AbsPathBuf;
 use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
 use heisenberg_analysis_threads::constants::UNRESERVABLE_STACK_SIZE;
 use heisenberg_analysis_threads::joined::joined;
+use heisenberg_command_tests::error_chain::error_chain;
 use heisenberg_command_tests::installed_proc_macro_server::installed_proc_macro_server;
 use heisenberg_project_model::proc_macro_loading::ProcMacroLoading;
 use heisenberg_project_model::project_model_error::ProjectModelError;
-
-fn chain(error: &(dyn Error + 'static)) -> Vec<String> {
-    iter::successors(Some(error), |cause| (*cause).source())
-        .map(ToString::to_string)
-        .collect()
-}
 
 #[test]
 fn library_that_the_server_cannot_load_fails_its_loading() {
@@ -73,7 +66,7 @@ fn library_whose_thread_cannot_start_fails_its_loading() {
         }
         .spawn()
         .err()
-        .map(|error| chain(&error));
+        .map(|error| error_chain(&error));
 
         assert_eq!(
             failure,

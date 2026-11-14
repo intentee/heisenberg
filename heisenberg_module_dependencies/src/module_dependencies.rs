@@ -112,6 +112,7 @@ impl ModuleDependencies<'_, '_> {
         let test_gated_code = OnceMap::default();
         let test_modules = TestModules::default();
         let trait_result_errors = OnceMap::default();
+        let result_method_effects = OnceMap::default();
 
         members
             .par_iter()
@@ -152,6 +153,7 @@ impl ModuleDependencies<'_, '_> {
                             inactive_code: &inactive_code,
                             krate: *krate,
                             module_paths: &module_paths,
+                            result_method_effects: &result_method_effects,
                             non_production_files,
                             source_files: files,
                             standard_items: &standard_items,
@@ -204,7 +206,7 @@ impl ModuleDependencies<'_, '_> {
         let database = &self.project.database;
         let serialization_traits = attach_db(database, || {
             SerializationTraits::new(database, &vetted_crates.serialization)
-        });
+        })?;
         let shared_files: BTreeSet<FileId> = file_modules
             .iter()
             .filter(|(_, modules)| modules.len() > 1)

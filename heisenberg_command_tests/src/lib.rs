@@ -1,7 +1,9 @@
 pub mod binary_check;
 pub mod check_outcome;
+pub mod cleared_path;
 pub mod constants;
 pub mod coverage_footer;
+pub mod error_chain;
 pub mod first_function_name;
 pub mod fixture_configuration;
 pub mod fixture_out_dir;

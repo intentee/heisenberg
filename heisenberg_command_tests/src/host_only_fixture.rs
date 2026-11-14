@@ -8,6 +8,7 @@ use toml::Table;
 use toml::Value;
 use toml::to_string;
 
+use crate::cleared_path::cleared_path;
 use crate::constants::CARGO_BUILD_TABLE;
 use crate::constants::CARGO_CONFIGURATION_DIRECTORY;
 use crate::constants::CARGO_CONFIGURATION_FILE;
@@ -268,17 +269,7 @@ impl HostOnlyFixture<'_> {
         let copy = self.directory.join(self.name);
         let manifest_path = copy.join("Cargo.toml");
 
-        fs::create_dir_all(&copy)
-            .map_err(|source| HeisenbergCheckError::FixtureDirectoryCreate {
-                path: copy.clone(),
-                source,
-            })
-            .and_then(|()| {
-                fs::remove_dir_all(&copy).map_err(|source| HeisenbergCheckError::FixtureReset {
-                    path: copy.clone(),
-                    source,
-                })
-            })
+        cleared_path(&copy)
             .and_then(|()| copied_directory(&source, &copy))
             .and_then(|()| {
                 fs::read_to_string(&manifest_path).map_err(|source| {

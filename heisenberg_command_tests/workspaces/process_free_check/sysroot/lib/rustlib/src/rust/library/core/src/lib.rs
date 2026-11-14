@@ -1,3 +1,5 @@
+#![feature(lang_items)]
+
 pub mod convert {
     pub enum Infallible {}
 }
@@ -16,6 +18,11 @@ pub mod iter {
             pub trait Iterator {}
         }
     }
+}
+
+pub mod marker {
+    #[lang = "destruct"]
+    pub trait Destruct {}
 }
 
 pub mod mem {

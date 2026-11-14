@@ -157,6 +157,7 @@ use crate::path_reference::PathReference;
 use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
+use crate::result_method_effect::ResultMethodEffect;
 use crate::round_trips::RoundTrips;
 use crate::serialization_traits::SerializationTraits;
 use crate::signature_scope::SignatureScope;
@@ -192,6 +193,8 @@ pub struct ModuleWalk<'walk, 'database> {
     pub options: &'walk CfgOptions,
     pub paths: &'walk PathResolutions<'walk, 'database>,
     pub production_options: &'walk CfgOptions,
+    pub result_method_effects:
+        &'walk OnceMap<Function, Result<ResultMethodEffect, Arc<ModuleDependenciesError>>>,
     pub semantics: &'walk Semantics<'database, RootDatabase>,
     pub serialization_traits: &'walk SerializationTraits,
     pub standard_items: &'walk StandardItems,
@@ -551,16 +554,19 @@ impl<'database> ModuleWalk<'_, 'database> {
             error_types: &self.error_types(),
             method_calls: self.method_calls,
             paths: self.paths,
+            result_method_effects: self.result_method_effects,
             semantics: self.semantics,
             standard_items: self.standard_items,
         }
         .discarded(node)
-        .map_or(Ok(None), |discarded| {
-            self.own_violation(
-                ViolationKind::Error(ErrorViolation::Discarded),
-                &discarded,
-                origin,
-            )
+        .and_then(|discarded| {
+            discarded.map_or(Ok(None), |discarded| {
+                self.own_violation(
+                    ViolationKind::Error(ErrorViolation::Discarded),
+                    &discarded,
+                    origin,
+                )
+            })
         })
     }
 
