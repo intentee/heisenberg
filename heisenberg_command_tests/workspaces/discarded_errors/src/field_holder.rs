@@ -31,4 +31,9 @@ impl FieldHolder {
     pub fn owned_check(text: &str) -> bool {
         Self::parsed_from(text).parsed.is_ok()
     }
+
+    #[must_use]
+    pub fn parenthesized_check(&self) -> bool {
+        (*self).parsed.is_ok()
+    }
 }

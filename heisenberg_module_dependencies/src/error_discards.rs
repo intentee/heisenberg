@@ -103,8 +103,8 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .or_else(|| {
                 ast::TupleStructPat::cast(node.clone()).map(|pattern| self.value_only(&pattern))
             })
-            .or_else(|| ast::RestPat::cast(node.clone()).map(|rest| Ok(self.rest(&rest))))
-            .or_else(|| ast::IdentPat::cast(node.clone()).map(|binding| Ok(self.unread(&binding))))
+            .or_else(|| ast::RestPat::cast(node.clone()).map(|rest| self.rest(&rest)))
+            .or_else(|| ast::IdentPat::cast(node.clone()).map(|binding| self.unread(&binding)))
             .unwrap_or(Ok(None))
     }
 
@@ -121,10 +121,18 @@ impl<'database> ErrorDiscards<'_, 'database> {
             Some(AssocItemContainer::Impl(implementation)) => {
                 let declaring = implementation.trait_(database);
 
-                match self
-                    .error_types
-                    .result_error(&implementation.self_ty(database))
-                {
+                let implemented = implementation.self_ty(database);
+
+                match self.error_types.result_error(&implemented) {
+                    None if declaring == Some(self.standard_items.into_iterator)
+                        && implemented.is_reference()
+                        && self
+                            .error_types
+                            .result_error(&implemented.strip_references())
+                            .is_some() =>
+                    {
+                        Ok(ResultMethodEffect::DropsATemporaryError)
+                    }
                     None => Ok(ResultMethodEffect::NotAResultMethod),
                     Some(_) if declaring == Some(self.standard_items.into_iterator) => {
                         Ok(ResultMethodEffect::DropsTheError)
@@ -155,6 +163,21 @@ impl<'database> ErrorDiscards<'_, 'database> {
         }
     }
 
+    fn discards(
+        &self,
+        held: &Type<'database>,
+        behind_a_reference: bool,
+        holder: &SyntaxNode,
+    ) -> Result<bool, ModuleDependenciesError> {
+        if !behind_a_reference && self.error_types.is_discardable(held) {
+            Ok(true)
+        } else if self.holds_an_error(held) {
+            self.lent_by_a_temporary(holder)
+        } else {
+            Ok(false)
+        }
+    }
+
     fn drops_an_error_of(&self, expression: &ast::Expr) -> Result<bool, ModuleDependenciesError> {
         if self.owns_a_result_error(expression) {
             Ok(true)
@@ -174,7 +197,7 @@ impl<'database> ErrorDiscards<'_, 'database> {
         self.effect(function).and_then(|effect| match effect {
             ResultMethodEffect::DropsTheError => self.drops_an_error_of(receiver),
             ResultMethodEffect::DropsATemporaryError => self
-                .lender(receiver.clone())
+                .lender(receiver)
                 .map(|lender| self.is_owned_temporary(&lender)),
             ResultMethodEffect::KeepsTheError | ResultMethodEffect::LendsTheError => Ok(false),
             ResultMethodEffect::NotAResultMethod => Ok((self
@@ -204,6 +227,21 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .map_err(ModuleDependenciesError::ResultMethodUnavailable)
     }
 
+    fn element_value(
+        &self,
+        element: &SyntaxNode,
+        mut elements: impl Iterator<Item = SyntaxNode>,
+        container: &SyntaxNode,
+    ) -> Option<ast::Expr> {
+        let position = elements.position(|candidate| candidate == *element);
+
+        self.lending_value(container).map(|value| {
+            ast::TupleExpr::cast(value.syntax().clone())
+                .and_then(|values| position.and_then(|position| values.fields().nth(position)))
+                .unwrap_or(value)
+        })
+    }
+
     fn function_value(
         &self,
         path: &ast::PathExpr,
@@ -222,20 +260,41 @@ impl<'database> ErrorDiscards<'_, 'database> {
                     self.effect(function)
                         .map(|effect| effect == ResultMethodEffect::DropsTheError)
                 }
+                .and_then(|drops| {
+                    let parameter_discardable = drops
+                        && self
+                            .semantics
+                            .type_of_expr(&ast::Expr::PathExpr(path.clone()))
+                            .and_then(|TypeInfo { original, .. }| original.as_callable(database))
+                            .and_then(|callable| callable.params().into_iter().next())
+                            .is_some_and(|parameter| {
+                                self.error_types.is_discardable(parameter.ty())
+                            });
+
+                    if parameter_discardable || function != self.standard_items.drop {
+                        Ok(parameter_discardable)
+                    } else {
+                        path.syntax()
+                            .parent()
+                            .and_then(ast::CallExpr::cast)
+                            .and_then(|call| call.arg_list())
+                            .and_then(|arguments| arguments.args().next())
+                            .map_or(Ok(false), |argument| self.lends_a_temporary(&argument))
+                    }
+                })
             })
             .transpose()
-            .map(|drops| {
-                drops
-                    .filter(|drops| *drops)
-                    .and_then(|_| {
-                        self.semantics
-                            .type_of_expr(&ast::Expr::PathExpr(path.clone()))
-                    })
-                    .and_then(|TypeInfo { original, .. }| original.as_callable(database))
-                    .and_then(|callable| callable.params().into_iter().next())
-                    .filter(|parameter| self.error_types.is_discardable(parameter.ty()))
-                    .map(|_| path.syntax().clone())
-            })
+            .map(|drops| drops.filter(|drops| *drops).map(|_| path.syntax().clone()))
+    }
+
+    fn holds_an_error(&self, candidate: &Type<'database>) -> bool {
+        let held = candidate.strip_references();
+
+        self.error_types.is_discardable(&held)
+            || self
+                .error_types
+                .result_error(&held)
+                .is_some_and(|error| self.error_types.implements_error(&error.strip_references()))
     }
 
     fn is_behind_a_pointer(&self, owner: &ast::Expr) -> bool {
@@ -339,28 +398,82 @@ impl<'database> ErrorDiscards<'_, 'database> {
             .map(Option::flatten)
     }
 
-    fn lender(&self, expression: ast::Expr) -> Result<ast::Expr, ModuleDependenciesError> {
-        ast::MethodCallExpr::cast(expression.syntax().clone())
-            .and_then(|call| {
-                self.method_calls.resolve(&call).map(
-                    |SubstitutedResolution {
-                         resolution: function,
-                         ..
-                     }| {
-                        self.passes_the_borrow_on(function, &call)
-                            .map(|passes| passes.then(|| call.receiver()).flatten())
-                    },
-                )
-            })
-            .transpose()
-            .map(Option::flatten)
-            .and_then(|receiver| receiver.map_or(Ok(expression), |receiver| self.lender(receiver)))
+    fn lender(&self, expression: &ast::Expr) -> Result<ast::Expr, ModuleDependenciesError> {
+        self.next_lender(expression)
+            .and_then(|next| next.map_or_else(|| Ok(expression.clone()), |next| self.lender(&next)))
+    }
+
+    fn lending_value(&self, node: &SyntaxNode) -> Option<ast::Expr> {
+        node.parent().and_then(|parent| {
+            ast::TuplePat::cast(parent.clone())
+                .map(|tuple| {
+                    self.element_value(
+                        node,
+                        tuple.fields().map(|field| field.syntax().clone()),
+                        &parent,
+                    )
+                })
+                .or_else(|| {
+                    ast::TupleExpr::cast(parent.clone()).map(|tuple| {
+                        self.element_value(
+                            node,
+                            tuple.fields().map(|field| field.syntax().clone()),
+                            &parent,
+                        )
+                    })
+                })
+                .unwrap_or_else(|| {
+                    if ast::Pat::can_cast(parent.kind())
+                        || ast::RecordPatField::can_cast(parent.kind())
+                        || ast::RecordPatFieldList::can_cast(parent.kind())
+                        || ast::MatchArm::can_cast(parent.kind())
+                        || ast::MatchArmList::can_cast(parent.kind())
+                        || ast::Param::can_cast(parent.kind())
+                        || ast::ParamList::can_cast(parent.kind())
+                    {
+                        self.lending_value(&parent)
+                    } else {
+                        ast::MatchExpr::cast(parent.clone())
+                            .and_then(|matched| matched.expr())
+                            .or_else(|| {
+                                ast::LetStmt::cast(parent.clone())
+                                    .and_then(|statement| statement.initializer())
+                            })
+                            .or_else(|| {
+                                ast::LetExpr::cast(parent.clone())
+                                    .and_then(|condition| condition.expr())
+                            })
+                            .or_else(|| {
+                                ast::BinExpr::cast(parent.clone())
+                                    .filter(|assignment| {
+                                        assignment
+                                            .lhs()
+                                            .is_some_and(|assignee| assignee.syntax() == node)
+                                    })
+                                    .and_then(|assignment| assignment.rhs())
+                            })
+                            .or_else(|| {
+                                ast::ClosureExpr::cast(parent.clone())
+                                    .and_then(|closure| closure.syntax().parent())
+                                    .and_then(ast::ArgList::cast)
+                                    .and_then(|arguments| arguments.syntax().parent())
+                                    .and_then(ast::MethodCallExpr::cast)
+                                    .and_then(|call| call.receiver())
+                            })
+                    }
+                })
+        })
     }
 
     fn lends_a_temporary(&self, expression: &ast::Expr) -> Result<bool, ModuleDependenciesError> {
-        self.lender(expression.clone()).map(|lender| {
+        self.lender(expression).map(|lender| {
             lender.syntax() != expression.syntax() && self.is_owned_temporary(&lender)
         })
+    }
+
+    fn lent_by_a_temporary(&self, holder: &SyntaxNode) -> Result<bool, ModuleDependenciesError> {
+        self.lending_value(holder)
+            .map_or(Ok(false), |value| self.lends_a_temporary(&value))
     }
 
     fn method_call(
@@ -432,14 +545,37 @@ impl<'database> ErrorDiscards<'_, 'database> {
             )
     }
 
+    fn next_lender(
+        &self,
+        expression: &ast::Expr,
+    ) -> Result<Option<ast::Expr>, ModuleDependenciesError> {
+        match expression {
+            ast::Expr::ParenExpr(inner) => Ok(inner.expr()),
+            ast::Expr::RefExpr(borrow) => Ok(borrow.expr()),
+            _ => ast::MethodCallExpr::cast(expression.syntax().clone())
+                .and_then(|call| {
+                    self.method_calls.resolve(&call).map(
+                        |SubstitutedResolution {
+                             resolution: function,
+                             ..
+                         }| {
+                            self.passes_the_borrow_on(function, &call)
+                                .map(|passes| passes.then(|| call.receiver()).flatten())
+                        },
+                    )
+                })
+                .transpose()
+                .map(Option::flatten),
+        }
+    }
+
     fn omitted_by(&self, parent: &SyntaxNode) -> Vec<Type<'database>> {
         let database = self.semantics.db;
 
         ast::TupleStructPat::cast(parent.clone())
             .map(|pattern| {
-                (!self.is_behind_a_reference(&ast::Pat::TupleStructPat(pattern.clone())))
-                    .then(|| self.semantics.resolve_tuple_struct_pat_fields(&pattern))
-                    .flatten()
+                self.semantics
+                    .resolve_tuple_struct_pat_fields(&pattern)
                     .map(|fields| {
                         omitted_elements(
                             pattern.fields(),
@@ -451,12 +587,8 @@ impl<'database> ErrorDiscards<'_, 'database> {
             })
             .or_else(|| {
                 ast::TuplePat::cast(parent.clone()).map(|pattern| {
-                    (!self.is_behind_a_reference(&ast::Pat::TuplePat(pattern.clone())))
-                        .then(|| {
-                            self.semantics
-                                .type_of_pat(&ast::Pat::TuplePat(pattern.clone()))
-                        })
-                        .flatten()
+                    self.semantics
+                        .type_of_pat(&ast::Pat::TuplePat(pattern.clone()))
                         .map(|TypeInfo { original, .. }| {
                             omitted_elements(
                                 pattern.fields(),
@@ -469,12 +601,8 @@ impl<'database> ErrorDiscards<'_, 'database> {
             })
             .or_else(|| {
                 ast::SlicePat::cast(parent.clone()).map(|pattern| {
-                    (!self.is_behind_a_reference(&ast::Pat::SlicePat(pattern.clone())))
-                        .then(|| {
-                            self.semantics
-                                .type_of_pat(&ast::Pat::SlicePat(pattern.clone()))
-                        })
-                        .flatten()
+                    self.semantics
+                        .type_of_pat(&ast::Pat::SlicePat(pattern.clone()))
                         .and_then(|TypeInfo { original, .. }| original.as_array(database))
                         .map(|(element, length)| {
                             omitted_elements(pattern.pats(), iter::repeat_n(element, length))
@@ -488,9 +616,6 @@ impl<'database> ErrorDiscards<'_, 'database> {
                 ast::RecordPatFieldList::cast(parent.clone())
                     .and_then(|fields| fields.syntax().parent())
                     .and_then(ast::RecordPat::cast)
-                    .filter(|pattern| {
-                        !self.is_behind_a_reference(&ast::Pat::RecordPat(pattern.clone()))
-                    })
                     .map(|pattern| {
                         self.semantics
                             .record_pattern_matched_fields(&pattern)
@@ -520,64 +645,91 @@ impl<'database> ErrorDiscards<'_, 'database> {
             ResultMethodEffect::KeepsTheError => self
                 .semantics
                 .type_of_expr(&ast::Expr::MethodCallExpr(call.clone()))
-                .and_then(|TypeInfo { original, .. }| self.error_types.result_error(&original))
-                .is_some_and(|error| error.is_reference()),
+                .is_some_and(|TypeInfo { original, .. }| {
+                    (original.is_reference()
+                        && self
+                            .error_types
+                            .implements_error(&original.strip_references()))
+                        || self
+                            .error_types
+                            .result_error(&original)
+                            .is_some_and(|error| error.is_reference())
+                }),
             ResultMethodEffect::DropsATemporaryError
             | ResultMethodEffect::DropsTheError
             | ResultMethodEffect::NotAResultMethod => false,
         })
     }
 
-    fn rest(&self, rest: &ast::RestPat) -> Option<SyntaxNode> {
+    fn rest(&self, rest: &ast::RestPat) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
         rest.syntax()
             .parent()
-            .filter(|parent| {
-                self.omitted_by(parent)
-                    .iter()
-                    .any(|element| self.error_types.is_discardable(element))
+            .and_then(|parent| {
+                ast::Pat::cast(parent.clone())
+                    .or_else(|| parent.parent().and_then(ast::Pat::cast))
+                    .map(|owner| {
+                        let omitted = self.omitted_by(&parent);
+
+                        if !self.is_behind_a_reference(&owner)
+                            && omitted
+                                .iter()
+                                .any(|element| self.error_types.is_discardable(element))
+                        {
+                            Ok(true)
+                        } else if omitted.iter().any(|element| self.holds_an_error(element)) {
+                            self.lent_by_a_temporary(owner.syntax())
+                        } else {
+                            Ok(false)
+                        }
+                    })
             })
-            .map(|_| rest.syntax().clone())
+            .transpose()
+            .map(|drops| drops.filter(|drops| *drops).map(|_| rest.syntax().clone()))
     }
 
     fn underscore(
         &self,
         underscore: &ast::UnderscoreExpr,
     ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
-        if self
-            .semantics
+        self.semantics
             .type_of_expr(&ast::Expr::UnderscoreExpr(underscore.clone()))
-            .is_some_and(|TypeInfo { original, .. }| self.error_types.is_discardable(&original))
-        {
-            Ok(true)
-        } else {
-            underscore
-                .syntax()
-                .parent()
-                .and_then(ast::BinExpr::cast)
-                .and_then(|assignment| assignment.rhs())
-                .map_or(Ok(false), |assigned| self.lends_a_temporary(&assigned))
-        }
-        .map(|drops| drops.then(|| underscore.syntax().clone()))
+            .map(|TypeInfo { original, .. }| self.discards(&original, false, underscore.syntax()))
+            .transpose()
+            .map(|drops| {
+                drops
+                    .filter(|drops| *drops)
+                    .map(|_| underscore.syntax().clone())
+            })
     }
 
-    fn unread(&self, binding: &ast::IdentPat) -> Option<SyntaxNode> {
+    fn unread(
+        &self,
+        binding: &ast::IdentPat,
+    ) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
         (self.semantics.resolve_bind_pat_to_const(binding).is_none()
             && !is_bodiless_parameter(binding.syntax()))
         .then(|| self.semantics.type_of_binding_in_pat(binding))
         .flatten()
-        .filter(|bound| self.error_types.is_discardable(bound))
-        .and_then(|_| self.semantics.to_def(binding))
-        .filter(|local| {
-            !Definition::Local(*local)
-                .usages(self.semantics)
-                .all()
-                .references
-                .values()
-                .flatten()
-                .any(|FileReference { category, .. }| category.contains(ReferenceCategory::READ))
+        .map(|bound| self.discards(&bound, false, binding.syntax()))
+        .transpose()
+        .map(|holds| {
+            holds
+                .filter(|holds| *holds)
+                .and_then(|_| self.semantics.to_def(binding))
+                .filter(|local| {
+                    !Definition::Local(*local)
+                        .usages(self.semantics)
+                        .all()
+                        .references
+                        .values()
+                        .flatten()
+                        .any(|FileReference { category, .. }| {
+                            category.contains(ReferenceCategory::READ)
+                        })
+                })
+                .and_then(|_| binding.name())
+                .map(|name| name.syntax().clone())
         })
-        .and_then(|_| binding.name())
-        .map(|name| name.syntax().clone())
     }
 
     fn value_only(
@@ -606,55 +758,39 @@ impl<'database> ErrorDiscards<'_, 'database> {
 
         (self.is_result_variant(pattern, RESULT_VALUE_VARIANT)
             && !binds_the_error
-            && refutably_matched
-            && !self.is_behind_a_reference(&ast::Pat::TupleStructPat(pattern.clone())))
-        .then(|| {
-            if self
-                .semantics
-                .type_of_pat(&ast::Pat::TupleStructPat(pattern.clone()))
-                .is_some_and(|TypeInfo { original, .. }| {
-                    self.error_types.owned_result_error(&original).is_some()
-                })
-            {
-                Ok(true)
-            } else {
-                top.parent()
-                    .and_then(|owner| {
-                        ast::LetExpr::cast(owner.clone())
-                            .and_then(|condition| condition.expr())
-                            .or_else(|| {
-                                ast::LetStmt::cast(owner)
-                                    .and_then(|statement| statement.initializer())
-                            })
-                    })
-                    .map_or(Ok(false), |matched| self.lends_a_temporary(&matched))
-            }
-        })
-        .transpose()
-        .map(|drops| {
-            drops
-                .filter(|drops| *drops)
-                .map(|_| pattern.syntax().clone())
-        })
+            && refutably_matched)
+            .then(|| {
+                if !self.is_behind_a_reference(&ast::Pat::TupleStructPat(pattern.clone()))
+                    && self
+                        .semantics
+                        .type_of_pat(&ast::Pat::TupleStructPat(pattern.clone()))
+                        .is_some_and(|TypeInfo { original, .. }| {
+                            self.error_types.owned_result_error(&original).is_some()
+                        })
+                {
+                    Ok(true)
+                } else {
+                    self.lent_by_a_temporary(pattern.syntax())
+                }
+            })
+            .transpose()
+            .map(|drops| {
+                drops
+                    .filter(|drops| *drops)
+                    .map(|_| pattern.syntax().clone())
+            })
     }
 
     fn wildcard(&self, wildcard: &ast::Pat) -> Result<Option<SyntaxNode>, ModuleDependenciesError> {
-        (!self.is_behind_a_reference(wildcard) && !is_bodiless_parameter(wildcard.syntax()))
-            .then(|| {
-                if self.semantics.type_of_pat(wildcard).is_some_and(
-                    |TypeInfo { original, .. }| self.error_types.is_discardable(&original),
-                ) {
-                    Ok(true)
-                } else {
-                    wildcard
-                        .syntax()
-                        .parent()
-                        .and_then(ast::LetStmt::cast)
-                        .and_then(|statement| statement.initializer())
-                        .map_or(Ok(false), |initializer| {
-                            self.lends_a_temporary(&initializer)
-                        })
-                }
+        (!is_bodiless_parameter(wildcard.syntax()))
+            .then(|| self.semantics.type_of_pat(wildcard))
+            .flatten()
+            .map(|TypeInfo { original, .. }| {
+                self.discards(
+                    &original,
+                    self.is_behind_a_reference(wildcard),
+                    wildcard.syntax(),
+                )
             })
             .transpose()
             .map(|drops| {
