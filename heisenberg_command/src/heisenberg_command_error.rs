@@ -1,4 +1,6 @@
+use std::error::Error as StdError;
 use std::io;
+use std::iter;
 
 use thiserror::Error;
 
@@ -49,4 +51,17 @@ pub enum HeisenbergCommandError {
     WriteExplanation(#[source] io::Error),
     #[error("the report cannot be written")]
     WriteReport(#[source] io::Error),
+}
+
+impl HeisenbergCommandError {
+    pub(crate) fn chain(&self) -> Vec<String> {
+        match self {
+            Self::Failures(failures) => failures.iter().flat_map(Self::chain).collect(),
+            _ => iter::successors(Some(self as &dyn StdError), |cause: &&dyn StdError| {
+                (*cause).source()
+            })
+            .map(|cause| cause.to_string().trim_end().to_owned())
+            .collect(),
+        }
+    }
 }

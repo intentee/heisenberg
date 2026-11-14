@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::ffi::OsString;
 use std::io;
 use std::io::Write;
-use std::iter;
 
 use clap::Parser;
 
@@ -12,19 +10,6 @@ use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::heisenberg_subcommand::HeisenbergSubcommand;
 use crate::rendered_report::RenderedReport;
-
-fn error_chain(error: &HeisenbergCommandError) -> Vec<String> {
-    match error {
-        HeisenbergCommandError::Failures(failures) => {
-            failures.iter().flat_map(error_chain).collect()
-        }
-        _ => iter::successors(Some(error as &dyn Error), |cause: &&dyn Error| {
-            (*cause).source()
-        })
-        .map(|cause| cause.to_string().trim_end().to_owned())
-        .collect(),
-    }
-}
 
 fn written(
     output: &mut dyn Write,
@@ -90,7 +75,8 @@ impl HeisenbergCommand {
             Ok(status) => Ok(status),
             Err(failure) => errors
                 .write_all(
-                    error_chain(&failure)
+                    failure
+                        .chain()
                         .iter()
                         .map(|cause| format!("error: {cause}\n"))
                         .collect::<Vec<String>>()

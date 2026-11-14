@@ -187,8 +187,6 @@ pub trait ConfigurationPipeline: Sync {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
-    use std::error::Error;
-    use std::iter;
     use std::thread;
     use std::thread::Builder;
 
@@ -228,11 +226,7 @@ mod tests {
                 || Ok::<(), HeisenbergCommandError>(()),
             )
             .err()
-            .map(|error| {
-                iter::successors(Some(&error as &dyn Error), |cause| (*cause).source())
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-            });
+            .map(|error| error.chain());
 
             assert_eq!(
                 failure,
