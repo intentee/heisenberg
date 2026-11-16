@@ -400,7 +400,7 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Benchmarks) => {
                 Self::FunctionUsedOnlyByBenchmarks
             }
-            ViolationKind::Test(TestViolation::Ignored) => Self::Test(TestIssue::IgnoredTest),
+            ViolationKind::Test(TestViolation::Ignored) => Self::Test(TestIssue::Ignored),
             ViolationKind::NonBenchmarkItemInBenchmarkTarget => {
                 Self::NonBenchmarkItemInBenchmarkTarget
             }
@@ -439,13 +439,10 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::Reexport => Self::Reexport,
             ViolationKind::SingleLetterName => Self::SingleLetterName,
             ViolationKind::Test(TestViolation::SerializationRoundTrip) => {
-                Self::Test(TestIssue::SerializationRoundTripTest)
+                Self::Test(TestIssue::SerializationRoundTrip)
             }
-            ViolationKind::Test(TestViolation::Sleeping) => Self::Test(TestIssue::SleepInTest),
+            ViolationKind::Test(TestViolation::Sleeping) => Self::Test(TestIssue::Sleeping),
             ViolationKind::TestOnlyCodeInProduction => Self::TestOnlyCodeInProduction,
-            ViolationKind::Test(TestViolation::WithoutAssertion) => {
-                Self::Test(TestIssue::TestWithoutAssertion)
-            }
             ViolationKind::TupleInSignature => Self::TupleInSignature,
             ViolationKind::UndestructuredParameter { .. } => Self::UndestructuredParameter,
             ViolationKind::UnimplementedBuiltinMacro => Self::UnimplementedBuiltinMacro,
@@ -549,7 +546,6 @@ impl ValueEnum for IssueType {
             Self::ConfinedPackageUserListedTwice,
             Self::ConfinedPackageUserNotAMember,
             Self::ConfinedPackageUserNotReachingIt,
-            Self::Error(ErrorIssue::DiscardedError),
             Self::DuplicatedFunctionBody,
             Self::Error(ErrorIssue::ErrorSourceOutsideChain),
             Self::Error(ErrorIssue::ErrorTypeNotAnEnum),
@@ -558,7 +554,7 @@ impl ValueEnum for IssueType {
             Self::FunctionUsedOnlyByTests,
             Self::GlobImport,
             Self::Error(ErrorIssue::HandwrittenErrorType),
-            Self::Test(TestIssue::IgnoredTest),
+            Self::Test(TestIssue::Ignored),
             Self::ImplWithoutLocalType,
             Self::IncludedSourceFile,
             Self::InvalidMacroDefinition,
@@ -594,17 +590,16 @@ impl ValueEnum for IssueType {
             Self::ReferencedTest,
             Self::RequiredClippySettingMissing,
             Self::RequiredLintNotDenied,
-            Self::Test(TestIssue::SerializationRoundTripTest),
+            Self::Test(TestIssue::SerializationRoundTrip),
             Self::SharedModuleFile,
             Self::SingleLetterName,
-            Self::Test(TestIssue::SleepInTest),
+            Self::Test(TestIssue::Sleeping),
             Self::Error(ErrorIssue::SourceInErrorMessage),
             Self::SplitIntegrationTests,
             Self::TestCrateDeclaredTwice,
             Self::TestCrateNotAMember,
             Self::TestCrateUsedByProduction,
             Self::TestOnlyCodeInProduction,
-            Self::Test(TestIssue::TestWithoutAssertion),
             Self::TestsOnlyPackageWithoutTestLibraries,
             Self::TupleInSignature,
             Self::UncoveredCode,

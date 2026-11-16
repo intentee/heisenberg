@@ -46,15 +46,16 @@ mod tests {
 
     #[test]
     fn every_supported_target_has_tables_that_parse() {
-        let unparsable: Vec<String> = SUPPORTED_TARGETS
+        let failures: Vec<Option<String>> = SUPPORTED_TARGETS
             .into_iter()
-            .filter_map(|target| {
+            .map(|target| {
                 TargetCfg::parse(target)
                     .err()
-                    .map(|error| format!("{}: {error}", target.triple()))
+                    .as_ref()
+                    .map(ToString::to_string)
             })
             .collect();
 
-        assert_eq!(unparsable, Vec::<String>::new());
+        assert_eq!(failures, vec![None; SUPPORTED_TARGETS.len()]);
     }
 }

@@ -190,6 +190,7 @@ mod tests {
     use std::thread;
     use std::thread::Builder;
 
+    use heisenberg_analysis_threads::analysis_thread::AnalysisThread;
     use heisenberg_analysis_threads::analysis_threads::AnalysisThreads;
     use heisenberg_analysis_threads::constants::UNRESERVABLE_STACK_SIZE;
     use heisenberg_project_model::configuration::Configuration;
@@ -199,21 +200,42 @@ mod tests {
     use super::configuration_thread;
     use crate::heisenberg_command_error::HeisenbergCommandError;
 
-    #[test]
-    fn configuration_whose_thread_cannot_start_fails_with_its_name() {
-        let configuration = Configuration {
-            name: "unstartable".to_owned(),
+    const FINISHED: fn() -> Result<(), HeisenbergCommandError> = || Ok(());
+
+    fn configuration(name: &str) -> Configuration {
+        Configuration {
+            name: name.to_owned(),
             target: SupportedTarget::X86_64UnknownLinuxGnu,
             features: FeatureSelection {
                 default_features: true,
                 features: BTreeSet::new(),
             },
-        };
+        }
+    }
+
+    #[test]
+    fn configuration_whose_thread_starts_completes_its_work() {
+        let configuration = configuration("startable");
+
+        thread::scope(|scope| {
+            assert_eq!(
+                configuration_thread(&AnalysisThreads::new(scope), &configuration, FINISHED)
+                    .ok()
+                    .map(AnalysisThread::join)
+                    .and_then(Result::ok),
+                Some(())
+            );
+        });
+    }
+
+    #[test]
+    fn configuration_whose_thread_cannot_start_fails_with_its_name() {
+        let configuration = configuration("unstartable");
 
         thread::scope(|scope| {
             let refused = Builder::new()
                 .stack_size(UNRESERVABLE_STACK_SIZE)
-                .spawn_scoped(scope, || ())
+                .spawn_scoped(scope, String::new)
                 .err()
                 .map(|error| error.to_string())
                 .expect("the operating system must refuse a stack it cannot reserve");
@@ -223,7 +245,7 @@ mod tests {
                     stack_size: UNRESERVABLE_STACK_SIZE,
                 },
                 &configuration,
-                || Ok::<(), HeisenbergCommandError>(()),
+                FINISHED,
             )
             .err()
             .map(|error| error.chain());

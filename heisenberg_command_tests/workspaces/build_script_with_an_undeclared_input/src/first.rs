@@ -1,7 +1,7 @@
 pub struct First;
 
 impl First {
-    #[cfg(three_jobs)]
+    #[cfg(undeclared_input)]
     pub fn second() -> crate::second::Second {
         crate::second::Second
     }

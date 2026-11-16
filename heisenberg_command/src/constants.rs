@@ -116,13 +116,6 @@ pub const CONFINED_PACKAGE_USER_NOT_REACHING_IT: IssueText = IssueText {
     summary: "A confined package user that never reaches the package",
 };
 
-pub const DISCARDED_ERROR: IssueText = IssueText {
-    definition: "Code that drops an owned error, one of a Result whose error is not a reference, (), Infallible or !, or a value of an error type, without binding and reading it: a _ pattern or a _ = assignment that matches it, a .. rest pattern that leaves it out, an if let, while let or let else that matches only the Ok of a Result, a method of Result that takes it by value and whose signature names neither the error type nor Self other than to let the error be dropped, such as ok, unwrap_or or map_or, iterating a Result with into_iter or a for loop, flatten or flat_map over Results, drop of it, a method of Result whose signature never names the error type called on a Result that is not stored in a place, such as is_ok, is_err, iter or iter_mut, and a binding of it that is never read. Each of these applies as well to an error borrowed from a Result that is not stored in a place, through a & borrow or the methods that lend its error by reference, such as as_ref, or pass such a borrow on, such as copied or unwrap_err, wherever the borrowed error is dropped: in a match arm, a nested pattern or assignee, the parameter of a closure passed to one of its methods, drop, or a binding that is never read.",
-    name: "DiscardedError",
-    purpose: "A dropped error hides the failure that caused it, so the program continues on a state it never checked and nothing explains what went wrong. Handle the error: return it, wrap it as the source of a more specific error, or match its variants.",
-    summary: "An error that is dropped without being handled",
-};
-
 pub const DUPLICATED_FUNCTION_BODY: IssueText = IssueText {
     definition: "Functions written in the module files of workspace members whose signatures and bodies are identical once every name is replaced by the definition it resolves to, with names a function declares itself compared by declaration order and names that resolve to nothing never equal; a format or assembly template compares by its written text and by the definitions its placeholders capture, and the name of a named format argument by its spelling. Functions with an empty body are not compared, and neither are the entry points that Rust requires one of per target or per macro: the main function of a binary, a build script, an example, or a test or benchmark target without libtest's harness, and the functions of procedural macros.",
     name: "DuplicatedFunctionBody",
@@ -506,13 +499,6 @@ pub const TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES: IssueText = IssueText {
     name: "TestsOnlyPackageWithoutTestLibraries",
     purpose: "Tests belong to the package whose behaviour they verify, in its tests directory. A separate tests package is justified only by test libraries of its own: shared helpers, which never live in a tests directory, and helpers that need the package under test, which that package cannot dev-depend on without a dependency cycle. Heisenberg cannot tell from the code which package the tests verify, so it lists every workspace member the tests use, either as a package that could take them or with the dependency cycle that moving them there would close; the right owner is the package they verify. If a test library they use depends on that package, the test library is entangled with the code it helps to test: move the helpers that need the package into this package's library, or make the test library independent of it.",
     summary: "A package of tests that holds no test library of its own",
-};
-
-pub const TEST_WITHOUT_ASSERTION: IssueText = IssueText {
-    definition: "A test function that libtest runs, whose body, including the expansions of the macros it calls, calls none of the assertion macros of the standard library, assert!, assert_eq!, assert_ne!, debug_assert!, debug_assert_eq! and debug_assert_ne!, and that is not marked should_panic.",
-    name: "TestWithoutAssertion",
-    purpose: "A test without an assertion passes whenever its code does not panic, so it checks no result. Assert the values the tested code produces.",
-    summary: "A test that asserts nothing",
 };
 
 pub const TUPLE_IN_SIGNATURE: IssueText = IssueText {

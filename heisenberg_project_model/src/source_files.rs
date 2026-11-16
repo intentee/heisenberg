@@ -120,6 +120,9 @@ mod tests {
     use std::env;
     use std::error::Error;
     use std::fs;
+    use std::io;
+    use std::io::ErrorKind;
+    use std::mem;
 
     use ra_ap_paths::AbsPathBuf;
     use ra_ap_vfs::Vfs;
@@ -162,11 +165,15 @@ mod tests {
         vfs.set_file_contents(VfsPath::from(missing.clone()), Some(Vec::new()));
 
         let failure = SourceFiles::new(&vfs, &directory, &OnceMap::default()).err();
+        let unreadable = ProjectModelError::SourceFileUnreadable {
+            path: missing.clone(),
+            source: io::Error::from(ErrorKind::NotFound),
+        };
 
         assert!(matches!(
             &failure,
             Some(ProjectModelError::SourceFileUnavailable(unavailable))
-                if matches!(&**unavailable, ProjectModelError::SourceFileUnreadable { .. })
+                if mem::discriminant(&**unavailable) == mem::discriminant(&unreadable)
         ));
         assert_eq!(
             failure.map(|error| {

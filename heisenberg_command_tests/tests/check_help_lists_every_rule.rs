@@ -55,7 +55,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     measures or judges them (--quick, --sample-size, --warm-up-time, --measurement-time, --nresamples,\n\
     --noise-threshold, --confidence-level, --significance-level and --profile-time). An environment\n\
     variable whose name or value is not UTF-8, CARGO_ENCODED_RUSTFLAGS, RUSTFLAGS, RUSTC,\n\
-    RUSTC_WORKSPACE_WRAPPER, RUSTC_WRAPPER, CLIPPY_ARGS, CLIPPY_CONF_DIR, NEXTEST_RETRIES or\n\
+    RUSTC_WORKSPACE_WRAPPER, RUSTC_WRAPPER, RUSTDOC, CLIPPY_ARGS, CLIPPY_CONF_DIR, NEXTEST_RETRIES or\n\
     RUSTC_BOOTSTRAP, __CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS in the environment, a workspace\n\
     directory that is not the root of its cargo workspace, a workspace member or crate root outside the\n\
     workspace root, a package whose metadata cargo_metadata cannot read, a crate root that two targets\n\
@@ -64,13 +64,13 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     discovery finds and cannot read, or that is the only one in its directory and is not valid TOML, a\n\
     .config/nextest.toml that cannot be read or is not a valid nextest configuration, rustflags in the\n\
     [build] or [target] tables of the cargo configuration or in the CARGO_BUILD_RUSTFLAGS and\n\
-    CARGO_TARGET_<TRIPLE>_RUSTFLAGS variables of a supported target, rustc, rustc-workspace-wrapper or\n\
-    rustc-wrapper in the [build] table of the cargo configuration, including through the environment\n\
-    variables that set them, and CLIPPY_ARGS, CLIPPY_CONF_DIR or RUSTC_BOOTSTRAP in the [env] table of\n\
-    the cargo configuration, under any letter case, fail the run. A failing run reports the first\n\
-    failure among loading the project, building it, resolving the standard library of its targets and\n\
-    reading its clippy and nextest configurations, in that order, and otherwise the analysis failures of\n\
-    every configuration.\n\
+    CARGO_TARGET_<TRIPLE>_RUSTFLAGS variables of a supported target, rustc, rustc-workspace-wrapper,\n\
+    rustc-wrapper or rustdoc in the [build] table of the cargo configuration, including through the\n\
+    environment variables that set them, and CLIPPY_ARGS, CLIPPY_CONF_DIR or RUSTC_BOOTSTRAP in the\n\
+    [env] table of the cargo configuration, under any letter case, fail the run. A failing run reports\n\
+    the first failure among loading the project, building it, resolving the standard library of its\n\
+    targets and reading its clippy and nextest configurations, in that order, and otherwise the analysis\n\
+    failures of every configuration.\n\
     \n\
     Analysis: Values that the [env] table of the cargo configuration declares reach the analysis as\n\
     cargo resolves them, OUT_DIR and the cfgs and env a build script emits come from running it, or from\n\
@@ -147,7 +147,6 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ConfinedPackageUserListedTwice: A confined package user listed more than once\n  \
     ConfinedPackageUserNotAMember: A confined package user that is not a workspace member\n  \
     ConfinedPackageUserNotReachingIt: A confined package user that never reaches the package\n  \
-    DiscardedError: An error that is dropped without being handled\n  \
     DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n  \
     ErrorSourceOutsideChain: An error held outside the source chain\n  \
     ErrorTypeNotAnEnum: An error type deriving thiserror::Error that is not an enum\n  \
@@ -203,7 +202,6 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     TestCrateNotAMember: A declared test crate that is not a workspace member\n  \
     TestCrateUsedByProduction: A declared test crate that production code depends on\n  \
     TestOnlyCodeInProduction: Code that exists only under cfg(test) outside test code\n  \
-    TestWithoutAssertion: A test that asserts nothing\n  \
     TestsOnlyPackageWithoutTestLibraries: A package of tests that holds no test library of its own\n  \
     TupleInSignature: A tuple type in an item signature\n  \
     UndestructuredParameter: A parameter used only through its fields\n  \

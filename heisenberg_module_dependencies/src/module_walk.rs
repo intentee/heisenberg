@@ -107,7 +107,6 @@ use crate::attribute_directives::AttributeDirectives;
 use crate::attributed_item::AttributedItem;
 use crate::benchmark_harness::BenchmarkHarness;
 use crate::benchmark_output::BenchmarkOutput;
-use crate::constants::ASSERTION_MACROS;
 use crate::constants::EQUALITY_ASSERTION_MACROS;
 use crate::constants::LIFETIME_PREFIX;
 use crate::constants_module::ConstantsModule;
@@ -118,7 +117,6 @@ use crate::defined_items::DefinedItems;
 use crate::definition_usages::DefinitionUsages;
 use crate::derived_sources::DerivedSources;
 use crate::error_derive::ErrorDerive;
-use crate::error_discards::ErrorDiscards;
 use crate::error_implementation_origin::ErrorImplementationOrigin;
 use crate::error_types::ErrorTypes;
 use crate::expanded_items::ExpandedItems;
@@ -160,7 +158,6 @@ use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
 use crate::qualified_names::QualifiedNames;
-use crate::result_method_effect::ResultMethodEffect;
 use crate::round_trips::RoundTrips;
 use crate::serialization_traits::SerializationTraits;
 use crate::signature_scope::SignatureScope;
@@ -196,8 +193,6 @@ pub struct ModuleWalk<'walk, 'database> {
     pub options: &'walk CfgOptions,
     pub paths: &'walk PathResolutions<'walk, 'database>,
     pub production_options: &'walk CfgOptions,
-    pub result_method_effects:
-        &'walk OnceMap<Function, Result<ResultMethodEffect, Arc<ModuleDependenciesError>>>,
     pub semantics: &'walk Semantics<'database, RootDatabase>,
     pub serialization_traits: &'walk SerializationTraits,
     pub standard_items: &'walk StandardItems,
@@ -305,7 +300,6 @@ impl<'database> ModuleWalk<'_, 'database> {
     ) -> Result<(), ModuleDependenciesError> {
         let holds_workspace_text = OnceCell::new();
         let AttributeDirectives {
-            expects_a_panic,
             ignores,
             suppressions,
         } = NodeAttributes {
@@ -316,7 +310,7 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
         .directives();
 
-        self.record_test(node, origin, expects_a_panic);
+        self.record_test(node, origin);
 
         suppressions
             .iter()
@@ -547,31 +541,6 @@ impl<'database> ModuleWalk<'_, 'database> {
             },
             origin,
         )
-    }
-
-    fn discarded_error(
-        &self,
-        node: &SyntaxNode,
-        origin: &SubtreeOrigin,
-    ) -> Result<Option<Violation>, ModuleDependenciesError> {
-        ErrorDiscards {
-            error_types: &self.error_types(),
-            method_calls: self.method_calls,
-            paths: self.paths,
-            result_method_effects: self.result_method_effects,
-            semantics: self.semantics,
-            standard_items: self.standard_items,
-        }
-        .discarded(node)
-        .and_then(|discarded| {
-            discarded.map_or(Ok(None), |discarded| {
-                self.own_violation(
-                    ViolationKind::Error(ErrorViolation::Discarded),
-                    &discarded,
-                    origin,
-                )
-            })
-        })
     }
 
     fn enter(
@@ -2057,14 +2026,14 @@ impl<'database> ModuleWalk<'_, 'database> {
     fn record_assertion(&self, call: &ast::MacroCall) {
         let database = self.semantics.db;
 
-        if let Some(assertion) = self
+        if self
             .semantics
             .resolve_macro_call(call)
-            .filter(|definition| {
+            .is_some_and(|definition| {
                 self.standard_items
                     .library_crates
                     .contains(&definition.module(database).krate(database))
-                    && ASSERTION_MACROS.contains(&definition.name(database).as_str())
+                    && EQUALITY_ASSERTION_MACROS.contains(&definition.name(database).as_str())
             })
             && let Some(written) = self
                 .semantics
@@ -2072,15 +2041,11 @@ impl<'database> ModuleWalk<'_, 'database> {
                 .find_map(ast::Fn::cast)
             && let Some(function) = self.semantics.to_def(&written)
         {
-            self.test_assertions.assert_in(function);
-
-            if EQUALITY_ASSERTION_MACROS.contains(&assertion.name(database).as_str()) {
-                self.test_assertions.compare_in(
-                    function,
-                    self.round_trips()
-                        .compares_a_round_trip(call, written.syntax()),
-                );
-            }
+            self.test_assertions.compare_in(
+                function,
+                self.round_trips()
+                    .compares_a_round_trip(call, written.syntax()),
+            );
         }
     }
 
@@ -2103,7 +2068,7 @@ impl<'database> ModuleWalk<'_, 'database> {
             })
     }
 
-    fn record_test(&self, node: &SyntaxNode, origin: &SubtreeOrigin, expects_a_panic: bool) {
+    fn record_test(&self, node: &SyntaxNode, origin: &SubtreeOrigin) {
         if let Some(written) = ast::Fn::cast(node.clone()).filter(|function| {
             AttributedItem {
                 item: &ast::Item::Fn(function.clone()),
@@ -2122,7 +2087,6 @@ impl<'database> ModuleWalk<'_, 'database> {
             }) && let Some(function) = self.semantics.to_def(&written)
             {
                 self.test_assertions.record(TestSite {
-                    expects_a_panic,
                     function,
                     node: node.clone(),
                     origin: origin.clone(),
@@ -2281,19 +2245,10 @@ impl<'database> ModuleWalk<'_, 'database> {
         crate_findings.runs_libtest_tests |= self.test_assertions.runs_tests();
 
         self.test_site_violations(
-            &self.test_assertions.without_assertions(),
-            &TestViolation::WithoutAssertion,
+            &self.test_assertions.round_trip_tests(),
+            &TestViolation::SerializationRoundTrip,
         )
-        .and_then(|without_assertions| {
-            self.test_site_violations(
-                &self.test_assertions.round_trip_tests(),
-                &TestViolation::SerializationRoundTrip,
-            )
-            .map(|round_trips| {
-                violations.extend(without_assertions);
-                violations.extend(round_trips);
-            })
-        })
+        .map(|round_trips| violations.extend(round_trips))
     }
 
     fn test_only_code(
@@ -2666,10 +2621,6 @@ impl<'database> ModuleWalk<'_, 'database> {
             })
             .and_then(|sleep| {
                 findings.violations.extend(sleep);
-                self.discarded_error(node, origin)
-            })
-            .and_then(|discarded| {
-                findings.violations.extend(discarded);
                 self.error_implementation(node, definition, origin, findings, crate_findings)
             })
             .and_then(|()| self.harness_call(node, origin, findings, crate_findings))

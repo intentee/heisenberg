@@ -27,8 +27,6 @@ const IGNORING_ATTRIBUTES: [&str; 1] = ["ignore"];
 
 const LOWERING_ATTRIBUTES: [&str; 1] = ["warn"];
 
-const PANIC_EXPECTING_ATTRIBUTES: [&str; 1] = ["should_panic"];
-
 const SUPPRESSING_ATTRIBUTES: [&str; 2] = ["allow", "expect"];
 
 fn is_required_lint(path: &[String]) -> bool {
@@ -59,8 +57,6 @@ impl NodeAttributes<'_, '_> {
                 directives.suppressions.push(meta);
             } else if attribute.is_named(&IGNORING_ATTRIBUTES) {
                 directives.ignores.push(meta);
-            } else if attribute.is_named(&PANIC_EXPECTING_ATTRIBUTES) {
-                directives.expects_a_panic = true;
             }
 
             ControlFlow::Continue(())

@@ -1,14 +1,5 @@
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
-pub const ASSERTION_MACROS: [&str; 6] = [
-    "assert",
-    "assert_eq",
-    "assert_ne",
-    "debug_assert",
-    "debug_assert_eq",
-    "debug_assert_ne",
-];
-
 pub const DESERIALIZE_OWNED_TRAIT_PATH: [&str; 2] = ["de", "DeserializeOwned"];
 
 pub const DESERIALIZE_TRAIT_PATH: [&str; 2] = ["de", "Deserialize"];
@@ -25,13 +16,7 @@ pub const ERROR_SOURCE_HELPERS: [&str; 2] = ["from", "source"];
 
 pub const ERROR_TRAIT_PATH: [&str; 2] = ["error", "Error"];
 
-pub const INFALLIBLE_PATH: [&str; 2] = ["convert", "Infallible"];
-
 pub const LIFETIME_PREFIX: char = '\'';
-
-pub const RESULT_ERROR_VARIANT: &str = "Err";
-
-pub const RESULT_VALUE_VARIANT: &str = "Ok";
 
 pub const ROUND_TRIP_TRANSPARENT_METHODS: [&str; 5] =
     ["as_bytes", "as_slice", "as_str", "expect", "unwrap"];

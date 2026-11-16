@@ -7,7 +7,6 @@ pub enum TestViolation {
     Ignored,
     SerializationRoundTrip,
     Sleeping,
-    WithoutAssertion,
 }
 
 impl Display for TestViolation {
@@ -18,7 +17,6 @@ impl Display for TestViolation {
                 "Test only compares values with what their serialization round trip decodes"
             }
             Self::Sleeping => "Test code sleeps",
-            Self::WithoutAssertion => "Test asserts nothing",
         })
     }
 }

@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_hir::Crate;
-use ra_ap_hir::Function;
 use ra_ap_hir::InFile;
 use ra_ap_hir::Module;
 use ra_ap_hir::Semantics;
@@ -31,7 +30,6 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
 use crate::path_resolutions::PathResolutions;
-use crate::result_method_effect::ResultMethodEffect;
 use crate::serialization_traits::SerializationTraits;
 use crate::standard_items::StandardItems;
 use crate::template_captures::TemplateCaptures;
@@ -49,8 +47,6 @@ pub struct CrateWalk<'walk> {
     pub krate: Crate,
     pub module_paths: &'walk ModulePaths,
     pub non_production_files: &'walk NonProductionFiles,
-    pub result_method_effects:
-        &'walk OnceMap<Function, Result<ResultMethodEffect, Arc<ModuleDependenciesError>>>,
     pub serialization_traits: &'walk SerializationTraits,
     pub source_files: &'walk SourceFiles,
     pub standard_items: &'walk StandardItems,
@@ -105,7 +101,6 @@ impl CrateWalk<'_> {
             options,
             paths: &paths,
             production_options: &production_options,
-            result_method_effects: self.result_method_effects,
             semantics: &semantics,
             serialization_traits: self.serialization_traits,
             template_captures: &template_captures,

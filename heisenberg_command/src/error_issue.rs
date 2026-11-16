@@ -1,6 +1,5 @@
 use heisenberg_module_graph::error_violation::ErrorViolation;
 
-use crate::constants::DISCARDED_ERROR;
 use crate::constants::ERROR_SOURCE_OUTSIDE_CHAIN;
 use crate::constants::ERROR_TYPE_NOT_AN_ENUM;
 use crate::constants::HANDWRITTEN_ERROR_TYPE;
@@ -12,7 +11,6 @@ use crate::issue_text::IssueText;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ErrorIssue {
-    DiscardedError,
     ErrorSourceOutsideChain,
     ErrorTypeNotAnEnum,
     HandwrittenErrorType,
@@ -26,7 +24,6 @@ impl ErrorIssue {
     #[must_use]
     pub const fn text(self) -> IssueText {
         match self {
-            Self::DiscardedError => DISCARDED_ERROR,
             Self::ErrorSourceOutsideChain => ERROR_SOURCE_OUTSIDE_CHAIN,
             Self::ErrorTypeNotAnEnum => ERROR_TYPE_NOT_AN_ENUM,
             Self::HandwrittenErrorType => HANDWRITTEN_ERROR_TYPE,
@@ -41,7 +38,6 @@ impl ErrorIssue {
 impl From<&ErrorViolation> for ErrorIssue {
     fn from(violation: &ErrorViolation) -> Self {
         match violation {
-            ErrorViolation::Discarded => Self::DiscardedError,
             ErrorViolation::Handwritten => Self::HandwrittenErrorType,
             ErrorViolation::MacroGenerated => Self::MacroGeneratedErrorType,
             ErrorViolation::MultipleTypes { .. } => Self::MultipleErrorTypes,

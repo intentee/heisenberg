@@ -28,7 +28,9 @@ pub fn installed_proc_macro_server() -> Result<ProcMacroClient, HeisenbergCheckE
                 .ok_or(HeisenbergCheckError::SysrootWithoutRoot(sysroot))
         })
         .and_then(|discovered| {
-            discovered.map_err(|error| HeisenbergCheckError::ProcMacroServerMissing(error.into()))
+            discovered
+                .map_err(Into::into)
+                .map_err(HeisenbergCheckError::ProcMacroServerMissing)
         })
         .and_then(|server| {
             ProcMacroClient::spawn(&server, no_environment.iter(), None, 1)

@@ -25,11 +25,14 @@ use heisenberg_workspace_build::workspace_build_error::WorkspaceBuildError;
 
 use crate::configuration::Configuration;
 use crate::configuration_list::ConfigurationList;
+use crate::constants::CARGO_BUILD_TABLE;
 use crate::constants::CARGO_ENVIRONMENT_TABLE;
+use crate::constants::CARGO_RUSTDOC;
 use crate::constants::CLIPPY_ARGUMENTS_VARIABLE;
 use crate::constants::CLIPPY_CONFIGURATION_DIRECTORY_VARIABLE;
 use crate::constants::NEXTEST_RETRIES_VARIABLE;
 use crate::constants::NIGHTLY_BOOTSTRAP_VARIABLE;
+use crate::constants::RUSTDOC_VARIABLE;
 use crate::supported_target_list::SupportedTargetList;
 
 #[derive(Debug, Error)]
@@ -181,6 +184,10 @@ pub enum ProjectModelError {
     ConfiguredClippyArguments { definition: Definition },
     #[error("`{key}` is set in {definition}, and Heisenberg builds with the rustc of the sysroot")]
     ConfiguredCompiler { definition: Definition, key: String },
+    #[error(
+        "`{CARGO_BUILD_TABLE}.{CARGO_RUSTDOC}` is set in {definition}, and Heisenberg cannot account for the rustdoc that cargo names to build scripts"
+    )]
+    ConfiguredRustdoc { definition: Definition },
     #[error("`{key}` is set in {definition}, and Heisenberg cannot account for rustflags")]
     ConfiguredRustflags { definition: Definition, key: String },
     #[error(
@@ -206,6 +213,10 @@ pub enum ProjectModelError {
         "`{variable}` is set in the environment, and Heisenberg builds with the rustc of the sysroot"
     )]
     EnvironmentCompiler { variable: &'static str },
+    #[error(
+        "`{RUSTDOC_VARIABLE}` is set in the environment, and Heisenberg cannot account for the rustdoc that cargo names to build scripts"
+    )]
+    EnvironmentRustdoc,
     #[error("`{variable}` is set in the environment, and Heisenberg cannot account for rustflags")]
     EnvironmentRustflags { variable: &'static str },
     #[error("the embedded crate cfg table of the target is not `rustc --print cfg` output")]

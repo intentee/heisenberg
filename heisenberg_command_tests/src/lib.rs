@@ -4,6 +4,7 @@ pub mod cleared_path;
 pub mod constants;
 pub mod coverage_footer;
 pub mod error_chain;
+mod failure_in;
 pub mod first_function_name;
 pub mod fixture_configuration;
 pub mod fixture_out_dir;

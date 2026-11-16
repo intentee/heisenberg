@@ -15,28 +15,8 @@ impl<'database> ErrorTypes<'_, 'database> {
         candidate.impls_trait(self.semantics.db, self.standard_items.error_trait, &[])
     }
 
-    pub fn is_discardable(&self, candidate: &Type<'database>) -> bool {
-        self.owned_result_error(candidate).is_some()
-            || (!candidate.is_reference()
-                && !candidate.is_unknown()
-                && self.implements_error(candidate))
-    }
-
     pub fn is_error_type(&self, candidate: &Type<'database>) -> bool {
         candidate.is_unknown() || self.implements_error(candidate)
-    }
-
-    pub fn owned_result_error(&self, candidate: &Type<'database>) -> Option<Type<'database>> {
-        (!candidate.is_reference())
-            .then(|| self.result_error(candidate))
-            .flatten()
-            .filter(|error| {
-                !error.is_reference()
-                    && !error.is_unit()
-                    && !error.is_never()
-                    && !error.is_unknown()
-                    && error.as_adt() != Some(Adt::Enum(self.standard_items.infallible))
-            })
     }
 
     pub fn result_error(&self, candidate: &Type<'database>) -> Option<Type<'database>> {

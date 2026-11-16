@@ -58,11 +58,95 @@ mod tests {
 
     use super::proc_macro_library;
 
-    const RELOCATABLE_ELF_HEADER: [u8; 64] = [
-        0x7f, b'E', b'L', b'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0x3e, 0, 1, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0,
-        0, 0, 0, 64, 0, 0, 0, 0, 0,
-    ];
+    const DYNAMIC_OBJECT: u8 = 3;
+    const RELOCATABLE_OBJECT: u8 = 1;
+
+    const fn elf_header(object_type: u8) -> [u8; 64] {
+        [
+            0x7f,
+            b'E',
+            b'L',
+            b'F',
+            2,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            object_type,
+            0,
+            0x3e,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            64,
+            0,
+            0,
+            0,
+            0,
+            0,
+            64,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]
+    }
+
+    #[test]
+    fn listed_dynamic_library_is_the_library_of_a_proc_macro() {
+        let library = Utf8PathBuf::from_path_buf(env::temp_dir().join(format!(
+            "heisenberg_workspace_build_{}_dynamic_library.so",
+            process::id()
+        )))
+        .expect("the temporary directory must be a UTF-8 path");
+
+        fs::write(&library, elf_header(DYNAMIC_OBJECT))
+            .expect("the dynamic library must be written");
+
+        let found = proc_macro_library("injected", slice::from_ref(&library)).ok();
+
+        fs::remove_file(&library).expect("the dynamic library must be removed");
+
+        assert_eq!(found, Some(library));
+    }
 
     #[test]
     fn listed_directory_and_relocatable_object_are_not_libraries_of_a_proc_macro() {
@@ -73,7 +157,7 @@ mod tests {
         )))
         .expect("the temporary directory must be a UTF-8 path");
 
-        fs::write(&relocatable, RELOCATABLE_ELF_HEADER)
+        fs::write(&relocatable, elf_header(RELOCATABLE_OBJECT))
             .expect("the relocatable object must be written");
 
         let failure = proc_macro_library("injected", &[directory, relocatable.clone()])

@@ -345,22 +345,33 @@ mod tests {
         let unreadable: &[u8] = b"\xff\n";
         let mut reader = unreadable;
         let mut line = String::new();
-        let expected = reader.read_line(&mut line).map_or_else(
-            |error| {
-                format!(
-                    "the build scripts and procedural macros cannot be built or run; a package whose build script cannot run on every host can declare its output in [workspace.metadata.heisenberg.out_dirs.<package>] instead:\nthe messages of the build cannot be read: {error}"
-                )
-            },
-            |_| String::new(),
-        );
+        let expected = reader.read_line(&mut line).err().map(|error| {
+            format!(
+                "the build scripts and procedural macros cannot be built or run; a package whose build script cannot run on every host can declare its output in [workspace.metadata.heisenberg.out_dirs.<package>] instead:\nthe messages of the build cannot be read: {error}"
+            )
+        });
 
         assert_eq!(
+            Some(
+                WorkspaceBuildError::Build {
+                    output: build_output(unreadable),
+                    source: Box::from("the build failed"),
+                }
+                .to_string()
+            ),
+            expected
+        );
+    }
+
+    #[test]
+    fn failed_build_reports_the_diagnostics_of_its_messages() {
+        assert_eq!(
             WorkspaceBuildError::Build {
-                output: build_output(unreadable),
+                output: build_output(b"the compiler stopped\n"),
                 source: Box::from("the build failed"),
             }
             .to_string(),
-            expected
+            "the build scripts and procedural macros cannot be built or run; a package whose build script cannot run on every host can declare its output in [workspace.metadata.heisenberg.out_dirs.<package>] instead:\nthe compiler stopped\n"
         );
     }
 

@@ -5,6 +5,7 @@ use serde_json::Value;
 use serde_json::from_slice;
 use serde_json::to_vec;
 
+use crate::failure_in::failure_in;
 use crate::heisenberg_check_error::HeisenbergCheckError;
 use crate::tampered_export::TamperedExport;
 
@@ -26,17 +27,15 @@ impl TamperedCoverageExport<'_> {
             let observed = tamper(&mut export);
 
             to_vec(&export)
-                .map_err(|source| HeisenbergCheckError::CoverageExportSerialization {
-                    path: self.copy.to_path_buf(),
-                    source,
-                })
+                .map_err(failure_in(
+                    self.copy.to_path_buf(),
+                    HeisenbergCheckError::CoverageExportSerialization,
+                ))
                 .and_then(|contents| {
-                    fs::write(self.copy, contents).map_err(|source| {
-                        HeisenbergCheckError::CoverageExportWrite {
-                            path: self.copy.to_path_buf(),
-                            source,
-                        }
-                    })
+                    fs::write(self.copy, contents).map_err(failure_in(
+                        self.copy.to_path_buf(),
+                        HeisenbergCheckError::CoverageExportWrite,
+                    ))
                 })
                 .map(|()| TamperedExport {
                     observed,
@@ -47,17 +46,15 @@ impl TamperedCoverageExport<'_> {
 
     fn source_export(&self) -> Result<Value, HeisenbergCheckError> {
         fs::read(self.source)
-            .map_err(|source| HeisenbergCheckError::CoverageExportRead {
-                path: self.source.to_path_buf(),
-                source,
-            })
+            .map_err(failure_in(
+                self.source.to_path_buf(),
+                HeisenbergCheckError::CoverageExportRead,
+            ))
             .and_then(|contents| {
-                from_slice::<Value>(&contents).map_err(|source| {
-                    HeisenbergCheckError::CoverageExportParse {
-                        path: self.source.to_path_buf(),
-                        source,
-                    }
-                })
+                from_slice::<Value>(&contents).map_err(failure_in(
+                    self.source.to_path_buf(),
+                    HeisenbergCheckError::CoverageExportParse,
+                ))
             })
     }
 }

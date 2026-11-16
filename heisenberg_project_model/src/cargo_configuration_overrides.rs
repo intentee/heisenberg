@@ -25,6 +25,7 @@ use crate::constants::COMPILER_VARIABLES;
 use crate::constants::NEXTEST_RETRIES_VARIABLE;
 use crate::constants::NIGHTLY_BOOTSTRAP_VARIABLE;
 use crate::constants::NIGHTLY_FEATURE_VARIABLES;
+use crate::constants::RUSTDOC_VARIABLE;
 use crate::constants::RUSTFLAGS_VARIABLES;
 use crate::constants::SUPPORTED_TARGETS;
 use crate::project_model_error::ProjectModelError;
@@ -95,16 +96,21 @@ impl CargoConfigurationOverrides<'_> {
                      rustc,
                      rustc_workspace_wrapper,
                      rustc_wrapper,
+                     rustdoc,
                      ..
                  }| {
-                    reject_compiler(CARGO_RUSTC, rustc.as_ref())
-                        .and_then(|()| {
-                            reject_compiler(
-                                CARGO_RUSTC_WORKSPACE_WRAPPER,
-                                rustc_workspace_wrapper.as_ref(),
-                            )
-                        })
-                        .and_then(|()| reject_compiler(CARGO_RUSTC_WRAPPER, rustc_wrapper.as_ref()))
+                    rejected(
+                        rustdoc.as_ref().map(ConfigRelativePath::value).cloned(),
+                        |definition| ProjectModelError::ConfiguredRustdoc { definition },
+                    )
+                    .and_then(|()| reject_compiler(CARGO_RUSTC, rustc.as_ref()))
+                    .and_then(|()| {
+                        reject_compiler(
+                            CARGO_RUSTC_WORKSPACE_WRAPPER,
+                            rustc_workspace_wrapper.as_ref(),
+                        )
+                    })
+                    .and_then(|()| reject_compiler(CARGO_RUSTC_WRAPPER, rustc_wrapper.as_ref()))
                 },
             )
             .and_then(|()| {
@@ -174,6 +180,12 @@ impl CargoConfigurationOverrides<'_> {
                         ProjectModelError::EnvironmentCompiler { variable },
                     )
                 })
+            })
+            .and_then(|()| {
+                self.reject_environment_variable(
+                    RUSTDOC_VARIABLE,
+                    ProjectModelError::EnvironmentRustdoc,
+                )
             })
             .and_then(|()| {
                 self.reject_environment_variable(

@@ -6,7 +6,6 @@ use crate::untyped_error_name::UntypedErrorName;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorViolation {
-    Discarded,
     Handwritten,
     MacroGenerated,
     MultipleTypes { count: usize },
@@ -19,7 +18,6 @@ pub enum ErrorViolation {
 impl Display for ErrorViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Discarded => formatter.write_str("Error is dropped without being handled"),
             Self::Handwritten => formatter.write_str("Error type is implemented by hand"),
             Self::MacroGenerated => formatter
                 .write_str("Error type is implemented by a macro other than thiserror::Error"),

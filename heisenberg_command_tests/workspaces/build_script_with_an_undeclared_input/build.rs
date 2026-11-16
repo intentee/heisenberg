@@ -1,9 +1,13 @@
 use std::env;
+use std::path::Path;
 
 fn main() {
-    println!("cargo::rustc-check-cfg=cfg(three_jobs)");
+    println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rustc-check-cfg=cfg(undeclared_input)");
 
-    if env::var_os("NUM_JOBS").is_some_and(|jobs| jobs == "3") {
-        println!("cargo::rustc-cfg=three_jobs");
+    if env::var_os("CARGO_MANIFEST_DIR")
+        .is_some_and(|directory| Path::new(&directory).join("undeclared_input").exists())
+    {
+        println!("cargo::rustc-cfg=undeclared_input");
     }
 }

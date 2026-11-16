@@ -43,6 +43,8 @@ pub const CARGO_OUT_DIR_VARIABLE: &str = "OUT_DIR";
 
 pub const CARGO_RUSTC: &str = "rustc";
 
+pub const CARGO_RUSTDOC: &str = "rustdoc";
+
 pub const CARGO_RUSTC_WORKSPACE_WRAPPER: &str = "rustc-workspace-wrapper";
 
 pub const CARGO_RUSTC_WRAPPER: &str = "rustc-wrapper";
@@ -225,6 +227,8 @@ pub const RESTRICTING_CLIPPY_SETTINGS: [&str; 5] = [
 ];
 
 pub const RUSTC_VARIABLE: &str = "RUSTC";
+
+pub const RUSTDOC_VARIABLE: &str = "RUSTDOC";
 
 pub const RUSTFLAGS_VARIABLES: [&str; 2] = ["CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS"];
 
