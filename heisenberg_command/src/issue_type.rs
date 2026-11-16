@@ -4,7 +4,6 @@ use clap::ValueEnum;
 use clap::builder::PossibleValue;
 use humantime::format_duration;
 
-use heisenberg_module_graph::error_violation::ErrorViolation;
 use heisenberg_module_graph::harness_violation::HarnessViolation;
 use heisenberg_module_graph::impl_placement::ImplPlacement;
 use heisenberg_module_graph::non_production_users::NonProductionUsers;
@@ -397,21 +396,7 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::BenchmarkHarness(HarnessViolation::UnvettedMethod { .. }) => {
                 Self::UnvettedCriterionMethod
             }
-            ViolationKind::Error(ErrorViolation::Discarded) => {
-                Self::Error(ErrorIssue::DiscardedError)
-            }
-            ViolationKind::Error(ErrorViolation::Handwritten) => {
-                Self::Error(ErrorIssue::HandwrittenErrorType)
-            }
-            ViolationKind::Error(ErrorViolation::MultipleTypes { .. }) => {
-                Self::Error(ErrorIssue::MultipleErrorTypes)
-            }
-            ViolationKind::Error(ErrorViolation::SourceInMessage) => {
-                Self::Error(ErrorIssue::SourceInErrorMessage)
-            }
-            ViolationKind::Error(ErrorViolation::SourceOutsideChain) => {
-                Self::Error(ErrorIssue::ErrorSourceOutsideChain)
-            }
+            ViolationKind::Error(violation) => Self::Error(ErrorIssue::from(violation)),
             ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Benchmarks) => {
                 Self::FunctionUsedOnlyByBenchmarks
             }
@@ -475,9 +460,6 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::IncludedSourceFile { .. } => Self::IncludedSourceFile,
             ViolationKind::UnsafeCode => Self::UnsafeCode,
             ViolationKind::ReferencedTest => Self::ReferencedTest,
-            ViolationKind::Error(ErrorViolation::UntypedResult { .. }) => {
-                Self::Error(ErrorIssue::UntypedResultError)
-            }
         }
     }
 }
@@ -570,6 +552,7 @@ impl ValueEnum for IssueType {
             Self::Error(ErrorIssue::DiscardedError),
             Self::DuplicatedFunctionBody,
             Self::Error(ErrorIssue::ErrorSourceOutsideChain),
+            Self::Error(ErrorIssue::ErrorTypeNotAnEnum),
             Self::FailedMacroExpansion,
             Self::FunctionUsedOnlyByBenchmarks,
             Self::FunctionUsedOnlyByTests,
@@ -582,6 +565,7 @@ impl ValueEnum for IssueType {
             Self::ItemOutOfOrder,
             Self::LintAllowedInManifest,
             Self::LintSuppression,
+            Self::Error(ErrorIssue::MacroGeneratedErrorType),
             Self::MethodOutOfOrder,
             Self::MisplacedBlanketImpl,
             Self::MisplacedForeignTypeImpl,

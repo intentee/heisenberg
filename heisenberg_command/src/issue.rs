@@ -11,7 +11,6 @@ use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::module_path::ModulePath;
 use heisenberg_module_graph::source_location::SourceLocation;
-use heisenberg_module_graph::violation::Violation;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::confined_reach::ConfinedReach;
 use heisenberg_project_model::confinement_breach::ConfinementBreach;
@@ -28,6 +27,8 @@ use crate::module_inclusion::ModuleInclusion;
 use crate::narrowing::Narrowing;
 use crate::shared_file_inclusions::SharedFileInclusions;
 use crate::violation_occurrences::ViolationOccurrences;
+use crate::violation_report::ViolationReport;
+use crate::violation_variant::ViolationVariant;
 
 const CONTINUATION_INDENT: &str = "    ";
 
@@ -94,10 +95,7 @@ pub enum Issue {
         module: ForeignModule,
         sites: NonEmpty<SourceLocation>,
     },
-    Violation {
-        occurrences: ViolationOccurrences,
-        violation: Violation,
-    },
+    Violation(ViolationReport),
 }
 
 impl Issue {
@@ -174,11 +172,8 @@ impl Issue {
     }
 
     #[must_use]
-    pub fn new_violation(violation: &Violation, occurrences: ViolationOccurrences) -> Self {
-        Self::Violation {
-            occurrences,
-            violation: violation.clone(),
-        }
+    pub const fn new_violation(report: ViolationReport) -> Self {
+        Self::Violation(report)
     }
 
     #[must_use]
@@ -218,10 +213,10 @@ impl Issue {
                 .iter()
                 .map(|site| format!("  also unresolved at {site}"))
                 .collect(),
-            Self::Violation {
+            Self::Violation(ViolationReport {
                 occurrences: ViolationOccurrences { folded, .. },
                 ..
-            } => folded
+            }) => folded
                 .iter()
                 .map(|finding| format!("  {finding}"))
                 .collect(),
@@ -251,7 +246,7 @@ impl Issue {
             | Self::UnexecutedRegion { .. } => IssueType::UncoveredCode,
             Self::SharedModuleFile { .. } => IssueType::SharedModuleFile,
             Self::UnresolvedForeignReferences { .. } => IssueType::UnresolvedPath,
-            Self::Violation { violation, .. } => IssueType::from(&violation.kind),
+            Self::Violation(ViolationReport { violation, .. }) => IssueType::from(&violation.kind),
         }
     }
 
@@ -265,16 +260,44 @@ impl Issue {
     ) -> Vec<String> {
         let location = self.location();
         let analysed = files.get(&location.file).into_iter().flatten();
+        let mut variant_lines: Vec<String> = Vec::new();
         let narrowing = match self {
-            Self::ModuleCycle { reported, .. }
-            | Self::Violation {
-                occurrences: ViolationOccurrences { reported, .. },
-                ..
-            } => Narrowing {
+            Self::ModuleCycle { reported, .. } => Narrowing {
                 base: &analysed.chain(reported).cloned().collect(),
                 reported,
             }
             .to_string(),
+            Self::Violation(ViolationReport {
+                occurrences: ViolationOccurrences { reported, .. },
+                variants,
+                ..
+            }) => {
+                let base: BTreeSet<AnalysisContext> = analysed
+                    .chain(reported)
+                    .chain(
+                        variants
+                            .iter()
+                            .flat_map(|ViolationVariant { reported, .. }| reported),
+                    )
+                    .cloned()
+                    .collect();
+
+                variant_lines.extend(variants.iter().map(|ViolationVariant { kind, reported }| {
+                    format!(
+                        "  {kind}{}",
+                        Narrowing {
+                            base: &base,
+                            reported,
+                        }
+                    )
+                }));
+
+                Narrowing {
+                    base: &base,
+                    reported,
+                }
+                .to_string()
+            }
             Self::ConfinedPackageReached {
                 breach: ConfinementBreach { configurations, .. },
             } => ConfigurationNarrowing {
@@ -306,6 +329,7 @@ impl Issue {
                     IssuePosition::WholeFile => None,
                 }
                 .into_iter()
+                .chain(variant_lines)
                 .chain(self.details())
                 .map(|line| format!("{CONTINUATION_INDENT}{line}")),
             )
@@ -338,7 +362,9 @@ impl Issue {
             Self::UnresolvedForeignReferences { sites, .. } => {
                 IssueLocation::new_position(&sites.first)
             }
-            Self::Violation { violation, .. } => IssueLocation::new_position(&violation.location),
+            Self::Violation(ViolationReport { violation, .. }) => {
+                IssueLocation::new_position(&violation.location)
+            }
         }
     }
 
@@ -382,7 +408,7 @@ impl Issue {
             Self::UnresolvedForeignReferences { module, .. } => {
                 format!("Path into {module} compiles, but rust-analyzer cannot resolve it")
             }
-            Self::Violation { violation, .. } => violation.kind.to_string(),
+            Self::Violation(ViolationReport { violation, .. }) => violation.kind.to_string(),
         }
     }
 }

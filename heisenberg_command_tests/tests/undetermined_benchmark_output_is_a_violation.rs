@@ -21,9 +21,9 @@ fn undetermined_benchmark_output_is_a_violation() {
         Ok(["UndeterminedBenchmarkOutput: 2 violations\n\
             Whether criterion drops a must-use value is decided where the routine is measured. Write the measured routine where it is measured, so that the type it returns is concrete.\n\
             \n\
-            - benches/measurement.rs:17:13: Measured routine returns TOutput, which leaves undetermined whether criterion drops a must-use value\n        \
+            - benches/measurement.rs:5:13: Measured routine returns TOutput, which leaves undetermined whether criterion drops a must-use value\n        \
             bencher.iter(routine);\n\
-            - benches/measurement.rs:21:13: Measured routine returns (u64, TOutput), which leaves undetermined whether criterion drops a must-use value\n        \
+            - benches/measurement.rs:9:13: Measured routine returns (u64, TOutput), which leaves undetermined whether criterion drops a must-use value\n        \
             bencher.iter(|| (64_u64, routine()));\n\
             \n\
             ------------------------------\n\

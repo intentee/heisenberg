@@ -131,10 +131,17 @@ pub const DUPLICATED_FUNCTION_BODY: IssueText = IssueText {
 };
 
 pub const ERROR_SOURCE_OUTSIDE_CHAIN: IssueText = IssueText {
-    definition: "A field of a variant of an enum that derives thiserror::Error whose type implements std::error::Error and that is not the source of its variant, as thiserror decides it: the field marked #[source] or #[from], otherwise the field named source, or the single field of an #[error(transparent)] variant.",
+    definition: "A field of a variant of an enum that derives thiserror::Error whose type implements std::error::Error, that is not the source of its variant, and that its variant does not report beside a source: the variant has no source, or its #[error(...)] message does not format the field. The source is as thiserror decides it: the field marked #[source] or #[from], otherwise the field named source, or the single field of an #[error(transparent)] variant.",
     name: "ErrorSourceOutsideChain",
-    purpose: "An error kept outside the source never reaches the error chain, so whoever reports the error loses its cause. Make the field the source of its variant, with #[source] or #[from], and give the variant no other error.",
+    purpose: "An error kept outside the source never reaches the error chain, so whoever reports the error loses its cause. Make the field the source of its variant, with #[source] or #[from]. Where a failure has several causes, keep one as the source and format each other one in the message of the variant.",
     summary: "An error held outside the source chain",
+};
+
+pub const ERROR_TYPE_NOT_AN_ENUM: IssueText = IssueText {
+    definition: "An implementation of std::error::Error that the Error derive of thiserror generates for a type that is not an enum, such as a struct. thiserror is the thiserror-impl package from crates.io, whose Error derive generates the implementation.",
+    name: "ErrorTypeNotAnEnum",
+    purpose: "A type that is not an enum cannot name which failure happened, so its callers cannot match on the failure. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.",
+    summary: "An error type deriving thiserror::Error that is not an enum",
 };
 
 pub const FAILED_MACRO_EXPANSION: IssueText = IssueText {
@@ -166,10 +173,10 @@ pub const GLOB_IMPORT: IssueText = IssueText {
 };
 
 pub const HANDWRITTEN_ERROR_TYPE: IssueText = IssueText {
-    definition: "An implementation of std::error::Error that the Error derive of thiserror does not generate for an enum: one written by hand, one that another macro generates, and one that thiserror derives for a struct. thiserror is the thiserror-impl package from crates.io, whose Error derive generates the implementation.",
+    definition: "An implementation of std::error::Error written by hand in a module file, for a type of any kind.",
     name: "HandwrittenErrorType",
-    purpose: "An error type written by hand repeats what thiserror generates, its messages, source chain and conversions, and drifts from it, and a struct cannot name which failure happened. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.",
-    summary: "An error type that is not an enum deriving thiserror::Error",
+    purpose: "An error type written by hand repeats what thiserror generates, its messages, source chain and conversions, and drifts from it. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.",
+    summary: "An error type implemented by hand",
 };
 
 pub const IGNORED_TEST: IssueText = IssueText {
@@ -201,9 +208,9 @@ pub const INVALID_MACRO_DEFINITION: IssueText = IssueText {
 };
 
 pub const ITEM_OUT_OF_ORDER: IssueText = IssueText {
-    definition: "An item of a module file or inline module, among the items written in module files, that follows an item of a later group. The groups, in order: module declarations; imports from vendor crates, which are std, core, alloc and every crate outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics, macro_rules! macros and macro calls; private structs, enums, unions, type aliases and traits with their impl blocks; public items with their impl blocks; tests, the functions under the built-in test, bench or test_case attribute; inline modules. An import takes the group of the crate that the first segment of each of its paths resolves to, except that an import of a macro_rules! macro of its own module, which Rust allows only after the macro, takes the group of the macro; an impl block takes the group of the item of its file it belongs to, and an item is public when its visibility reaches beyond its own module. The item is reported at its name, with the first earlier item of a later group.",
+    definition: "An item of a module file or inline module, among the items written in module files, that follows an item of a later group. The groups, in order: module declarations; imports from vendor crates, which are std, core, alloc and every crate outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics, macro_rules! macros and macro calls; private structs, enums, unions, type aliases and traits with their impl blocks; public items with their impl blocks, and the main function that its crate target enters through; tests, the functions under the built-in test, bench or test_case attribute; inline modules. An import, like an extern crate declaration, takes the group of the crate that the first segment of each of its paths resolves to, except that an import of a macro_rules! macro of its own module, which Rust allows only after the macro, takes the group of the macro; an impl block takes the group of the type or trait it belongs to, the items of an extern block take their places one by one, and an item is public when its visibility reaches beyond its own module. The item is reported at its name, with the first earlier item of a later group.",
     name: "ItemOutOfOrder",
-    purpose: "Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names.",
+    purpose: "Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names. A module that calls a macro_rules! macro of its parent by its bare name compiles only when it is declared after the macro, so declare the module first and hand it the macro by path: re-export the macro after its definition with pub(crate) use, and import it in the module.",
     summary: "An item that follows an item of a later group",
 };
 
@@ -219,6 +226,13 @@ pub const LINT_SUPPRESSION: IssueText = IssueText {
     name: "LintSuppression",
     purpose: "Suppressing lints is a slippery slope. Remove the attribute and fix the code the lint reports.",
     summary: "An attribute that suppresses or lowers lints over code written in the workspace",
+};
+
+pub const MACRO_GENERATED_ERROR_TYPE: IssueText = IssueText {
+    definition: "An implementation of std::error::Error that a macro other than the Error derive of thiserror generates, whether a macro_rules! macro or a procedural macro. thiserror is the thiserror-impl package from crates.io, whose Error derive generates the implementation.",
+    name: "MacroGeneratedErrorType",
+    purpose: "The error type rules read the source and the message of each failure from what the Error derive of thiserror declares, and another macro declares neither where they can be checked. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.",
+    summary: "An error type implemented by a macro other than thiserror::Error",
 };
 
 pub const METHOD_OUT_OF_ORDER: IssueText = IssueText {
@@ -278,7 +292,7 @@ pub const MODULE_NOT_NAMED_AFTER_ITS_ITEM: IssueText = IssueText {
 };
 
 pub const MULTIPLE_ERROR_TYPES: IssueText = IssueText {
-    definition: "A crate target that implements std::error::Error more than once, by hand or through derives and other macros, each implementation reported where it is written.",
+    definition: "A crate target that implements std::error::Error more than once, by hand or through derives and other macros, each implementation reported where it is written. An implementation in test code is not counted: one in a module that only the test configuration enables, in an integration test target or in a declared test crate.",
     name: "MultipleErrorTypes",
     purpose: "A crate whose failures one error enum cannot describe does more than one thing, and its callers cannot tell from its signatures which concern failed. Split the crate along its error boundaries: move each error enum, with the code that fails with it, into its own crate, and wrap it in the crates that depend on it as a #[source] or #[from] variant of their own error enum.",
     summary: "A crate with more than one error type",
@@ -627,7 +641,7 @@ pub const UNSAFE_CODE: IssueText = IssueText {
 pub const UNTYPED_RESULT_ERROR: IssueText = IssueText {
     definition: "A Result written in an item signature or type definition, such as the type of a function parameter, a return type, a field or a type alias, whose error type does not implement std::error::Error, such as String, &str, (), an integer, a collection, Box<dyn Error> or anyhow::Error, and an associated type of a trait impl that the trait names as the error of a Result, such as the Err of FromStr, set to such a type. A type parameter is checked where it is given a type, and a Result whose type the trait of an impl dictates is exempt.",
     name: "UntypedResultError",
-    purpose: "An error that is not an error type carries no source chain and no variant that a caller can match, so callers can only print it or compare its text. Declare an error enum whose variants name each failure, and return it.",
+    purpose: "An error that is not an error type erases which failure happened: a caller can print it, or downcast it where it carries a type, but cannot match on it, and the signature names no failure. Declare an error enum whose variants name each failure, and return it.",
     summary: "A Result whose error type is not an error",
 };
 

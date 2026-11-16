@@ -39,3 +39,5 @@ pub mod test_issue;
 mod tool_review;
 mod unreachable_test_files;
 mod violation_occurrences;
+mod violation_report;
+mod violation_variant;

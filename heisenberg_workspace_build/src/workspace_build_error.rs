@@ -66,4 +66,8 @@ pub enum WorkspaceBuildError {
         dependent: String,
         substituted: String,
     },
+    #[error(
+        "the build scripts and procedural macros of the workspace compile `{package}`, which needs its build script to run, and out_dirs declares its output instead of running it; a package that build scripts or procedural macros depend on cannot be declared in out_dirs"
+    )]
+    SubstitutedPackageBuilt { package: String },
 }

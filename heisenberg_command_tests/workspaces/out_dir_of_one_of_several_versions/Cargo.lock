@@ -38,7 +38,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
-name = "out_dir_of_an_ambiguous_package"
+name = "out_dir_of_one_of_several_versions"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.3.4",

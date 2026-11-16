@@ -24,7 +24,7 @@ Each file needs to follow this order:
 4. local crate `use` 
 5. private function helpers
 6. private struct helpers
-7. single public export
+7. single public export, or the `main` function a target enters through
 
 All the method within `impl` block must be sorted like so:
 1. builder/constructor/`new`/`new_*` methods first (alphabetically)
@@ -32,3 +32,8 @@ All the method within `impl` block must be sorted like so:
 3. `pub(crate)` methods (alphabetically)
 4. private methods (alphabetically)
 
+# Errors
+
+- Each crate has one error type: an enum that derives `thiserror::Error`, in its own module file. Error types in test code are not counted.
+- A variant that holds errors has one source; a further cause is formatted in the message of the variant.
+- A message never formats the source of its variant.

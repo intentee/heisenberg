@@ -15,6 +15,29 @@ fn label() -> impl Display {
     64_u64
 }
 
+fn numbers() -> impl Iterator<Item = u64> {
+    iter::empty()
+}
+
+fn parsed() -> Result<u64, ParseIntError> {
+    "64".parse()
+}
+
+struct ImmediateExecutor;
+
+impl AsyncExecutor for ImmediateExecutor {
+    fn block_on<TOutput>(&self, future: impl Future<Output = TOutput>) -> TOutput {
+        let mut pinned = pin!(future);
+        let mut context = Context::from_waker(Waker::noop());
+
+        loop {
+            if let Poll::Ready(output) = pinned.as_mut().poll(&mut context) {
+                return output;
+            }
+        }
+    }
+}
+
 fn main() {
     let mut criterion = Criterion::default().configure_from_args();
 
@@ -55,27 +78,4 @@ fn main() {
         bencher.iter(|| (64_u64, [(); 0]));
     });
     criterion.final_summary();
-}
-
-fn numbers() -> impl Iterator<Item = u64> {
-    iter::empty()
-}
-
-fn parsed() -> Result<u64, ParseIntError> {
-    "64".parse()
-}
-
-struct ImmediateExecutor;
-
-impl AsyncExecutor for ImmediateExecutor {
-    fn block_on<TOutput>(&self, future: impl Future<Output = TOutput>) -> TOutput {
-        let mut pinned = pin!(future);
-        let mut context = Context::from_waker(Waker::noop());
-
-        loop {
-            if let Poll::Ready(output) = pinned.as_mut().poll(&mut context) {
-                return output;
-            }
-        }
-    }
 }

@@ -156,9 +156,18 @@ impl WorkspaceBuild<'_> {
                     .iter()
                     .find(|UnitDep { unit, .. }| self.is_substituted(unit))
                 {
-                    return Err(WorkspaceBuildError::SubstitutedBuildScriptRequired {
-                        dependent: vacancy.key().pkg.name().to_string(),
-                        substituted: substituted.unit.pkg.name().to_string(),
+                    let dependent = vacancy.key().pkg.name().to_string();
+                    let substituted = substituted.unit.pkg.name().to_string();
+
+                    return Err(if dependent == substituted {
+                        WorkspaceBuildError::SubstitutedPackageBuilt {
+                            package: substituted,
+                        }
+                    } else {
+                        WorkspaceBuildError::SubstitutedBuildScriptRequired {
+                            dependent,
+                            substituted,
+                        }
                     });
                 }
 

@@ -16,32 +16,33 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     keeps or leaves out the default features, and features, the names of features that workspace members\n\
     define, each listed once, no two configurations sharing their target and features, and whose\n\
     optional out_dirs table declares, for a package of the workspace, member or dependency, whose build\n\
-    script cannot run on every host, a configurations table that gives, for each declared configuration,\n\
-    a directory, relative to the workspace root, with the files the build script writes to OUT_DIR, and\n\
-    the cfgs and env the build script emits; that build script then never runs, and the declared files,\n\
-    cfgs and env stand in for its output; its optional test_crates list names the workspace members that\n\
-    hold only code for tests; and its optional confined_packages table maps the name of a package, which\n\
-    names every resolved version of it, to the workspace members that may depend on it, directly or\n\
-    transitively. A missing table, an unknown key, an empty configuration list, an empty or repeated\n\
-    configuration name, a configuration with an unknown target, with a feature that no workspace member\n\
-    defines or with a feature listed twice, two configurations with the same target and features, a\n\
-    configuration that selects features other than the default ones in a workspace that uses resolver 1\n\
-    with a root package and other members, where cargo applies a feature selection to the root package\n\
-    only, an out-dir for a package the workspace does not resolve, for a name that several resolved\n\
-    versions share or for a package without a build script, an out-dir directory outside the workspace\n\
-    or that cannot be read, an out-dir without the output of a declared configuration or with the output\n\
-    of an undeclared configuration, and a declared cfg that does not parse fail the run. A test_crates\n\
-    entry that is not a workspace member, that is listed twice, whose package can be published, or that\n\
-    a member other than a test crate depends on through a normal or build dependency is a violation, and\n\
-    an entry that fails these conditions is not a test crate. A confined_packages entry for a package\n\
-    that the workspace does not resolve, a user that is listed twice for one package or that is not a\n\
-    workspace member, a member other than the users of a package for which cargo builds the package in\n\
-    an analysed configuration, through the normal and build dependencies of any package and the member's\n\
-    own dev-dependencies, on the target or the host where cargo builds it, a member never reaching its\n\
-    own package, and a user for which cargo builds the package in no declared configuration are\n\
-    violations. No setting exempts code from any rule: test_crates declares which members are test code,\n\
-    confined_packages declares which members may depend on a package, and Heisenberg verifies both\n\
-    declarations.\n\
+    script cannot run on every host, the version of that package that the workspace resolves and a\n\
+    configurations table that gives, for each declared configuration, a directory, relative to the\n\
+    workspace root, with the files the build script writes to OUT_DIR, and the cfgs and env the build\n\
+    script emits; that build script then never runs, and the declared files, cfgs and env stand in for\n\
+    its output; its optional test_crates list names the workspace members that hold only code for tests;\n\
+    and its optional confined_packages table maps the name of a package, which names every resolved\n\
+    version of it, to the workspace members that may depend on it, directly or transitively. A missing\n\
+    table, an unknown key, an empty configuration list, an empty or repeated configuration name, a\n\
+    configuration with an unknown target, with a feature that no workspace member defines or with a\n\
+    feature listed twice, two configurations with the same target and features, a configuration that\n\
+    selects features other than the default ones in a workspace that uses resolver 1 with a root package\n\
+    and other members, where cargo applies a feature selection to the root package only, an out-dir for\n\
+    a package the workspace does not resolve, for a version of it other than the resolved ones, for a\n\
+    name and version that packages from several sources share or for a package without a build script,\n\
+    an out-dir directory outside the workspace or that cannot be read, an out-dir without the output of\n\
+    a declared configuration or with the output of an undeclared configuration, and a declared cfg that\n\
+    does not parse fail the run. A test_crates entry that is not a workspace member, that is listed\n\
+    twice, whose package can be published, or that a member other than a test crate depends on through a\n\
+    normal or build dependency is a violation, and an entry that fails these conditions is not a test\n\
+    crate. A confined_packages entry for a package that the workspace does not resolve, a user that is\n\
+    listed twice for one package or that is not a workspace member, a member other than the users of a\n\
+    package for which cargo builds the package in an analysed configuration, through the normal and\n\
+    build dependencies of any package and the member's own dev-dependencies, on the target or the host\n\
+    where cargo builds it, a member never reaching its own package, and a user for which cargo builds\n\
+    the package in no declared configuration are violations. No setting exempts code from any rule:\n\
+    test_crates declares which members are test code, confined_packages declares which members may\n\
+    depend on a package, and Heisenberg verifies both declarations.\n\
     \n\
     Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration with the standard\n\
     library of its target installed, Cargo.lock is up to date, the cargo home holds every package of\n\
@@ -91,8 +92,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     a sysroot without the server, or whose server cannot start, fail the run. Every decision is\n\
     semantic, as rust-analyzer resolves the code. The analysis runs on --jobs worker threads and reports\n\
     the same issues for every count. Shared module files are analysed in every crate that includes them.\n\
-    The public item, constant, item order, method order, integration test target and benchmark target\n\
-    rules apply to items written in module files, including those that a macro_rules! macro of the crate\n\
+    The public item, constant, method order, integration test target and benchmark target rules apply to\n\
+    items written in module files, including those that a macro_rules! macro of the crate writes, the\n\
+    item order rule to the items written in module files, where a macro call takes one place whatever it\n\
     writes, and the name, tuple and parameter rules to the text written in them; an item that an\n\
     attribute macro rewrites is analysed through the items of its expansion that rust-analyzer maps back\n\
     to it, and the rest of the expansion, like the items that procedural macros and the macros of other\n\
@@ -106,12 +108,12 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     criterion package from crates.io, whose calls the criterion rules check wherever workspace code\n\
     makes them; a test crate is a workspace member that test_crates lists, whose package cannot be\n\
     published (publish = false), and that no member other than a test crate depends on through a normal\n\
-    or build dependency. The error type rules count every implementation of std::error::Error in a crate\n\
-    target, those that macros generate included, and accept only those that the Error derive of\n\
-    thiserror, the thiserror-impl package from crates.io, generates for an enum, and the serialization\n\
-    rule recognizes serde, the serde and serde_core packages from crates.io. A standard library without\n\
-    the items that the analysis relies on, and serde packages that leave one of ser::Serialize,\n\
-    de::Deserialize and de::DeserializeOwned undeclared, fail the run.\n\
+    or build dependency. The error type rules count every implementation of std::error::Error in the\n\
+    production code of a crate target, those that macros generate included, and accept only those that\n\
+    the Error derive of thiserror, the thiserror-impl package from crates.io, generates for an enum, and\n\
+    the serialization rule recognizes serde, the serde and serde_core packages from crates.io. A\n\
+    standard library without the items that the analysis relies on, and serde packages that leave one of\n\
+    ser::Serialize, de::Deserialize and de::DeserializeOwned undeclared, fail the run.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\
@@ -148,11 +150,12 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     DiscardedError: An error that is dropped without being handled\n  \
     DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n  \
     ErrorSourceOutsideChain: An error held outside the source chain\n  \
+    ErrorTypeNotAnEnum: An error type deriving thiserror::Error that is not an enum\n  \
     FailedMacroExpansion: A macro call that fails to expand\n  \
     FunctionUsedOnlyByBenchmarks: A production function that only benchmarks use\n  \
     FunctionUsedOnlyByTests: A production function that only tests use\n  \
     GlobImport: A glob import\n  \
-    HandwrittenErrorType: An error type that is not an enum deriving thiserror::Error\n  \
+    HandwrittenErrorType: An error type implemented by hand\n  \
     IgnoredTest: A test that the test run skips\n  \
     ImplWithoutLocalType: An impl of another crate's trait with no home in this crate\n  \
     IncludedSourceFile: An include! of a file that is not a build script output\n  \
@@ -160,6 +163,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     ItemOutOfOrder: An item that follows an item of a later group\n  \
     LintAllowedInManifest: A manifest lints table that allows a lint\n  \
     LintSuppression: An attribute that suppresses or lowers lints over code written in the workspace\n  \
+    MacroGeneratedErrorType: An error type implemented by a macro other than thiserror::Error\n  \
     MethodOutOfOrder: A function of an impl block or trait that follows one it belongs before\n  \
     MisplacedBlanketImpl: A blanket impl outside the file of its trait\n  \
     MisplacedForeignTypeImpl: A local trait's impl for a foreign type outside the trait's file\n  \

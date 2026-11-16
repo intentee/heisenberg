@@ -42,6 +42,9 @@ target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = []
 
+[workspace.metadata.heisenberg.out_dirs.blake3]
+version = "1.8.7"
+
 [workspace.metadata.heisenberg.out_dirs.blake3.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/blake3/x86_64-pc-windows-msvc"
 cfgs = ["blake3_sse2_ffi", "blake3_sse41_ffi", "blake3_avx2_ffi", "blake3_avx512_ffi"]
@@ -51,6 +54,9 @@ env = {}
 directory = "build_script_outputs/blake3/x86_64-unknown-linux-gnu"
 cfgs = ["blake3_sse2_ffi", "blake3_sse41_ffi", "blake3_avx2_ffi", "blake3_avx512_ffi"]
 env = {}
+
+[workspace.metadata.heisenberg.out_dirs.cargo]
+version = "0.100.0"
 
 [workspace.metadata.heisenberg.out_dirs.cargo.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/cargo/x86_64-pc-windows-msvc"
@@ -62,6 +68,9 @@ directory = "build_script_outputs/cargo/x86_64-unknown-linux-gnu"
 cfgs = []
 env = { RUST_HOST_TARGET = "x86_64-unknown-linux-gnu" }
 
+[workspace.metadata.heisenberg.out_dirs.curl]
+version = "0.4.51"
+
 [workspace.metadata.heisenberg.out_dirs.curl.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/curl/x86_64-pc-windows-msvc"
 cfgs = []
@@ -71,6 +80,9 @@ env = {}
 directory = "build_script_outputs/curl/x86_64-unknown-linux-gnu"
 cfgs = ["need_openssl_probe"]
 env = {}
+
+[workspace.metadata.heisenberg.out_dirs.curl-sys]
+version = "0.4.91+curl-8.22.0"
 
 [workspace.metadata.heisenberg.out_dirs.curl-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/curl-sys/x86_64-pc-windows-msvc"
@@ -82,6 +94,9 @@ directory = "build_script_outputs/curl-sys/x86_64-unknown-linux-gnu"
 cfgs = ["libcurl_vendored", "link_libnghttp2", "link_libz", "link_openssl"]
 env = {}
 
+[workspace.metadata.heisenberg.out_dirs.libgit2-sys]
+version = "0.18.8+1.9.7"
+
 [workspace.metadata.heisenberg.out_dirs.libgit2-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/libgit2-sys/x86_64-pc-windows-msvc"
 cfgs = ["libgit2_vendored"]
@@ -91,6 +106,9 @@ env = {}
 directory = "build_script_outputs/libgit2-sys/x86_64-unknown-linux-gnu"
 cfgs = ["libgit2_vendored"]
 env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libnghttp2-sys]
+version = "0.1.13+1.68.1"
 
 [workspace.metadata.heisenberg.out_dirs.libnghttp2-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/libnghttp2-sys/x86_64-pc-windows-msvc"
@@ -102,6 +120,9 @@ directory = "build_script_outputs/libnghttp2-sys/x86_64-unknown-linux-gnu"
 cfgs = []
 env = {}
 
+[workspace.metadata.heisenberg.out_dirs.libsqlite3-sys]
+version = "0.38.2"
+
 [workspace.metadata.heisenberg.out_dirs.libsqlite3-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/libsqlite3-sys/x86_64-pc-windows-msvc"
 cfgs = []
@@ -111,6 +132,9 @@ env = {}
 directory = "build_script_outputs/libsqlite3-sys/x86_64-unknown-linux-gnu"
 cfgs = []
 env = {}
+
+[workspace.metadata.heisenberg.out_dirs.libssh2-sys]
+version = "0.3.3"
 
 [workspace.metadata.heisenberg.out_dirs.libssh2-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/libssh2-sys/x86_64-pc-windows-msvc"
@@ -122,6 +146,9 @@ directory = "build_script_outputs/libssh2-sys/x86_64-unknown-linux-gnu"
 cfgs = []
 env = {}
 
+[workspace.metadata.heisenberg.out_dirs.libz-sys]
+version = "1.1.32"
+
 [workspace.metadata.heisenberg.out_dirs.libz-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/libz-sys/x86_64-pc-windows-msvc"
 cfgs = []
@@ -132,6 +159,9 @@ directory = "build_script_outputs/libz-sys/x86_64-unknown-linux-gnu"
 cfgs = []
 env = {}
 
+[workspace.metadata.heisenberg.out_dirs.openssl]
+version = "0.10.81"
+
 [workspace.metadata.heisenberg.out_dirs.openssl.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/openssl/x86_64-pc-windows-msvc"
 cfgs = []
@@ -141,6 +171,9 @@ env = {}
 directory = "build_script_outputs/openssl/x86_64-unknown-linux-gnu"
 cfgs = ['osslconf="OPENSSL_NO_IDEA"', 'osslconf="OPENSSL_NO_CAMELLIA"', 'osslconf="OPENSSL_NO_COMP"', 'osslconf="OPENSSL_NO_SSL3_METHOD"', 'osslconf="OPENSSL_NO_SEED"', "ossl101", "ossl102", "ossl110", "ossl110g", "ossl110h", "ossl111", "ossl111d", "ossl300", "ossl310", "ossl320", "ossl330", "ossl340", "ossl350"]
 env = {}
+
+[workspace.metadata.heisenberg.out_dirs.openssl-sys]
+version = "0.9.117"
 
 [workspace.metadata.heisenberg.out_dirs.openssl-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/openssl-sys/x86_64-pc-windows-msvc"

@@ -1,0 +1,55 @@
+[package]
+name = "out_dir_of_one_of_several_versions"
+edition = "2024"
+version = "0.1.0"
+
+[dependencies]
+getrandom_old = { package = "getrandom", version = "=0.3.4" }
+getrandom_new = { package = "getrandom", version = "=0.4.3" }
+
+[workspace]
+
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+arithmetic_side_effects = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+panic_in_result_fn = "deny"
+string_slice = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+unwrap_used = "deny"
+
+[workspace.metadata.heisenberg]
+
+[workspace.metadata.heisenberg.out_dirs.getrandom]
+version = "0.3.4"
+
+[workspace.metadata.heisenberg.out_dirs.getrandom.configurations.x86_64-pc-windows-msvc]
+directory = "generated/x86_64-pc-windows-msvc"
+cfgs = []
+env = {}
+
+[workspace.metadata.heisenberg.out_dirs.getrandom.configurations.x86_64-unknown-linux-gnu]
+directory = "generated/x86_64-unknown-linux-gnu"
+cfgs = []
+env = {}
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-pc-windows-msvc"
+target = "x86_64-pc-windows-msvc"
+default_features = true
+features = []
+
+[[workspace.metadata.heisenberg.configurations]]
+name = "x86_64-unknown-linux-gnu"
+target = "x86_64-unknown-linux-gnu"
+default_features = true
+features = []

@@ -7,6 +7,7 @@ use std::str::Utf8Error;
 use std::sync::Arc;
 
 use cargo::context::Definition;
+use cargo_metadata::semver::Version;
 use cargo_platform::ParseError;
 use guppy::errors;
 use ra_ap_ide_db::base_db::ProcMacroLoadingError;
@@ -260,14 +261,24 @@ pub enum ProjectModelError {
         package: String,
     },
     #[error(
-        "`{manifest_path}` declares an out-dir for `{package}`, which names {} packages of the workspace: {}",
-        versions.len(),
-        versions.join(", ")
+        "`{manifest_path}` declares an out-dir for `{package}` {version}, which names {} packages of the workspace that differ in their source",
+        packages.len()
     )]
     AmbiguousOutDirPackage {
         manifest_path: AbsPathBuf,
         package: String,
-        versions: Vec<String>,
+        packages: Vec<String>,
+        version: Version,
+    },
+    #[error(
+        "`{manifest_path}` declares an out-dir for `{package}` {declared}, and the workspace resolves `{package}` {}: declare the build script output of the resolved version",
+        resolved.join(", ")
+    )]
+    OutDirPackageVersionUnresolved {
+        declared: Version,
+        manifest_path: AbsPathBuf,
+        package: String,
+        resolved: Vec<String>,
     },
     #[error(
         "`{manifest_path}` declares an out-dir for `{package}` without the build script output of the configuration `{configuration}`"
@@ -294,6 +305,15 @@ pub enum ProjectModelError {
         "`{manifest_path}` declares the out-dir `{directory}` of `{package}` for the configuration `{configuration}` outside the workspace"
     )]
     OutDirOutsideWorkspace {
+        configuration: String,
+        directory: String,
+        manifest_path: AbsPathBuf,
+        package: String,
+    },
+    #[error(
+        "`{manifest_path}` declares the out-dir `{directory}` of `{package}` for the configuration `{configuration}` inside the target directory, which holds what earlier builds left behind: commit the declared build script output outside it"
+    )]
+    OutDirInsideTargetDirectory {
         configuration: String,
         directory: String,
         manifest_path: AbsPathBuf,

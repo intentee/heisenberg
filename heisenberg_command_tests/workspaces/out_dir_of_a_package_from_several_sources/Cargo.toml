@@ -1,13 +1,13 @@
 [package]
-name = "out_dir_of_an_ambiguous_package"
+name = "out_dir_of_a_package_from_several_sources"
 edition = "2024"
 version = "0.1.0"
 
 [dependencies]
-getrandom_old = { package = "getrandom", version = "=0.3.4" }
-getrandom_new = { package = "getrandom", version = "=0.4.3" }
+getrandom = "=0.3.4"
 
 [workspace]
+members = ["getrandom"]
 
 [lints.rust]
 warnings = "deny"
@@ -28,6 +28,9 @@ unreachable = "deny"
 unwrap_used = "deny"
 
 [workspace.metadata.heisenberg]
+
+[workspace.metadata.heisenberg.out_dirs.getrandom]
+version = "0.3.4"
 
 [workspace.metadata.heisenberg.out_dirs.getrandom.configurations.x86_64-pc-windows-msvc]
 directory = "generated/x86_64-pc-windows-msvc"

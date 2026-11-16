@@ -32,6 +32,7 @@ pub mod test_harness;
 pub mod test_violation;
 pub mod token_spelling;
 pub mod unresolved_foreign_reference;
+pub mod untyped_error_name;
 pub mod violation;
 pub mod violation_kind;
 pub mod violation_set;

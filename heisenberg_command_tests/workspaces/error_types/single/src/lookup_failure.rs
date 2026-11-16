@@ -49,4 +49,12 @@ pub enum LookupFailure {
     Context { context: io::Error },
     #[error[transparent]]
     Bracketed(ParseIntError),
+    #[error("both attempts failed, the first with: {first}")]
+    Attempts {
+        first: ParseIntError,
+        #[source]
+        second: ParseIntError,
+    },
+    #[error("the reason is lost: {reason}")]
+    Reason { reason: io::Error },
 }

@@ -19,7 +19,7 @@ fn derive_macro_output_closing_a_cycle_is_found() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["ItemOutOfOrder: 2 violations\n\
-            Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names.\n\
+            Every file reads in the same order, from what it declares and imports down to what it exposes. Move the item before the item the message names. A module that calls a macro_rules! macro of its parent by its bare name compiles only when it is declared after the macro, so declare the module first and hand it the macro by path: re-export the macro after its definition with pub(crate) use, and import it in the module.\n\
             \n\
             - src/lib.rs:9:9: Item belongs before described: module declarations precede private helpers\n    \
             pub mod first;\n\

@@ -8,10 +8,12 @@ use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
 
+use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::item_group::ItemGroup;
 
 use crate::attributed_item::AttributedItem;
 use crate::defined_items::DefinedItems;
+use crate::entry_point::EntryPoint;
 use crate::impl_home::ImplHome;
 use crate::implemented_type::ImplementedType;
 use crate::item_visibility::ItemVisibility;
@@ -25,6 +27,7 @@ use crate::token_origin::TokenOrigin;
 use crate::trait_arguments::trait_arguments;
 
 pub struct ItemOrder<'order, 'database> {
+    pub crate_target: &'order CrateTarget,
     pub items: &'order [ast::Item],
     pub krate: Crate,
     pub options: &'order CfgOptions,
@@ -151,6 +154,15 @@ impl ItemOrder<'_, '_> {
                 .has_test_attribute() =>
             {
                 Some(ItemGroup::Test)
+            }
+            ast::Item::Fn(function)
+                if (EntryPoint {
+                    crate_target: self.crate_target,
+                    semantics: self.semantics,
+                })
+                .is_written_as(function) =>
+            {
+                Some(ItemGroup::PublicItem)
             }
             ast::Item::Const(_)
             | ast::Item::Fn(_)

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use cargo_metadata::semver::Version;
 use serde::Deserialize;
 
 use crate::declared_build_script_output::DeclaredBuildScriptOutput;
@@ -8,4 +9,5 @@ use crate::declared_build_script_output::DeclaredBuildScriptOutput;
 #[serde(deny_unknown_fields)]
 pub struct DeclaredOutDir {
     pub configurations: BTreeMap<String, DeclaredBuildScriptOutput>,
+    pub version: Version,
 }

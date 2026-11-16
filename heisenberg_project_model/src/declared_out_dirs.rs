@@ -4,7 +4,9 @@ use std::fs;
 
 use cargo_metadata::Target;
 use cargo_metadata::TargetKind;
+use cargo_metadata::semver::Version;
 use ra_ap_paths::AbsPath;
+use ra_ap_paths::AbsPathBuf;
 
 use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
@@ -33,31 +35,15 @@ impl DeclaredOutDirs<'_> {
             .map(|configuration| (configuration.clone(), BTreeMap::new()))
             .collect();
 
-        for (package, DeclaredOutDir { mut configurations }) in out_dirs {
-            let PackageDocument { metadata, .. } = match self
-                .resolved
-                .named(&package)
-                .collect::<Vec<&PackageDocument>>()
-                .as_slice()
-            {
-                [] => {
-                    return Err(ProjectModelError::UnknownOutDirPackage {
-                        manifest_path: self.manifest_path.to_path_buf(),
-                        package,
-                    });
-                }
-                [document] => *document,
-                documents => {
-                    return Err(ProjectModelError::AmbiguousOutDirPackage {
-                        manifest_path: self.manifest_path.to_path_buf(),
-                        versions: documents
-                            .iter()
-                            .map(|PackageDocument { metadata, .. }| metadata.version.to_string())
-                            .collect(),
-                        package,
-                    });
-                }
-            };
+        for (
+            package,
+            DeclaredOutDir {
+                mut configurations,
+                version,
+            },
+        ) in out_dirs
+        {
+            let PackageDocument { metadata, .. } = self.pinned_package(&package, &version)?;
 
             if !metadata
                 .targets
@@ -85,21 +71,8 @@ impl DeclaredOutDirs<'_> {
                         package,
                     });
                 };
-                let out_dir = self.resolved.workspace.root.join(&directory).normalize();
+                let out_dir = self.out_dir(&configuration.name, &package, directory)?;
 
-                if !out_dir.starts_with(&self.resolved.workspace.root) {
-                    return Err(ProjectModelError::OutDirOutsideWorkspace {
-                        configuration: configuration.name.clone(),
-                        directory,
-                        manifest_path: self.manifest_path.to_path_buf(),
-                        package,
-                    });
-                }
-
-                fs::read_dir(&out_dir).map_err(|source| ProjectModelError::UnreadableOutDir {
-                    path: out_dir.clone().into(),
-                    source,
-                })?;
                 declared.insert(
                     configuration.clone(),
                     BuildScriptOutput {
@@ -127,5 +100,79 @@ impl DeclaredOutDirs<'_> {
         }
 
         Ok(validated)
+    }
+
+    fn out_dir(
+        &self,
+        configuration: &str,
+        package: &str,
+        directory: String,
+    ) -> Result<AbsPathBuf, ProjectModelError> {
+        let out_dir = self.resolved.workspace.root.join(&directory).normalize();
+
+        if !out_dir.starts_with(&self.resolved.workspace.root) {
+            return Err(ProjectModelError::OutDirOutsideWorkspace {
+                configuration: configuration.to_owned(),
+                directory,
+                manifest_path: self.manifest_path.to_path_buf(),
+                package: package.to_owned(),
+            });
+        }
+
+        if out_dir.starts_with(&self.resolved.workspace.target_directory) {
+            return Err(ProjectModelError::OutDirInsideTargetDirectory {
+                configuration: configuration.to_owned(),
+                directory,
+                manifest_path: self.manifest_path.to_path_buf(),
+                package: package.to_owned(),
+            });
+        }
+
+        fs::read_dir(&out_dir)
+            .map_err(|source| ProjectModelError::UnreadableOutDir {
+                path: out_dir.clone().into(),
+                source,
+            })
+            .map(|_| out_dir)
+    }
+
+    fn pinned_package(
+        &self,
+        package: &str,
+        version: &Version,
+    ) -> Result<&PackageDocument, ProjectModelError> {
+        let named: Vec<&PackageDocument> = self.resolved.named(package).collect();
+
+        match named
+            .iter()
+            .copied()
+            .filter(|PackageDocument { metadata, .. }| metadata.version == *version)
+            .collect::<Vec<&PackageDocument>>()
+            .as_slice()
+        {
+            [] if named.is_empty() => Err(ProjectModelError::UnknownOutDirPackage {
+                manifest_path: self.manifest_path.to_path_buf(),
+                package: package.to_owned(),
+            }),
+            [] => Err(ProjectModelError::OutDirPackageVersionUnresolved {
+                declared: version.clone(),
+                manifest_path: self.manifest_path.to_path_buf(),
+                package: package.to_owned(),
+                resolved: named
+                    .iter()
+                    .map(|PackageDocument { metadata, .. }| metadata.version.to_string())
+                    .collect(),
+            }),
+            [document] => Ok(*document),
+            documents => Err(ProjectModelError::AmbiguousOutDirPackage {
+                manifest_path: self.manifest_path.to_path_buf(),
+                package: package.to_owned(),
+                packages: documents
+                    .iter()
+                    .map(|PackageDocument { metadata, .. }| metadata.id.repr.clone())
+                    .collect(),
+                version: version.clone(),
+            }),
+        }
     }
 }

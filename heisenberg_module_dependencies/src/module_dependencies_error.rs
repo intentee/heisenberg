@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use ra_ap_hir::Crate;
 use ra_ap_hir::Function;
 use ra_ap_hir::Impl;
 use thiserror::Error;
@@ -14,6 +15,8 @@ use crate::serialization_trait::SerializationTrait;
 
 #[derive(Debug, Error)]
 pub enum ModuleDependenciesError {
+    #[error("rust-analyzer gives no name for the crate {0:?}, which declares a Result error type")]
+    ErrorTypeCrateWithoutName(Crate),
     #[error("rust-analyzer gives no type for the output of the criterion measurement loop {0:?}")]
     LoopOutputWithoutType(Function),
     #[error(transparent)]
@@ -24,6 +27,10 @@ pub enum ModuleDependenciesError {
     ResultMethodWithoutSource(Function),
     #[error(transparent)]
     ResultMethodUnavailable(Arc<Self>),
+    #[error(
+        "`{written}` is a Result that is neither a type alias nor written with its error type, so its error type cannot be named"
+    )]
+    ResultErrorNotWritten { written: String },
     #[error(
         "rust-analyzer gives no source for the trait method {0:?}, whose signature names the associated types that are Result errors"
     )]

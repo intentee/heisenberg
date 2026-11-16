@@ -19,8 +19,8 @@ fn error_types_that_break_the_thiserror_rules_are_violations() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok([
-            "ErrorSourceOutsideChain: 3 violations\n\
-            An error kept outside the source never reaches the error chain, so whoever reports the error loses its cause. Make the field the source of its variant, with #[source] or #[from], and give the variant no other error.\n\
+            "ErrorSourceOutsideChain: 4 violations\n\
+            An error kept outside the source never reaches the error chain, so whoever reports the error loses its cause. Make the field the source of its variant, with #[source] or #[from]. Where a failure has several causes, keep one as the source and format each other one in the message of the variant.\n\
             \n\
             - several/src/forwarded_failure.rs:9:11: Field holds an error outside the source chain of its variant\n        \
             Empty(ParseIntError),\n\
@@ -28,16 +28,26 @@ fn error_types_that_break_the_thiserror_rules_are_violations() {
             first: ParseIntError,\n\
             - single/src/lookup_failure.rs:49:15: Field holds an error outside the source chain of its variant\n        \
             Context { context: io::Error },\n\
+            - single/src/lookup_failure.rs:59:14: Field holds an error outside the source chain of its variant\n        \
+            Reason { reason: io::Error },\n\
             \n\
-            HandwrittenErrorType: 3 violations\n\
-            An error type written by hand repeats what thiserror generates, its messages, source chain and conversions, and drifts from it, and a struct cannot name which failure happened. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.\n\
+            ErrorTypeNotAnEnum: 1 violation\n\
+            A type that is not an enum cannot name which failure happened, so its callers cannot match on the failure. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.\n\
             \n\
-            - several/src/closed_failure.rs:17:16: Error type is not an enum that derives thiserror::Error\n    \
-            impl Error for ClosedFailure {}\n\
-            - several/src/declared_failure.rs:12:13: Error type is not an enum that derives thiserror::Error\n    \
-            error_type!(DeclaredFailure);\n\
-            - several/src/read_failure.rs:1:3: Error type is not an enum that derives thiserror::Error\n    \
+            - several/src/read_failure.rs:1:3: Error type that derives thiserror::Error is not an enum\n    \
             #[derive(Debug, thiserror::Error)]\n\
+            \n\
+            HandwrittenErrorType: 1 violation\n\
+            An error type written by hand repeats what thiserror generates, its messages, source chain and conversions, and drifts from it. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.\n\
+            \n\
+            - several/src/closed_failure.rs:17:16: Error type is implemented by hand\n    \
+            impl Error for ClosedFailure {}\n\
+            \n\
+            MacroGeneratedErrorType: 1 violation\n\
+            The error type rules read the source and the message of each failure from what the Error derive of thiserror declares, and another macro declares neither where they can be checked. Declare the error type as an enum with a variant for each failure, and derive thiserror::Error on it.\n\
+            \n\
+            - several/src/declared_failure.rs:12:13: Error type is implemented by a macro other than thiserror::Error\n    \
+            error_type!(DeclaredFailure);\n\
             \n\
             MultipleErrorTypes: 5 violations\n\
             A crate whose failures one error enum cannot describe does more than one thing, and its callers cannot tell from its signatures which concern failed. Split the crate along its error boundaries: move each error enum, with the code that fails with it, into its own crate, and wrap it in the crates that depend on it as a #[source] or #[from] variant of their own error enum.\n\
@@ -66,7 +76,7 @@ fn error_types_that_break_the_thiserror_rules_are_violations() {
             #[error(\"the field cannot be parsed: {}\", (.source))]\n\
             \n\
             ------------------------------\n\
-            15 errors found\n\
+            16 errors found\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(2, 8).as_str()
         ]

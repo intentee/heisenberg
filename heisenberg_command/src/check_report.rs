@@ -44,6 +44,7 @@ use crate::rendered_report::RenderedReport;
 use crate::shared_file::SharedFile;
 use crate::shared_file_tree::SharedFileTree;
 use crate::violation_occurrences::ViolationOccurrences;
+use crate::violation_report::ViolationReport;
 
 fn shared_module_file_issues(
     shared_files: &BTreeMap<
@@ -69,6 +70,23 @@ fn shared_module_file_issues(
             Issue::new_shared_module_file(root.file, root.inclusions.clone(), submodule_files)
         })
         .collect()
+}
+
+fn violation_reports(
+    violations: BTreeMap<&Violation, ViolationOccurrences>,
+) -> Vec<ViolationReport> {
+    let mut reports: Vec<ViolationReport> = Vec::new();
+
+    for (violation, occurrences) in violations {
+        match reports.last_mut() {
+            Some(report) if report.reports_the_defect_of(violation) => {
+                report.absorb(violation, occurrences);
+            }
+            _ => reports.push(ViolationReport::new(violation, occurrences)),
+        }
+    }
+
+    reports
 }
 
 pub struct CheckReport {
@@ -357,9 +375,11 @@ impl CheckReport {
 
         issues.extend(self.unresolved_foreign_reference_issues(&mut violations));
 
-        for (violation, occurrences) in violations {
-            issues.push(Issue::new_violation(violation, occurrences));
-        }
+        issues.extend(
+            violation_reports(violations)
+                .into_iter()
+                .map(Issue::new_violation),
+        );
 
         issues.extend(
             cycles

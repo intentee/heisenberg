@@ -86,6 +86,7 @@ use heisenberg_module_graph::shared_module_file::SharedModuleFile;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::test_violation::TestViolation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
+use heisenberg_module_graph::untyped_error_name::UntypedErrorName;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_module_graph::violation_set::ViolationSet;
@@ -118,6 +119,7 @@ use crate::definition_usages::DefinitionUsages;
 use crate::derived_sources::DerivedSources;
 use crate::error_derive::ErrorDerive;
 use crate::error_discards::ErrorDiscards;
+use crate::error_implementation_origin::ErrorImplementationOrigin;
 use crate::error_types::ErrorTypes;
 use crate::expanded_items::ExpandedItems;
 use crate::expansion_chain::ExpansionChain;
@@ -157,6 +159,7 @@ use crate::path_reference::PathReference;
 use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
+use crate::qualified_names::QualifiedNames;
 use crate::result_method_effect::ResultMethodEffect;
 use crate::round_trips::RoundTrips;
 use crate::serialization_traits::SerializationTraits;
@@ -647,7 +650,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                 let DerivedSources {
                     outside_chain,
                     sources,
-                } = error_derive.sources(&written);
+                } = error_derive.sources(&written, expansion);
                 let expansion_origin = origin.expansion_of(derive.syntax());
 
                 outside_chain
@@ -692,19 +695,49 @@ impl<'database> ModuleWalk<'_, 'database> {
                     == Some(self.standard_items.error_trait) =>
             {
                 self.locate_focus(node, origin).map(|location| {
-                    if !self.is_derived_error_enum(node, *implementation) {
-                        violations.insert(Violation {
-                            kind: ViolationKind::Error(ErrorViolation::Handwritten),
-                            location: location.clone(),
-                        });
-                    }
+                    let origin_violation = match self
+                        .error_implementation_origin(node, *implementation)
+                    {
+                        ErrorImplementationOrigin::DerivedForAnEnum => None,
+                        ErrorImplementationOrigin::DerivedForAnotherType => {
+                            Some(ErrorViolation::NotAnEnum)
+                        }
+                        ErrorImplementationOrigin::Handwritten => Some(ErrorViolation::Handwritten),
+                        ErrorImplementationOrigin::MacroGenerated => {
+                            Some(ErrorViolation::MacroGenerated)
+                        }
+                    };
 
-                    error_types
-                        .implementations
-                        .insert(*implementation, location);
+                    violations.extend(origin_violation.map(|violation| Violation {
+                        kind: ViolationKind::Error(violation),
+                        location: location.clone(),
+                    }));
+
+                    if !self.non_production_code.is_test(node) {
+                        error_types
+                            .implementations
+                            .insert(*implementation, location);
+                    }
                 })
             }
             _ => Ok(()),
+        }
+    }
+
+    fn error_implementation_origin(
+        &self,
+        node: &SyntaxNode,
+        implementation: Impl,
+    ) -> ErrorImplementationOrigin {
+        match self.semantics.hir_file_for(node).macro_file() {
+            None => ErrorImplementationOrigin::Handwritten,
+            Some(expansion) if !self.error_derive().generates(expansion) => {
+                ErrorImplementationOrigin::MacroGenerated
+            }
+            Some(_) => match implementation.self_ty(self.semantics.db).as_adt() {
+                Some(Adt::Enum(_)) => ErrorImplementationOrigin::DerivedForAnEnum,
+                _ => ErrorImplementationOrigin::DerivedForAnotherType,
+            },
         }
     }
 
@@ -1221,17 +1254,6 @@ impl<'database> ModuleWalk<'_, 'database> {
         })
     }
 
-    fn is_derived_error_enum(&self, node: &SyntaxNode, implementation: Impl) -> bool {
-        matches!(
-            implementation.self_ty(self.semantics.db).as_adt(),
-            Some(Adt::Enum(_))
-        ) && self
-            .semantics
-            .hir_file_for(node)
-            .macro_file()
-            .is_some_and(|expansion| self.error_derive().generates(expansion))
-    }
-
     fn is_exempt_from_the_procedural_rule(&self, function: Function, node: &SyntaxNode) -> bool {
         let database = self.semantics.db;
 
@@ -1393,6 +1415,7 @@ impl<'database> ModuleWalk<'_, 'database> {
     ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         self.order_violations(
             ItemOrder {
+                crate_target: self.crate_target,
                 items,
                 krate: self.krate,
                 options: self.options,
@@ -2530,27 +2553,65 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         self.semantics
             .to_def(alias)
-            .map(|definition| {
+            .map_or(Ok(false), |definition| {
                 self.names_a_result_error_of_its_trait(definition)
                     .map(|names| {
-                        names
-                            .then(|| definition.ty(database))
-                            .filter(|chosen| !self.error_types().is_error_type(chosen))
+                        names && !self.error_types().is_error_type(&definition.ty(database))
                     })
             })
-            .transpose()
-            .map(Option::flatten)
-            .and_then(|chosen| {
-                chosen.map_or(Ok(None), |chosen| {
-                    alias.ty().map_or(Ok(None), |written| {
+            .and_then(|is_untyped| {
+                alias
+                    .ty()
+                    .filter(|_| is_untyped)
+                    .map_or(Ok(None), |written| {
                         self.own_violation(
-                            self.untyped_result_violation(&chosen),
+                            ViolationKind::Error(ErrorViolation::UntypedResult {
+                                error: UntypedErrorName::Named {
+                                    error_type: written.syntax().to_string(),
+                                },
+                            }),
                             written.syntax(),
                             origin,
                         )
                     })
-                })
             })
+    }
+
+    fn untyped_error_name(
+        &self,
+        written: &ast::PathType,
+        error: &Type<'database>,
+    ) -> Result<UntypedErrorName, ModuleDependenciesError> {
+        let names = QualifiedNames {
+            krate: self.krate,
+            semantics: self.semantics,
+        };
+        let path = written.path();
+        let result = written.syntax().to_string();
+
+        match path.as_ref().and_then(|path| self.paths.resolve(path)) {
+            Some(PathResolution::Def(ModuleDef::TypeAlias(alias))) => {
+                names.type_alias(alias).and_then(|alias| {
+                    names
+                        .error_type(error)
+                        .map(|error_type| UntypedErrorName::NamedByAlias { alias, error_type })
+                })
+            }
+            _ => path
+                .and_then(|path| path.segment())
+                .and_then(|segment| segment.generic_arg_list())
+                .and_then(|arguments| {
+                    arguments
+                        .generic_args()
+                        .filter_map(|argument| ast::TypeArg::cast(argument.syntax().clone()))
+                        .nth(1)
+                })
+                .and_then(|argument| argument.ty())
+                .ok_or(ModuleDependenciesError::ResultErrorNotWritten { written: result })
+                .map(|written_error| UntypedErrorName::Named {
+                    error_type: written_error.syntax().to_string(),
+                }),
+        }
     }
 
     fn untyped_result_error(
@@ -2576,21 +2637,13 @@ impl<'database> ModuleWalk<'_, 'database> {
                 && !self.error_types().is_error_type(error)
         })
         .map_or(Ok(None), |error| {
-            self.own_violation(
-                self.untyped_result_violation(&error),
-                written.syntax(),
-                origin,
-            )
-        })
-    }
-
-    fn untyped_result_violation(&self, error: &Type<'_>) -> ViolationKind {
-        let database = self.semantics.db;
-
-        ViolationKind::Error(ErrorViolation::UntypedResult {
-            error_type: error
-                .display_truncated(database, None, self.krate.to_display_target(database))
-                .to_string(),
+            self.untyped_error_name(written, &error).and_then(|name| {
+                self.own_violation(
+                    ViolationKind::Error(ErrorViolation::UntypedResult { error: name }),
+                    written.syntax(),
+                    origin,
+                )
+            })
         })
     }
 

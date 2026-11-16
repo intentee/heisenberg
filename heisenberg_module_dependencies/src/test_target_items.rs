@@ -5,7 +5,7 @@ use ra_ap_syntax::ast;
 use heisenberg_module_graph::crate_target::CrateTarget;
 
 use crate::attributed_item::AttributedItem;
-use crate::main_function::MainFunction;
+use crate::entry_point::EntryPoint;
 use crate::path_resolutions::PathResolutions;
 
 pub struct TestTargetItems<'items, 'database> {
@@ -51,13 +51,10 @@ impl TestTargetItems<'_, '_> {
     }
 
     fn is_entry_point(&self, function: &ast::Fn) -> bool {
-        self.semantics.to_def(function).is_some_and(|definition| {
-            MainFunction {
-                crate_target: self.crate_target,
-                database: self.semantics.db,
-                function: definition,
-            }
-            .enters_its_target()
-        })
+        EntryPoint {
+            crate_target: self.crate_target,
+            semantics: self.semantics,
+        }
+        .is_written_as(function)
     }
 }

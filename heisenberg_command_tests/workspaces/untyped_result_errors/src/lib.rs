@@ -4,4 +4,6 @@ pub mod holder;
 pub mod outcome;
 pub mod parse_digit;
 pub mod parse_number;
+pub mod retry;
+pub mod text_outcome;
 pub mod word;

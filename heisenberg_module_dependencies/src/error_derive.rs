@@ -67,7 +67,7 @@ impl<'database> ErrorDerive<'_, 'database> {
         ) && self.derive_crates.contains(&Crate::from(definition.krate))
     }
 
-    pub fn sources(&self, written: &ast::Enum) -> DerivedSources {
+    pub fn sources(&self, written: &ast::Enum, expansion: MacroCallId) -> DerivedSources {
         let database = self.semantics.db;
         let transparent = self.is_transparent(written);
         let mut derived = DerivedSources::default();
@@ -82,6 +82,8 @@ impl<'database> ErrorDerive<'_, 'database> {
                     .filter(|VariantField { definition, .. }| {
                         source != Some(*definition)
                             && self.error_types.implements_error(&definition.ty(database))
+                            && !(source.is_some()
+                                && self.formats_in_its_message(expansion, *definition))
                     })
                     .map(|VariantField { node, .. }| node.clone()),
             );
@@ -264,6 +266,12 @@ impl<'database> ErrorDerive<'_, 'database> {
                     .unwrap_or_default()
             })
             .collect()
+    }
+
+    fn formats_in_its_message(&self, expansion: MacroCallId, field: Field) -> bool {
+        !self
+            .sources_in_messages(expansion, &HashSet::from([field]))
+            .is_empty()
     }
 
     fn has_helper(&self, attributes: &[ast::Attr], names: &[&str]) -> bool {
