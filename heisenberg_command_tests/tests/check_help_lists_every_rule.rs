@@ -126,13 +126,14 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     cause and its direct consequences form one issue. A partial run, one that leaves out a declared\n\
     configuration, names the configurations it left out after the analysed ones and does not evaluate\n\
     AttributeAppliedInNoConfiguration, CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt,\n\
-    ItemMoreVisibleThanItsUses, NextestConfigurationMissing, UnneededNextestConfiguration,\n\
-    UnreachableSourceFile, VacuousNegatedConfiguration, which hold only over every declared\n\
-    configuration, although it does evaluate NextestConfigurationMissing and\n\
-    UnneededNextestConfiguration when an analysed configuration runs a test under libtest's harness,\n\
-    evaluates only in part BenchmarksOnlyPackageWithoutLibraries, TestsOnlyPackageWithoutTestLibraries,\n\
-    whose empty-library checks hold only over every declared configuration, and names the rules it does\n\
-    not evaluate and those it evaluates in part; a partial run without issues exits as compliant.\n\
+    ItemMoreVisibleThanItsUses, NextestConfigurationMissing, TestDependencyInProduction,\n\
+    TestLibraryInProductionPackage, UnneededNextestConfiguration, UnreachableSourceFile,\n\
+    UnusedDependency, VacuousNegatedConfiguration, which hold only over every declared configuration,\n\
+    although it does evaluate NextestConfigurationMissing and UnneededNextestConfiguration when an\n\
+    analysed configuration runs a test under libtest's harness, evaluates only in part\n\
+    BenchmarksOnlyPackageWithoutLibraries, TestsOnlyPackageWithoutTestLibraries, whose empty-library\n\
+    checks hold only over every declared configuration, and names the rules it does not evaluate and\n\
+    those it evaluates in part; a partial run without issues exits as compliant.\n\
     \n\
     Rules: every rule is mandatory and decidable, and is listed under its section with its identifier.\n  \
     1 Analysable code\n    \
@@ -188,7 +189,10 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Rule 4.6 PackageDependsOnItself: A package that depends on itself through dev-dependencies\n    \
     Rule 4.7 UnknownConfinedPackage: A confined package that the workspace does not resolve\n    \
     Rule 4.8 UnpinnedDependencyRequirement: A dependency requirement that is not a MAJOR.MINOR\n    \
-    version or a git rev\n  \
+    version or a git rev\n    \
+    Rule 4.9 TestDependencyInProduction: A production dependency that only test code uses\n    \
+    Rule 4.10 TestLibraryInProductionPackage: A test library declared by a production package\n    \
+    Rule 4.11 UnusedDependency: A dependency that no code uses\n  \
     5 Modules and items\n    \
     Rule 5.1 AdditionalPublicItem: A module with more than one public item\n    \
     Rule 5.2 GlobImport: A glob import\n    \

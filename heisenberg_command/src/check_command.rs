@@ -16,6 +16,7 @@ use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::dependency_requirements::DependencyRequirements;
+use heisenberg_project_model::dependency_roles::DependencyRoles;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::nextest_requirements::NextestRequirements;
@@ -29,6 +30,7 @@ use heisenberg_project_model::rustfmt_requirements::RustfmtRequirements;
 use crate::check_report::CheckReport;
 use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::configuration_pipeline::ConfigurationPipeline;
+use crate::dependency_uses::dependency_uses;
 use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::nextest_presence_verdict::NextestPresenceVerdict;
 use crate::project_arguments::ProjectArguments;
@@ -214,6 +216,16 @@ impl ConfigurationPipeline for CheckCommand {
                         .iter()
                         .map(|ConfigurationAnalysis { confinement, .. }| confinement),
                 )
+            })
+            .chain(if scope.is_partial() {
+                Vec::new()
+            } else {
+                DependencyRoles {
+                    resolved: &project.resolved,
+                    test_crates: &packages.test_crates,
+                    uses: &dependency_uses(&analyses),
+                }
+                .violations()
             })
             .chain(
                 ManifestLintAllowances {

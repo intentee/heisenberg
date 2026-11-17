@@ -4,6 +4,7 @@ use std::iter::once;
 
 use ra_ap_cfg::CfgExpr;
 use ra_ap_hir::Crate;
+use ra_ap_hir::CrateDependency;
 use ra_ap_hir::InFile;
 use ra_ap_hir::Module;
 use ra_ap_hir::Semantics;
@@ -146,9 +147,19 @@ impl ModuleDependencies<'_, '_> {
                             },
                         );
                         let inactive_code = inactive_code(&diagnostics);
+                        let dependency_names: HashMap<Crate, String> = attach_db(database, || {
+                            krate
+                                .dependencies(database)
+                                .into_iter()
+                                .map(|CrateDependency { krate, name }| {
+                                    (krate, name.as_str().to_owned())
+                                })
+                                .collect()
+                        });
                         let crate_walk = CrateWalk {
                             build_script_output_files,
                             crate_target,
+                            dependency_names: &dependency_names,
                             file_modules,
                             files: member_files,
                             inactive_code: &inactive_code,

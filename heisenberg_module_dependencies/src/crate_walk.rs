@@ -43,6 +43,7 @@ use crate::walked_module::WalkedModule;
 pub struct CrateWalk<'walk> {
     pub build_script_output_files: &'walk BTreeSet<FileId>,
     pub crate_target: &'walk CrateTarget,
+    pub dependency_names: &'walk HashMap<Crate, String>,
     pub file_modules: &'walk HashMap<FileId, Vec<Module>>,
     pub files: &'walk BTreeSet<FileId>,
     pub inactive_code: &'walk HashMap<InFile<SyntaxNodePtr>, CfgExpr>,
@@ -90,6 +91,7 @@ impl CrateWalk<'_> {
             },
             build_script_output_files: self.build_script_output_files,
             crate_target: self.crate_target,
+            dependency_names: self.dependency_names,
             file_modules: self.file_modules,
             inactive_code: self.inactive_code,
             krate: self.krate,

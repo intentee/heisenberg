@@ -17,6 +17,7 @@ pub mod constants;
 pub mod coverage_check_command;
 pub mod coverage_report;
 mod cycle_shape;
+mod dependency_uses;
 pub mod error_issue;
 pub mod explain_command;
 pub mod heisenberg_command;

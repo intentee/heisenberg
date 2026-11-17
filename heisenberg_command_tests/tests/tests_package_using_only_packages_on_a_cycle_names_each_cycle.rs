@@ -33,8 +33,13 @@ fn tests_package_using_only_packages_on_a_cycle_names_each_cycle() {
             cannot move to harness: harness v0.1.0 -> library v0.1.0 -> harness v0.1.0\n      \
             cannot move to library: library v0.1.0 -> harness v0.1.0 -> library v0.1.0\n\
             \n\
+            UnusedDependency: 1 violation\n\
+            A declared dependency is an input of the build and of every analysis of the package, so one that no code uses states an input that does not exist. Remove the dependency from the manifest.\n\
+            \n\
+            - library/Cargo.toml: Dev-dependency harness is referred to by no code that the role serves\n\
+            \n\
             ------------------------------\n\
-            2 errors found in 2 rules\n\
+            3 errors found in 3 rules\n\
             ------------------------------\n", full_run_footer(4, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

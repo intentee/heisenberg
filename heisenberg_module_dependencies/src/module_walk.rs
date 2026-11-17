@@ -72,10 +72,12 @@ use heisenberg_configured_code::negated_configuration::NegatedConfiguration;
 use heisenberg_configured_code::non_production_code::NonProductionCode;
 use heisenberg_configured_code::test_predicate::TestPredicate;
 use heisenberg_expanded_code::code_tokens::code_tokens;
+use heisenberg_module_graph::code_category::CodeCategory;
 use heisenberg_module_graph::configuration_atom::ConfigurationAtom;
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
+use heisenberg_module_graph::dependency_reference::DependencyReference;
 use heisenberg_module_graph::error_violation::ErrorViolation;
 use heisenberg_module_graph::every_configuration_findings::EveryConfigurationFindings;
 use heisenberg_module_graph::foreign_module::ForeignModule;
@@ -191,6 +193,7 @@ pub struct ModuleWalk<'walk, 'database> {
     pub benchmark_harness: &'walk BenchmarkHarness<'walk, 'database>,
     pub build_script_output_files: &'walk BTreeSet<FileId>,
     pub crate_target: &'walk CrateTarget,
+    pub dependency_names: &'walk HashMap<Crate, String>,
     pub error_derive_crates: &'walk HashSet<Crate>,
     pub error_runtime_crates: &'walk HashSet<Crate>,
     pub file_modules: &'walk HashMap<FileId, Vec<Module>>,
@@ -607,6 +610,25 @@ impl<'database> ModuleWalk<'_, 'database> {
             },
             origin,
         )
+    }
+
+    fn dependency_reference(
+        &self,
+        referenced: Option<Crate>,
+        node: &SyntaxNode,
+    ) -> Option<DependencyReference> {
+        referenced
+            .and_then(|krate| self.dependency_names.get(&krate))
+            .map(|extern_crate_name| DependencyReference {
+                category: if self.non_production_code.is_benchmark(node) {
+                    CodeCategory::Benchmark
+                } else if self.is_test_code(node) {
+                    CodeCategory::Test
+                } else {
+                    CodeCategory::Production
+                },
+                extern_crate_name: extern_crate_name.clone(),
+            })
     }
 
     fn enter(
@@ -2383,11 +2405,25 @@ impl<'database> ModuleWalk<'_, 'database> {
         origin: &SubtreeOrigin,
         ModuleFindings {
             dependencies,
+            dependency_references,
             unresolved_foreign_references,
             violations,
             ..
         }: &mut ModuleFindings,
     ) -> Result<(), ModuleDependenciesError> {
+        if let Some(PathResolution::Def(definition)) = self.paths.resolve(path) {
+            dependency_references.extend(
+                self.dependency_reference(
+                    match definition {
+                        ModuleDef::Module(module) => Some(module),
+                        other => other.module(self.semantics.db),
+                    }
+                    .map(|module| module.krate(self.semantics.db)),
+                    path.syntax(),
+                ),
+            );
+        }
+
         match (PathReference {
             krate: self.krate,
             module_paths: self.module_paths,
@@ -3075,6 +3111,16 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.unresolved_method_call(node, origin)
             .and_then(|unresolved| {
                 findings.violations.extend(unresolved);
+
+                if let ItemDefinition::ExternCrate(declaration) = definition {
+                    findings.dependency_references.extend(
+                        self.dependency_reference(
+                            declaration.resolved_crate(self.semantics.db),
+                            node,
+                        ),
+                    );
+                }
+
                 self.error_implementation(node, definition, origin, findings, crate_findings)
             })
             .and_then(|()| {

@@ -234,6 +234,21 @@ const CATALOGUE: &str = "Heisenberg 0.1.0 rule catalogue\n\
         Applies to: all code\n  \
         Evaluated: in each analysed configuration\n\
         \n\
+        Rule 4.9 TestDependencyInProduction: A production dependency that only test code uses\n  \
+        Scope: package\n  \
+        Applies to: all code\n  \
+        Evaluated: only when every declared configuration is analysed\n\
+        \n\
+        Rule 4.10 TestLibraryInProductionPackage: A test library declared by a production package\n  \
+        Scope: package\n  \
+        Applies to: all code\n  \
+        Evaluated: only when every declared configuration is analysed\n\
+        \n\
+        Rule 4.11 UnusedDependency: A dependency that no code uses\n  \
+        Scope: package\n  \
+        Applies to: all code\n  \
+        Evaluated: only when every declared configuration is analysed\n\
+        \n\
         Section 5: Modules and items\n\
         \n\
         Rule 5.1 AdditionalPublicItem: A module with more than one public item\n  \

@@ -8,27 +8,9 @@ use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_command_tests::host_only_fixture::HostOnlyFixture;
 
-#[test]
-fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
-    let outcome = HeisenbergCheck {
-        workspace: &HostOnlyFixture {
-            directory: Path::new(env!("CARGO_TARGET_TMPDIR")),
-            name: "confined_packages",
-        }
-        .path()
-        .expect("the host-only fixture must be prepared"),
-    }
-    .run_with_arguments(&[
-        CONFIGURATION_ARGUMENT,
-        HOST_CONFIGURATION,
-        CONFIGURATION_ARGUMENT,
-        &format!("{HOST_CONFIGURATION}-without-features"),
-    ])
-    .expect("the arguments must parse");
-
-    assert_eq!(
-        str::from_utf8(&outcome.output),
-        Ok(format!("ConfinedPackageReachedOutsideItsUsers: 7 violations\n\
+fn expected_report() -> String {
+    format!(
+        "ConfinedPackageReachedOutsideItsUsers: 7 violations\n\
             A confined package is built and used only by its declared users, so nothing else reaches what it provides, even through another member. Remove the dependency that the path names; code that needs the package belongs in one of its users.\n\
             \n\
             - both/Cargo.toml: Package both depends on confined package confined without being one of its users\n      \
@@ -90,17 +72,59 @@ fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
             \n\
             - cyclic/Cargo.toml: Packages cyclic v0.1.0, harness v0.1.0 depend on each other through dev-dependencies\n\
             \n\
+            TestLibraryInProductionPackage: 3 violations\n\
+            A library that only tests need belongs with the tests, in a test crate: a production package that declares it mixes the inputs of its tests into its own manifest, and every package that tests the same way repeats it. Move the tests that need the library, with the dev-dependency, into a declared test crate.\n\
+            \n\
+            - tested/Cargo.toml: Dev-dependency x brings a library from outside the workspace into the tests of a production package\n\
+            - tool/Cargo.toml: Dev-dependency d brings a library from outside the workspace into the tests of a production package\n\
+            - unlisted/Cargo.toml: Dev-dependency confined brings a library from outside the workspace into the tests of a production package\n\
+            \n\
             UnknownConfinedPackage: 1 violation\n\
             A confinement holds only for a package that the workspace resolves. Remove the entry from confined_packages, or correct the package name.\n\
             \n\
             - Cargo.toml: Confined package absent names no package that the workspace resolves\n\
             \n\
+            UnusedDependency: 7 violations\n\
+            A declared dependency is an input of the build and of every analysis of the package, so one that no code uses states an input that does not exist. Remove the dependency from the manifest.\n\
+            \n\
+            - both/Cargo.toml: Dependency confined is referred to by no code that the role serves\n\
+            - both/Cargo.toml: Dependency wrapper is referred to by no code that the role serves\n\
+            - cyclic/Cargo.toml: Dev-dependency harness is referred to by no code that the role serves\n\
+            - forked/Cargo.toml: Dependency wrapper is referred to by no code that the role serves\n\
+            - stranger/Cargo.toml: Dependency user is referred to by no code that the role serves\n\
+            - tested/Cargo.toml: Dev-dependency q is referred to by no code that the role serves\n\
+            - tested/Cargo.toml: Dependency x is referred to by no code that the role serves\n\
+            \n\
             ------------------------------\n\
-            22 errors found in 7 rules\n\
+            32 errors found in 9 rules\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 19 crate targets, 22 modules\n\
-            {FULL_RUN_FOOTER_END}").as_str())
+            {FULL_RUN_FOOTER_END}"
+    )
+}
+
+#[test]
+fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
+    let outcome = HeisenbergCheck {
+        workspace: &HostOnlyFixture {
+            directory: Path::new(env!("CARGO_TARGET_TMPDIR")),
+            name: "confined_packages",
+        }
+        .path()
+        .expect("the host-only fixture must be prepared"),
+    }
+    .run_with_arguments(&[
+        CONFIGURATION_ARGUMENT,
+        HOST_CONFIGURATION,
+        CONFIGURATION_ARGUMENT,
+        &format!("{HOST_CONFIGURATION}-without-features"),
+    ])
+    .expect("the arguments must parse");
+
+    assert_eq!(
+        str::from_utf8(&outcome.output),
+        Ok(expected_report().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

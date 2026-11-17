@@ -1072,6 +1072,35 @@ pub const TEST_CRATE_USED_BY_PRODUCTION: IssueText = IssueText {
     summary: "A declared test crate that production code depends on",
 };
 
+pub const TEST_DEPENDENCY_IN_PRODUCTION: IssueText = IssueText {
+    definition: "A dependency of a workspace member, declared in a dependencies table and not also in a dev-dependencies table, that only test code, benchmark code or an example of the package refers to in any declared configuration, and no production code of it. Code refers to a dependency when a path, an extern crate declaration or the code a macro generates resolves into it. Evaluated only when every declared configuration is analysed.",
+    evaluation: RuleEvaluation::EveryDeclaredConfiguration,
+    exceptions: &["A dependency of a declared test crate, whose every target is test code."],
+    name: "TestDependencyInProduction",
+    ordinal: 9,
+    rationale: "A dependency declared for production is built into every user of the package, so one that only tests need states a production input that production does not have.",
+    remedy: "Declare the dependency in dev-dependencies, or move the tests that need it into a test crate.",
+    scope: RuleScope::Package,
+    section: RuleSection::Packages,
+    summary: "A production dependency that only test code uses",
+};
+
+pub const TEST_LIBRARY_IN_PRODUCTION_PACKAGE: IssueText = IssueText {
+    definition: "A dev-dependency of a workspace member that is not a declared test crate, on a package that is not a workspace member, that test code of the member refers to. Evaluated only when every declared configuration is analysed.",
+    evaluation: RuleEvaluation::EveryDeclaredConfiguration,
+    exceptions: &[
+        "A dev-dependency that only benchmark targets or examples refer to, which cannot live in a test crate.",
+        "A dev-dependency on a workspace member, such as a declared test crate.",
+    ],
+    name: "TestLibraryInProductionPackage",
+    ordinal: 10,
+    rationale: "A library that only tests need belongs with the tests, in a test crate: a production package that declares it mixes the inputs of its tests into its own manifest, and every package that tests the same way repeats it.",
+    remedy: "Move the tests that need the library, with the dev-dependency, into a declared test crate.",
+    scope: RuleScope::Package,
+    section: RuleSection::Packages,
+    summary: "A test library declared by a production package",
+};
+
 pub const TEST_MODULE_IN_ITS_OWN_FILE: IssueText = IssueText {
     definition: "A module declaration without a body, in production code, whose cfg or cfg_attr predicate requires test, so that the tests or test helpers of a production crate live in a file of their own. Production code is every crate target that is neither an integration test target, a benchmark target nor a target of a test crate.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
@@ -1401,6 +1430,19 @@ pub const UNTYPED_RESULT_ERROR: IssueText = IssueText {
     scope: RuleScope::ModuleFile,
     section: RuleSection::Errors,
     summary: "A Result whose error type erases the failure",
+};
+
+pub const UNUSED_DEPENDENCY: IssueText = IssueText {
+    definition: "A dependency of a workspace member that no code its role serves refers to in any declared configuration: no code of the package at all for a dependency, no build script for a build-dependency, and no test code, benchmark code or example for a dev-dependency. Code refers to a dependency when a path, an extern crate declaration or the code a macro generates resolves into it. Evaluated only when every declared configuration is analysed.",
+    evaluation: RuleEvaluation::EveryDeclaredConfiguration,
+    exceptions: &[],
+    name: "UnusedDependency",
+    ordinal: 11,
+    rationale: "A declared dependency is an input of the build and of every analysis of the package, so one that no code uses states an input that does not exist.",
+    remedy: "Remove the dependency from the manifest.",
+    scope: RuleScope::Package,
+    section: RuleSection::Packages,
+    summary: "A dependency that no code uses",
 };
 
 pub const UNVETTED_CLIPPY_SETTING: IssueText = IssueText {
