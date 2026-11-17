@@ -42,3 +42,6 @@ features = []
 [[test]]
 name = "counter_for_tests_starts_at_seven"
 path = "tests/counter_for_tests_starts_at_seven.rs"
+
+[lib]
+doctest = false

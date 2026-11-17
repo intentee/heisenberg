@@ -9,3 +9,6 @@ z = { path = "../z", optional = true }
 
 [features]
 f = ["dep:z"]
+
+[lib]
+doctest = false

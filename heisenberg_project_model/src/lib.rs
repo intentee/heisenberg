@@ -43,6 +43,7 @@ mod dependency_document;
 mod dependency_kind_document;
 mod dependency_requirement;
 pub mod dependency_requirements;
+pub mod doc_tests;
 mod exact_crate_cfg;
 mod feature_graph;
 pub mod feature_selection;

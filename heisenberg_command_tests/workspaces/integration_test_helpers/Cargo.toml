@@ -53,3 +53,6 @@ path = "tests/recorded_values.rs"
 [[test]]
 name = "second_shared"
 path = "tests/second_shared.rs"
+
+[lib]
+doctest = false

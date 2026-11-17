@@ -21,3 +21,6 @@ todo = "forbid"
 unimplemented = "forbid"
 unreachable = "forbid"
 unwrap_used = "forbid"
+
+[lib]
+doctest = false

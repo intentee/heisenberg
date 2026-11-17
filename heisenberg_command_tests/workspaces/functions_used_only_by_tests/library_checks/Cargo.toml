@@ -28,3 +28,6 @@ unwrap_used = "deny"
 [[test]]
 name = "checked_counter_starts_at_zero"
 path = "tests/checked_counter_starts_at_zero.rs"
+
+[lib]
+doctest = false

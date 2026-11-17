@@ -41,3 +41,6 @@ features = []
 [[test]]
 name = "unreachable_source_files"
 path = "tests/main.rs"
+
+[lib]
+doctest = false

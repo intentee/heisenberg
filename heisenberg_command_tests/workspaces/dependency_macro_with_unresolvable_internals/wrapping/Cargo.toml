@@ -20,3 +20,6 @@ todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
 unwrap_used = "deny"
+
+[lib]
+doctest = false

@@ -51,3 +51,6 @@ name = "x86_64-unknown-linux-gnu-without-features"
 target = "x86_64-unknown-linux-gnu"
 default_features = false
 features = []
+
+[lib]
+doctest = false

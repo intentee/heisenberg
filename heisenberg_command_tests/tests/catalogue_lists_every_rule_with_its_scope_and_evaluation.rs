@@ -93,6 +93,11 @@ const CATALOGUE: &str = "Heisenberg 0.1.0 rule catalogue\n\
         Applies to: all code\n  \
         Evaluated: in each analysed configuration\n\
         \n\
+        Rule 1.17 DocTestsEnabled: A target whose doc tests are enabled\n  \
+        Scope: package\n  \
+        Applies to: all code\n  \
+        Evaluated: in each analysed configuration\n\
+        \n\
         Section 2: Declared configurations\n\
         \n\
         Rule 2.1 AttributeAppliedInNoConfiguration: A cfg_attr that applies in no declared configuration\n  \

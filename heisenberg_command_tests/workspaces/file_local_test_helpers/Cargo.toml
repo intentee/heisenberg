@@ -49,3 +49,6 @@ path = "tests/local_helpers.rs"
 [[test]]
 name = "unused_helper"
 path = "tests/unused_helper.rs"
+
+[lib]
+doctest = false

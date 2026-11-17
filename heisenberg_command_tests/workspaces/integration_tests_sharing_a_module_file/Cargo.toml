@@ -45,3 +45,6 @@ path = "tests/first.rs"
 [[test]]
 name = "second"
 path = "tests/second.rs"
+
+[lib]
+doctest = false

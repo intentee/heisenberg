@@ -29,3 +29,6 @@ unwrap_used = "deny"
 [[test]]
 name = "library_is_held_by_its_harness"
 path = "tests/library_is_held_by_its_harness.rs"
+
+[lib]
+doctest = false

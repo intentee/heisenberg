@@ -32,3 +32,6 @@ unwrap_used = "deny"
 [[test]]
 name = "library_is_constructible_with_an_extra_harness"
 path = "tests/library_is_constructible_with_an_extra_harness.rs"
+
+[lib]
+doctest = false

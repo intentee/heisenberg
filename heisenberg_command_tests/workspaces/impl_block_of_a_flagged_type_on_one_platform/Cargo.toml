@@ -41,3 +41,6 @@ features = []
 [[test]]
 name = "recording"
 path = "tests/recording.rs"
+
+[lib]
+doctest = false

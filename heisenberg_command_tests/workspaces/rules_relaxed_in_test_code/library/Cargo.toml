@@ -28,3 +28,6 @@ unwrap_used = "deny"
 [[test]]
 name = "library"
 path = "tests/main.rs"
+
+[lib]
+doctest = false

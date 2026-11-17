@@ -35,3 +35,6 @@ walkdir = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

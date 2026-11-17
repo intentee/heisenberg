@@ -25,3 +25,6 @@ unwrap_used = "deny"
 
 [workspace.metadata.heisenberg]
 configurations = []
+
+[lib]
+doctest = false

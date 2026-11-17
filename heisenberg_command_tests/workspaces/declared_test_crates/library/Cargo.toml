@@ -32,3 +32,6 @@ unwrap_used = "deny"
 [[test]]
 name = "total_exceeds_the_sample"
 path = "tests/total_exceeds_the_sample.rs"
+
+[lib]
+doctest = false

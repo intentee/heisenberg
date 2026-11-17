@@ -5,3 +5,6 @@ version = "0.2.0"
 
 [dependencies]
 twin_previous = { package = "twin", path = ".." }
+
+[lib]
+doctest = false

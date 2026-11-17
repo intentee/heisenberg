@@ -8,6 +8,10 @@ use crate::unpinned_requirement::UnpinnedRequirement;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ManifestViolation {
+    DocTestsEnabled {
+        manifest: String,
+        target: String,
+    },
     RustVersionBelowSupported {
         rust_version: String,
         table: LintTable,
@@ -24,7 +28,9 @@ impl ManifestViolation {
     pub fn manifest(&self) -> &str {
         match self {
             Self::RustVersionBelowSupported { table, .. } => table.manifest(),
-            Self::UnpinnedDependency { manifest, .. } => manifest,
+            Self::DocTestsEnabled { manifest, .. } | Self::UnpinnedDependency { manifest, .. } => {
+                manifest
+            }
         }
     }
 }
@@ -32,6 +38,10 @@ impl ManifestViolation {
 impl Display for ManifestViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::DocTestsEnabled { target, .. } => write!(
+                formatter,
+                "Target {target} has doc tests enabled, which cargo test runs and no analysis reads"
+            ),
             Self::RustVersionBelowSupported {
                 rust_version,
                 table,

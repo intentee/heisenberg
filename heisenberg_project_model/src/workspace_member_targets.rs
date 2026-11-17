@@ -5,6 +5,7 @@ use heisenberg_module_graph::test_harness::TestHarness;
 
 use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::cargo_target_kind::CargoTargetKind;
+use crate::doc_tests::DocTests;
 use crate::member_target::MemberTarget;
 use crate::project_model_error::ProjectModelError;
 use crate::target_manifest_flags::TargetManifestFlags;
@@ -49,6 +50,11 @@ impl WorkspaceMemberTargets<'_, '_> {
                                 } else {
                                     TestHarness::Absent
                                 },
+                            },
+                            doc_tests: if target.doctested() && target.doctestable() {
+                                DocTests::Enabled
+                            } else {
+                                DocTests::Disabled
                             },
                             manifest_flags: TargetManifestFlags {
                                 benched: target.benched(),

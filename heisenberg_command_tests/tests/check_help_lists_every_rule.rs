@@ -152,7 +152,8 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Rule 1.13 UnresolvedMethodCall: A method call that rust-analyzer cannot resolve\n    \
     Rule 1.14 UnresolvedModule: A module declaration whose file rust-analyzer cannot resolve\n    \
     Rule 1.15 UnresolvedPath: A path that rust-analyzer cannot resolve\n    \
-    Rule 1.16 UnsafeCode: Unsafe code in a crate that integrates no foreign code\n  \
+    Rule 1.16 UnsafeCode: Unsafe code in a crate that integrates no foreign code\n    \
+    Rule 1.17 DocTestsEnabled: A target whose doc tests are enabled\n  \
     2 Declared configurations\n    \
     Rule 2.1 AttributeAppliedInNoConfiguration: A cfg_attr that applies in no declared configuration\n    \
     Rule 2.2 CodeActiveInNoConfiguration: Code that no declared configuration builds\n    \

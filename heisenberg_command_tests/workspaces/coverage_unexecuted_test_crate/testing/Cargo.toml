@@ -3,3 +3,6 @@ name = "coverage_unexecuted_test_crate_testing"
 edition = "2024"
 version = "0.1.0"
 publish = false
+
+[lib]
+doctest = false

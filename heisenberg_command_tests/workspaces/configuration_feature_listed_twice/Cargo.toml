@@ -34,3 +34,6 @@ name = "repeating"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = ["cyclic", "verbose", "cyclic"]
+
+[lib]
+doctest = false

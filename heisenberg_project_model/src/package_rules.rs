@@ -8,9 +8,11 @@ use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 
 use crate::benchmark_target_violation::BenchmarkTargetViolation;
 use crate::dependency_document::DependencyDocument;
+use crate::doc_tests::DocTests;
 use crate::integration_test_violation::IntegrationTestViolation;
 use crate::libraryless_contents::LibrarylessContents;
 use crate::libraryless_package::LibrarylessPackage;
+use crate::manifest_violation::ManifestViolation;
 use crate::member_target::MemberTarget;
 use crate::package_composition::PackageComposition;
 use crate::package_document::PackageDocument;
@@ -32,6 +34,7 @@ impl PackageRules<'_> {
             self.dependency_cycles().into_iter().collect();
 
         violations.extend(self.benchmark_target_flags());
+        violations.extend(self.doc_tested_targets());
         violations.extend(self.integration_test_targets());
         violations.extend(self.packages_without_libraries());
 
@@ -162,6 +165,26 @@ impl PackageRules<'_> {
                         PackageViolation::PackageDependencyCycle { manifest, packages }
                     }
                 }
+            })
+            .collect()
+    }
+
+    fn doc_tested_targets(&self) -> Vec<PackageViolation> {
+        let workspace_path = self.resolved.workspace_path();
+
+        self.resolved
+            .member_targets
+            .iter()
+            .filter(|MemberTarget { doc_tests, .. }| *doc_tests == DocTests::Enabled)
+            .filter_map(|MemberTarget { crate_target, .. }| {
+                self.resolved
+                    .member_named(&crate_target.package_name)
+                    .map(|member| {
+                        PackageViolation::Manifest(ManifestViolation::DocTestsEnabled {
+                            manifest: member.relative_manifest(&workspace_path),
+                            target: crate_target.target_description.clone(),
+                        })
+                    })
             })
             .collect()
     }

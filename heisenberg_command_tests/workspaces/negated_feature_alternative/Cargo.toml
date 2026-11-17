@@ -39,3 +39,6 @@ name = "x86_64-unknown-linux-gnu"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = ["web_admin_panel"]
+
+[lib]
+doctest = false

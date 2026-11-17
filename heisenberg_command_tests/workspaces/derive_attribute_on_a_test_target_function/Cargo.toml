@@ -41,3 +41,6 @@ features = []
 [[test]]
 name = "derived"
 path = "tests/derived.rs"
+
+[lib]
+doctest = false

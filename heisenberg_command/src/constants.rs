@@ -216,6 +216,19 @@ pub const CONFINED_PACKAGE_USER_NOT_REACHING_IT: IssueText = IssueText {
     summary: "A confined package user that never reaches the package",
 };
 
+pub const DOC_TESTS_ENABLED: IssueText = IssueText {
+    definition: "A library or procedural macro target of a workspace member whose doc tests are enabled, as cargo decides it from the doctest key of the target, which is on unless the manifest turns it off. Whether a documentation comment holds a code block is not examined.",
+    evaluation: RuleEvaluation::EachAnalysedConfiguration,
+    exceptions: &[],
+    name: "DocTestsEnabled",
+    ordinal: 17,
+    rationale: "A doc test is Rust code that cargo test compiles and runs out of a documentation comment, where it is text that no analysis reads, so a target with doc tests enabled can hold code that escapes every rule.",
+    remedy: "Set doctest = false in the [lib] table of the package, and keep code that must compile in an example or a test, which are analysed.",
+    scope: RuleScope::Package,
+    section: RuleSection::Analysis,
+    summary: "A target whose doc tests are enabled",
+};
+
 pub const DUPLICATED_FUNCTION_BODY: IssueText = IssueText {
     definition: "Functions written in the module files of workspace members whose signatures and bodies are identical once every name is replaced by the definition it resolves to, with names a function declares itself compared by declaration order and names that resolve to nothing never equal; a format or assembly template compares by its written text and by the definitions its placeholders capture, and the name of a named format argument by its spelling. Functions with an empty body are not compared, and neither are the entry points that Rust requires one of per target or per macro: the main function of a binary, a build script, an example, or a test or benchmark target without libtest's harness, and the functions of procedural macros.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,

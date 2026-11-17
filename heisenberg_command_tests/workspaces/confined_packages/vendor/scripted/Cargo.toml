@@ -6,3 +6,6 @@ publish = false
 
 [build-dependencies]
 x = { path = "../x" }
+
+[lib]
+doctest = false

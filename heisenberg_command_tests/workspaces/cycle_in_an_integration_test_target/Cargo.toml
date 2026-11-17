@@ -41,3 +41,6 @@ features = []
 [[test]]
 name = "cycle"
 path = "tests/cycle.rs"
+
+[lib]
+doctest = false

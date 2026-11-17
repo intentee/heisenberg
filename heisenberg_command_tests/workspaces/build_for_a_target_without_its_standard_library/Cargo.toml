@@ -30,3 +30,6 @@ name = "aarch64-apple-darwin"
 target = "aarch64-apple-darwin"
 default_features = true
 features = []
+
+[lib]
+doctest = false

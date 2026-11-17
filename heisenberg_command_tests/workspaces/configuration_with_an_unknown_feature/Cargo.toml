@@ -34,3 +34,6 @@ name = "unknowing"
 target = "x86_64-unknown-linux-gnu"
 default_features = true
 features = ["cyclic", "missing"]
+
+[lib]
+doctest = false

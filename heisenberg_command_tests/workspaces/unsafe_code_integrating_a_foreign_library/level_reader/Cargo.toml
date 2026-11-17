@@ -23,3 +23,6 @@ unwrap_used = "deny"
 
 [dependencies]
 foreign_sys = { path = "../foreign_sys" }
+
+[lib]
+doctest = false

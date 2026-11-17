@@ -9,3 +9,6 @@ y = { path = "../y", optional = true }
 
 [features]
 extra = ["dep:y"]
+
+[lib]
+doctest = false

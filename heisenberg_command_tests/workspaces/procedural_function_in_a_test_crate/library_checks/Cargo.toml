@@ -28,3 +28,6 @@ unwrap_used = "deny"
 [[test]]
 name = "report_is_rendered"
 path = "tests/report_is_rendered.rs"
+
+[lib]
+doctest = false

@@ -30,3 +30,6 @@ unwrap_used = "deny"
 [[test]]
 name = "library_is_constructible"
 path = "tests/library_is_constructible.rs"
+
+[lib]
+doctest = false

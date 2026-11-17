@@ -3,6 +3,7 @@ kind: rule
 section: 1
 enforced_by:
   - ConfigurationSelectionMacro
+  - DocTestsEnabled
   - FailedMacroExpansion
   - IncludedSourceFile
   - InvalidMacroDefinition
@@ -32,3 +33,4 @@ Every statement is mandatory and is decided by the Heisenberg check named after 
 - A module file is declared at module level, never inside a block, and belongs to exactly one module. [ModuleFileInsideBlock, SharedModuleFile]
 - Every `.rs` file of a workspace member is a module file of a crate target. [UnreachableSourceFile]
 - No unsafe code, except in a crate that integrates foreign code. [UnsafeCode]
+- No target has doc tests enabled: a doc test is code inside a comment that no analysis reads. Code that must compile lives in an example or a test. [DocTestsEnabled]

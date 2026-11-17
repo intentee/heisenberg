@@ -26,3 +26,6 @@ unwrap_used = "deny"
 [[test]]
 name = "counter_increments"
 path = "tests/counter_increments.rs"
+
+[lib]
+doctest = false

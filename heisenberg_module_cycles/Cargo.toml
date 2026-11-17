@@ -9,3 +9,6 @@ heisenberg_module_graph = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false
