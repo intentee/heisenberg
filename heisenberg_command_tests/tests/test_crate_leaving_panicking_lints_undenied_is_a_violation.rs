@@ -33,7 +33,7 @@ fn test_crate_leaving_panicking_lints_undenied_is_a_violation() {
             - checks/Cargo.toml: Package checks does not deny clippy::unwrap_used\n\
             \n\
             ------------------------------\n\
-            10 errors found\n\
+            10 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(3, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

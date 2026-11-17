@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::configured_out_negations::ConfiguredOutNegations;
+use crate::every_configuration_findings::EveryConfigurationFindings;
 use crate::module_dependency::ModuleDependency;
 use crate::shared_module_file::SharedModuleFile;
 use crate::unresolved_foreign_reference::UnresolvedForeignReference;
@@ -13,6 +14,7 @@ pub struct ModuleFindings {
     pub dependencies: BTreeSet<ModuleDependency>,
     pub shared_module_files: BTreeSet<SharedModuleFile>,
     pub unresolved_foreign_references: BTreeSet<UnresolvedForeignReference>,
+    pub every_configuration: EveryConfigurationFindings,
     pub violations: ViolationSet,
     pub walked_code: WalkedCode,
 }
@@ -25,6 +27,7 @@ impl ModuleFindings {
             dependencies,
             shared_module_files,
             unresolved_foreign_references,
+            every_configuration,
             violations,
             walked_code,
         }: Self,
@@ -35,6 +38,7 @@ impl ModuleFindings {
         self.shared_module_files.extend(shared_module_files);
         self.unresolved_foreign_references
             .extend(unresolved_foreign_references);
+        self.every_configuration.merge(every_configuration);
         self.violations.merge(violations);
         self.walked_code.merge(walked_code);
     }

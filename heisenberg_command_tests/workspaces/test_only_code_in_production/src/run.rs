@@ -6,14 +6,10 @@ pub const fn run() -> u8 {
 
 #[cfg(test)]
 mod tests {
+    use super::run;
+
     #[test]
-    fn sample_increments() {
-        assert_eq!(
-            crate::counter::Counter {
-                value: crate::sample_value::sample_value()
-            }
-            .incremented(),
-            4
-        );
+    fn run_increments_one() {
+        assert_eq!(run(), 2);
     }
 }

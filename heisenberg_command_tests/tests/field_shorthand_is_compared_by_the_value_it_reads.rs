@@ -35,7 +35,7 @@ fn field_shorthand_is_compared_by_the_value_it_reads() {
             Declaration { command }\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 2 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 9).as_str()
         ]

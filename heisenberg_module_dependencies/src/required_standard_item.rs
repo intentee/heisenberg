@@ -3,27 +3,26 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use crate::constants::ERROR_TRAIT_PATH;
-use crate::constants::STANDARD_SLEEP_MS_PATH;
-use crate::constants::STANDARD_SLEEP_PATH;
+use crate::constants::OWNED_BOX_PATH;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RequiredStandardItem {
+    Display,
     ErrorTrait,
-    FromStr,
+    Option,
+    OwnedBox,
     Result,
-    Sleep,
-    SleepMs,
     ToString,
 }
 
 impl Display for RequiredStandardItem {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Display => write!(formatter, "core::fmt::Display"),
             Self::ErrorTrait => write!(formatter, "core::{}", ERROR_TRAIT_PATH.join("::")),
-            Self::FromStr => write!(formatter, "core::str::FromStr"),
+            Self::Option => write!(formatter, "core::option::Option"),
+            Self::OwnedBox => write!(formatter, "alloc::{}", OWNED_BOX_PATH.join("::")),
             Self::Result => write!(formatter, "core::result::Result"),
-            Self::Sleep => write!(formatter, "std::{}", STANDARD_SLEEP_PATH.join("::")),
-            Self::SleepMs => write!(formatter, "std::{}", STANDARD_SLEEP_MS_PATH.join("::")),
             Self::ToString => write!(formatter, "alloc::string::ToString"),
         }
     }

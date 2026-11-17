@@ -39,7 +39,7 @@ fn additional_public_item_in_a_module_is_a_violation() {
             pub enum AlsoNested {}\n\
             \n\
             ------------------------------\n\
-            8 errors found\n\
+            8 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

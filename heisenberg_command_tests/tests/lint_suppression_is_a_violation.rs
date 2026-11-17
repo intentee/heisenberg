@@ -52,7 +52,7 @@ fn lint_suppression_is_a_violation() {
              #[expect(clippy::expect_used, reason = \"the fixture expects\")]\n\
              \n\
              ------------------------------\n\
-             {SUPPRESSIONS} errors found\n\
+             {SUPPRESSIONS} errors found in 1 rule\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2)

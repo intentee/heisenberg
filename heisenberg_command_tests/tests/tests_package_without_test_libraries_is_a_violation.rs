@@ -30,7 +30,7 @@ fn tests_package_without_test_libraries_is_a_violation() {
             could move without a dependency cycle to library\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", full_run_footer(8, 8).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

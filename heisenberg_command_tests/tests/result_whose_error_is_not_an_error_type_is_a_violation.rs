@@ -40,7 +40,7 @@ fn result_whose_error_is_not_an_error_type_is_a_violation() {
             type Err = String;\n\
             \n\
             ------------------------------\n\
-            8 errors found\n\
+            8 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 10).as_str()
         ]

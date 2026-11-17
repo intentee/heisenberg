@@ -37,7 +37,7 @@ fn tuple_in_an_item_signature_is_a_violation() {
             impl From<(u8, u8)> for Span {\n\
             \n\
             ------------------------------\n\
-            7 errors found\n\
+            7 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 7).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

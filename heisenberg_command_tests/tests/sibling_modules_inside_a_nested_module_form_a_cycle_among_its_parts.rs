@@ -31,7 +31,7 @@ fn sibling_modules_inside_a_nested_module_form_a_cycle_among_its_parts() {
             crate::outer::second uses crate::outer::first at src/outer/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

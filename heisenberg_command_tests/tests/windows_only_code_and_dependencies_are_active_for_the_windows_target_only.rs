@@ -28,7 +28,7 @@ const WINDOWS_ONLY_CYCLE: &str = "ModuleCycle: 1 violation\n\
 ";
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
-const ERRORS: &str = "1 errors found\n";
+const ERRORS: &str = "1 errors found in 1 rule\n";
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
 const STATUS: HeisenbergExitStatus = HeisenbergExitStatus::Violations;

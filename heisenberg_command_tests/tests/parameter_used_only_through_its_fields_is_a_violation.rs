@@ -33,7 +33,7 @@ fn parameter_used_only_through_its_fields_is_a_violation() {
             .map(|other| other.end)\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 5).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

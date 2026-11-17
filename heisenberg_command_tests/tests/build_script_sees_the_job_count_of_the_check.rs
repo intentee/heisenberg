@@ -33,7 +33,7 @@ fn build_script_sees_the_job_count_of_the_check() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             {footer}", footer = NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4)).as_str())
     );

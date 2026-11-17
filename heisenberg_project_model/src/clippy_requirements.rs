@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use toml::Value;
 
 use crate::clippy_configuration_file::ClippyConfigurationFile;
+use crate::clippy_violation::ClippyViolation;
 use crate::constants::PANICKING_LINTS;
 use crate::constants::REQUIRED_CLIPPY_SETTINGS;
 use crate::constants::REQUIRED_LINT_GROUPS;
@@ -39,15 +40,19 @@ fn member_violations(
 
     match configuration {
         ClippyConfigurationFile::Ambiguous { file } => {
-            violations.push(PackageViolation::ClippyConfigurationAmbiguous {
-                file: workspace_path.relative(&file),
-            });
+            violations.push(PackageViolation::Clippy(
+                ClippyViolation::ConfigurationAmbiguous {
+                    file: workspace_path.relative(&file),
+                },
+            ));
         }
         ClippyConfigurationFile::Missing => {
-            violations.push(PackageViolation::ClippyConfigurationMissing {
-                manifest,
-                package: name,
-            });
+            violations.push(PackageViolation::Clippy(
+                ClippyViolation::ConfigurationMissing {
+                    manifest,
+                    package: name,
+                },
+            ));
         }
         ClippyConfigurationFile::Present { file, settings } => {
             let relative = workspace_path.relative(&file);
@@ -59,11 +64,11 @@ fn member_violations(
                         settings.get(*name) != Some(&Value::Boolean(*value))
                     })
                     .map(|RequiredClippySetting { name, value }| {
-                        PackageViolation::RequiredClippySettingMissing {
+                        PackageViolation::Clippy(ClippyViolation::RequiredSettingMissing {
                             file: relative.clone(),
                             setting: (*name).to_owned(),
                             value: *value,
-                        }
+                        })
                     }),
             );
             violations.extend(
@@ -75,9 +80,11 @@ fn member_violations(
                             .any(|RequiredClippySetting { name, .. }| name == setting)
                             && !RESTRICTING_CLIPPY_SETTINGS.contains(&setting.as_str())
                     })
-                    .map(|setting| PackageViolation::UnvettedClippySetting {
-                        file: relative.clone(),
-                        setting: setting.clone(),
+                    .map(|setting| {
+                        PackageViolation::Clippy(ClippyViolation::UnvettedSetting {
+                            file: relative.clone(),
+                            setting: setting.clone(),
+                        })
                     }),
             );
         }

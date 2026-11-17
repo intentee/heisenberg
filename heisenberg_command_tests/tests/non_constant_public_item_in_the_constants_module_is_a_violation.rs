@@ -29,7 +29,7 @@ fn non_constant_public_item_in_the_constants_module_is_a_violation() {
             pub static COUNTER: u8 = 0;\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

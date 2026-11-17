@@ -27,7 +27,7 @@ fn impl_outside_the_file_of_its_struct_is_a_violation() {
             impl Greeting for First {\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

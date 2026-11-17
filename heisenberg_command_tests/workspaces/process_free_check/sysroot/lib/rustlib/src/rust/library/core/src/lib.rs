@@ -8,6 +8,10 @@ pub mod error {
     pub trait Error {}
 }
 
+pub mod fmt {
+    pub trait Display {}
+}
+
 pub mod iter {
     pub mod traits {
         pub mod collect {
@@ -23,6 +27,13 @@ pub mod iter {
 pub mod marker {
     #[lang = "destruct"]
     pub trait Destruct {}
+}
+
+pub mod option {
+    pub enum Option<TValue> {
+        None,
+        Some(TValue),
+    }
 }
 
 pub mod mem {

@@ -44,7 +44,7 @@ fn module_file_shared_with_a_dependency_is_analysed_in_the_dependent() {
             crate::support in binary_sharing_a_module_file_with_its_library lib\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

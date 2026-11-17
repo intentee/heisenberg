@@ -7,27 +7,22 @@ use std::time::Duration;
 use humantime::format_duration;
 
 use crate::benchmark_target_violation::BenchmarkTargetViolation;
+use crate::clippy_violation::ClippyViolation;
 use crate::confinement_violation::ConfinementViolation;
-use crate::constants::CLIPPY_CONFIGURATION_FILE;
-use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
 use crate::constants::MAXIMUM_SLOW_TEST_PERIOD;
 use crate::constants::MAXIMUM_TEST_DURATION;
 use crate::integration_test_violation::IntegrationTestViolation;
 use crate::libraryless_package::LibrarylessPackage;
 use crate::lint_table::LintTable;
+use crate::manifest_violation::ManifestViolation;
 use crate::nextest_presence_violation::NextestPresenceViolation;
 use crate::potential_owner::PotentialOwner;
+use crate::rustfmt_violation::RustfmtViolation;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PackageViolation {
     BenchmarkTarget(BenchmarkTargetViolation),
-    ClippyConfigurationAmbiguous {
-        file: String,
-    },
-    ClippyConfigurationMissing {
-        manifest: String,
-        package: String,
-    },
+    Clippy(ClippyViolation),
     Confinement(ConfinementViolation),
     IntegrationTests(IntegrationTestViolation),
     LintAllowedInManifest {
@@ -35,6 +30,7 @@ pub enum PackageViolation {
         table: LintTable,
         tool: String,
     },
+    Manifest(ManifestViolation),
     NextestOverride {
         file: String,
         profile: String,
@@ -74,11 +70,7 @@ pub enum PackageViolation {
         manifest: String,
         package: String,
     },
-    RequiredClippySettingMissing {
-        file: String,
-        setting: String,
-        value: bool,
-    },
+    Rustfmt(RustfmtViolation),
     RequiredLintNotDenied {
         lint: String,
         table: LintTable,
@@ -96,12 +88,8 @@ pub enum PackageViolation {
         manifest: String,
         package: String,
     },
-    UnreachableTestFile {
+    UnreachableSourceFile {
         file: String,
-    },
-    UnvettedClippySetting {
-        file: String,
-        setting: String,
     },
     UnvettedNextestSetting {
         file: String,
@@ -124,11 +112,12 @@ impl PackageViolation {
                 targets.clone()
             }
             Self::BenchmarkTarget(_)
-            | Self::ClippyConfigurationAmbiguous { .. }
-            | Self::ClippyConfigurationMissing { .. }
+            | Self::Clippy(_)
             | Self::Confinement(_)
             | Self::IntegrationTests(IntegrationTestViolation::Discovered { .. })
             | Self::LintAllowedInManifest { .. }
+            | Self::Manifest(_)
+            | Self::Rustfmt(_)
             | Self::NextestPresence(_)
             | Self::NextestOverride { .. }
             | Self::NextestSlowPeriodTooLong { .. }
@@ -139,13 +128,11 @@ impl PackageViolation {
             | Self::PackageDependencyCycle { .. }
             | Self::PackageDependsOnItself { .. }
             | Self::PublishableTestCrate { .. }
-            | Self::RequiredClippySettingMissing { .. }
             | Self::RequiredLintNotDenied { .. }
             | Self::TestCrateDeclaredTwice { .. }
             | Self::TestCrateNotAMember { .. }
             | Self::TestCrateUsedByProduction { .. }
-            | Self::UnreachableTestFile { .. }
-            | Self::UnvettedClippySetting { .. }
+            | Self::UnreachableSourceFile { .. }
             | Self::UnvettedNextestSetting { .. } => Vec::new(),
         }
     }
@@ -153,18 +140,14 @@ impl PackageViolation {
     #[must_use]
     pub fn file(&self) -> &str {
         match self {
-            Self::ClippyConfigurationAmbiguous { file }
-            | Self::RequiredClippySettingMissing { file, .. }
-            | Self::UnvettedClippySetting { file, .. }
-            | Self::NextestOverride { file, .. }
+            Self::NextestOverride { file, .. }
             | Self::NextestSlowPeriodTooLong { file, .. }
             | Self::NextestSlowTimeoutUnset { file }
             | Self::NextestTestNeverTerminated { file, .. }
             | Self::NextestTestTerminatedTooLate { file, .. }
             | Self::NextestTimeoutPasses { file, .. }
             | Self::UnvettedNextestSetting { file, .. }
-            | Self::UnreachableTestFile { file }
-            | Self::ClippyConfigurationMissing { manifest: file, .. }
+            | Self::UnreachableSourceFile { file }
             | Self::PackageDependencyCycle { manifest: file, .. }
             | Self::PackageDependsOnItself { manifest: file, .. }
             | Self::PublishableTestCrate { manifest: file, .. }
@@ -172,8 +155,11 @@ impl PackageViolation {
             | Self::TestCrateNotAMember { manifest: file, .. }
             | Self::TestCrateUsedByProduction { manifest: file, .. } => file,
             Self::BenchmarkTarget(violation) => violation.manifest(),
+            Self::Clippy(violation) => violation.file(),
             Self::Confinement(violation) => violation.manifest(),
             Self::IntegrationTests(violation) => violation.manifest(),
+            Self::Manifest(violation) => violation.manifest(),
+            Self::Rustfmt(violation) => violation.file(),
             Self::NextestPresence(violation) => violation.file(),
             Self::WithoutLibrary(LibrarylessPackage { manifest, .. }) => manifest,
             Self::LintAllowedInManifest { table, .. }
@@ -186,15 +172,10 @@ impl Display for PackageViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::BenchmarkTarget(violation) => violation.fmt(formatter),
-            Self::ClippyConfigurationAmbiguous { .. } => write!(
-                formatter,
-                "Directory holds both {CLIPPY_CONFIGURATION_FILE} and {CLIPPY_HIDDEN_CONFIGURATION_FILE}"
-            ),
-            Self::ClippyConfigurationMissing { package, .. } => write!(
-                formatter,
-                "Package {package} has no {CLIPPY_CONFIGURATION_FILE} or {CLIPPY_HIDDEN_CONFIGURATION_FILE} within the workspace"
-            ),
+            Self::Clippy(violation) => violation.fmt(formatter),
             Self::IntegrationTests(violation) => violation.fmt(formatter),
+            Self::Manifest(violation) => violation.fmt(formatter),
+            Self::Rustfmt(violation) => violation.fmt(formatter),
             Self::Confinement(violation) => violation.fmt(formatter),
             Self::LintAllowedInManifest { lint, table, tool } => {
                 write!(formatter, "{table} allows {lint} in its {tool} lints")
@@ -247,12 +228,6 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {package} is declared a test crate but can be published"
             ),
-            Self::RequiredClippySettingMissing { setting, value, .. } => {
-                write!(
-                    formatter,
-                    "Clippy configuration does not set {setting} = {value}"
-                )
-            }
             Self::RequiredLintNotDenied { lint, table } => {
                 write!(formatter, "{table} does not deny {lint}")
             }
@@ -270,12 +245,8 @@ impl Display for PackageViolation {
                 formatter,
                 "Package {dependent} depends on test crate {package} through a normal or build dependency"
             ),
-            Self::UnvettedClippySetting { setting, .. } => write!(
-                formatter,
-                "Clippy configuration sets {setting}, which Heisenberg has not vetted"
-            ),
-            Self::UnreachableTestFile { .. } => {
-                formatter.write_str("Test file is a module file of no crate target")
+            Self::UnreachableSourceFile { .. } => {
+                formatter.write_str("Source file is a module file of no crate target")
             }
             Self::UnvettedNextestSetting { setting, .. } => write!(
                 formatter,

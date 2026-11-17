@@ -1,4 +1,5 @@
 use std::iter;
+use std::sync::OnceLock;
 
 use clap::ValueEnum;
 use clap::builder::PossibleValue;
@@ -7,9 +8,9 @@ use humantime::format_duration;
 use heisenberg_module_graph::harness_violation::HarnessViolation;
 use heisenberg_module_graph::impl_placement::ImplPlacement;
 use heisenberg_module_graph::non_production_users::NonProductionUsers;
-use heisenberg_module_graph::test_violation::TestViolation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::benchmark_target_violation::BenchmarkTargetViolation;
+use heisenberg_project_model::clippy_violation::ClippyViolation;
 use heisenberg_project_model::confinement_violation::ConfinementViolation;
 use heisenberg_project_model::constants::CLIPPY_CONFIGURATION_FILE;
 use heisenberg_project_model::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
@@ -19,10 +20,13 @@ use heisenberg_project_model::constants::PANICKING_LINTS;
 use heisenberg_project_model::constants::REQUIRED_CLIPPY_SETTINGS;
 use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 use heisenberg_project_model::constants::RESTRICTING_CLIPPY_SETTINGS;
+use heisenberg_project_model::constants::RUSTFMT_CONFIGURATION_FILE;
+use heisenberg_project_model::constants::RUSTFMT_HIDDEN_CONFIGURATION_FILE;
 use heisenberg_project_model::constants::VETTED_BENCHMARK_HARNESS_METHODS;
 use heisenberg_project_model::constants::VETTED_NEXTEST_PROFILE_SETTINGS;
 use heisenberg_project_model::constants::VETTED_NEXTEST_SETTINGS;
 use heisenberg_project_model::constants::VETTED_NEXTEST_SLOW_TIMEOUT_SETTINGS;
+use heisenberg_project_model::constants::VETTED_RUSTFMT_SETTINGS;
 use heisenberg_project_model::harness_methods::HarnessMethods;
 use heisenberg_project_model::libraryless_contents::LibrarylessContents;
 use heisenberg_project_model::libraryless_package::LibrarylessPackage;
@@ -31,6 +35,7 @@ use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::required_clippy_setting::RequiredClippySetting;
 
 use crate::constants::ADDITIONAL_PUBLIC_ITEM;
+use crate::constants::ATTRIBUTE_APPLIED_IN_NO_CONFIGURATION;
 use crate::constants::BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS;
 use crate::constants::BENCHMARK_TARGET_RUN_BY_TESTS;
 use crate::constants::BENCHMARK_TARGET_WITH_LIBTEST_HARNESS;
@@ -47,13 +52,13 @@ use crate::constants::CONFINED_PACKAGE_USER_NOT_A_MEMBER;
 use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
 use crate::constants::DUPLICATED_FUNCTION_BODY;
 use crate::constants::FAILED_MACRO_EXPANSION;
-use crate::constants::FUNCTION_USED_ONLY_BY_BENCHMARKS;
-use crate::constants::FUNCTION_USED_ONLY_BY_TESTS;
 use crate::constants::GLOB_IMPORT;
 use crate::constants::IMPL_WITHOUT_LOCAL_TYPE;
 use crate::constants::INCLUDED_SOURCE_FILE;
 use crate::constants::INVALID_MACRO_DEFINITION;
 use crate::constants::ITEM_OUT_OF_ORDER;
+use crate::constants::ITEM_USED_ONLY_BY_BENCHMARKS;
+use crate::constants::ITEM_USED_ONLY_BY_TESTS;
 use crate::constants::LINT_ALLOWED_IN_MANIFEST;
 use crate::constants::LINT_SUPPRESSION;
 use crate::constants::METHOD_OUT_OF_ORDER;
@@ -91,6 +96,7 @@ use crate::constants::TEST_CRATE_NOT_A_MEMBER;
 use crate::constants::TEST_CRATE_USED_BY_PRODUCTION;
 use crate::constants::TEST_ONLY_CODE_IN_PRODUCTION;
 use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
+use crate::constants::TOOL_ATTRIBUTE;
 use crate::constants::TUPLE_IN_SIGNATURE;
 use crate::constants::UNCOVERED_CODE;
 use crate::constants::UNDESTRUCTURED_PARAMETER;
@@ -101,7 +107,7 @@ use crate::constants::UNMAPPED_ITEM;
 use crate::constants::UNNEEDED_NEXTEST_CONFIGURATION;
 use crate::constants::UNPARSABLE_MACRO_EXPANSION;
 use crate::constants::UNPREFIXED_TYPE_PARAMETER;
-use crate::constants::UNREACHABLE_TEST_FILE;
+use crate::constants::UNREACHABLE_SOURCE_FILE;
 use crate::constants::UNRESOLVED_EXTERN_CRATE;
 use crate::constants::UNRESOLVED_MACRO_CALL;
 use crate::constants::UNRESOLVED_METHOD_CALL;
@@ -111,15 +117,101 @@ use crate::constants::UNSAFE_CODE;
 use crate::constants::UNVETTED_CLIPPY_SETTING;
 use crate::constants::UNVETTED_CRITERION_METHOD;
 use crate::constants::UNVETTED_NEXTEST_SETTING;
+use crate::constants::VACUOUS_NEGATED_CONFIGURATION;
 use crate::error_issue::ErrorIssue;
 use crate::issue_text::IssueText;
+use crate::layout_issue::LayoutIssue;
+use crate::manifest_issue::ManifestIssue;
+use crate::rustfmt_issue::RustfmtIssue;
 use crate::test_issue::TestIssue;
+
+const RULE_FAMILIES: [&[IssueType]; 13] = [
+    &[
+        IssueType::UnresolvedExternCrate,
+        IssueType::UnresolvedMacroCall,
+        IssueType::UnresolvedMethodCall,
+        IssueType::UnresolvedModule,
+        IssueType::UnresolvedPath,
+    ],
+    &[
+        IssueType::AttributeAppliedInNoConfiguration,
+        IssueType::CodeActiveInNoConfiguration,
+        IssueType::NegatedConfiguration,
+        IssueType::VacuousNegatedConfiguration,
+    ],
+    &[
+        IssueType::LintAllowedInManifest,
+        IssueType::LintSuppression,
+        IssueType::RequiredLintNotDenied,
+        IssueType::ToolAttribute,
+    ],
+    &[
+        IssueType::ClippyConfigurationAmbiguous,
+        IssueType::ClippyConfigurationMissing,
+        IssueType::RequiredClippySettingMissing,
+        IssueType::UnvettedClippySetting,
+    ],
+    &[
+        IssueType::Rustfmt(RustfmtIssue::ConfigurationAmbiguous),
+        IssueType::Rustfmt(RustfmtIssue::ConfigurationInvalid),
+        IssueType::Rustfmt(RustfmtIssue::ConfigurationMissing),
+        IssueType::Rustfmt(RustfmtIssue::ConfigurationUnreadable),
+        IssueType::Rustfmt(RustfmtIssue::UnvettedSetting),
+    ],
+    &[
+        IssueType::NextestConfigurationMissing,
+        IssueType::NextestOverride,
+        IssueType::NextestTimeoutNotEnforced,
+        IssueType::UnneededNextestConfiguration,
+        IssueType::UnvettedNextestSetting,
+    ],
+    &[
+        IssueType::ConfinedPackageReachedOutsideItsUsers,
+        IssueType::ConfinedPackageUserListedTwice,
+        IssueType::ConfinedPackageUserNotAMember,
+        IssueType::ConfinedPackageUserNotReachingIt,
+        IssueType::UnknownConfinedPackage,
+    ],
+    &[
+        IssueType::PublishableTestCrate,
+        IssueType::TestCrateDeclaredTwice,
+        IssueType::TestCrateNotAMember,
+        IssueType::TestCrateUsedByProduction,
+    ],
+    &[
+        IssueType::ImplWithoutLocalType,
+        IssueType::MisplacedBlanketImpl,
+        IssueType::MisplacedForeignTypeImpl,
+        IssueType::MisplacedImpl,
+        IssueType::MisplacedTraitObjectImpl,
+    ],
+    &[
+        IssueType::NonConstantInConstantsModule,
+        IssueType::PublicAssociatedConstant,
+        IssueType::PublicConstantOutsideConstantsModule,
+    ],
+    &[
+        IssueType::Layout(LayoutIssue::PositionalFields),
+        IssueType::TupleInSignature,
+    ],
+    &[
+        IssueType::BenchmarkTargetExcludedFromBenchmarks,
+        IssueType::BenchmarkTargetRunByTests,
+        IssueType::BenchmarkTargetWithLibtestHarness,
+        IssueType::BenchmarkTargetWithoutCriterionBenchmark,
+    ],
+    &[IssueType::CodeWithoutCoverageData, IssueType::UncoveredCode],
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IssueType {
     Error(ErrorIssue),
+    Layout(LayoutIssue),
+    Manifest(ManifestIssue),
+    Rustfmt(RustfmtIssue),
     Test(TestIssue),
     AdditionalPublicItem,
+    AttributeAppliedInNoConfiguration,
     BenchmarkTargetExcludedFromBenchmarks,
     BenchmarkTargetRunByTests,
     BenchmarkTargetWithLibtestHarness,
@@ -136,8 +228,8 @@ pub enum IssueType {
     ConfinedPackageUserNotReachingIt,
     DuplicatedFunctionBody,
     FailedMacroExpansion,
-    FunctionUsedOnlyByBenchmarks,
-    FunctionUsedOnlyByTests,
+    ItemUsedOnlyByBenchmarks,
+    ItemUsedOnlyByTests,
     GlobImport,
     ImplWithoutLocalType,
     IncludedSourceFile,
@@ -180,6 +272,7 @@ pub enum IssueType {
     TestCrateUsedByProduction,
     TestOnlyCodeInProduction,
     TestsOnlyPackageWithoutTestLibraries,
+    ToolAttribute,
     TupleInSignature,
     UncoveredCode,
     UndestructuredParameter,
@@ -190,7 +283,7 @@ pub enum IssueType {
     UnneededNextestConfiguration,
     UnparsableMacroExpansion,
     UnprefixedTypeParameter,
-    UnreachableTestFile,
+    UnreachableSourceFile,
     UnresolvedExternCrate,
     UnresolvedMacroCall,
     UnresolvedMethodCall,
@@ -200,29 +293,60 @@ pub enum IssueType {
     UnvettedClippySetting,
     UnvettedCriterionMethod,
     UnvettedNextestSetting,
+    VacuousNegatedConfiguration,
 }
 
 impl IssueType {
     #[must_use]
     pub fn explanation(self) -> String {
+        let text = self.text();
         let IssueText {
             definition,
+            evaluation,
+            exceptions,
             name,
-            purpose,
+            rationale,
+            remedy,
+            scope,
+            section,
             summary,
-        } = self.text();
+            ..
+        } = text;
+        let related = self.related();
 
-        iter::once(format!("{name}: {summary}"))
-            .chain([definition.to_owned()])
-            .chain(self.values())
-            .chain([purpose.to_owned()])
-            .collect::<Vec<String>>()
-            .join(
-                "
+        iter::once(format!(
+            "{} {name}: {summary}\nSection {}, {}. Scope: {scope}. Evaluated {evaluation}.",
+            text.identifier(),
+            section.number(),
+            section.title()
+        ))
+        .chain([definition.to_owned()])
+        .chain(
+            exceptions
+                .iter()
+                .map(|exception| format!("Exception: {exception}")),
+        )
+        .chain(self.values())
+        .chain([
+            format!("Rationale: {rationale}"),
+            format!("Remedy: {remedy}"),
+        ])
+        .chain((!related.is_empty()).then(|| {
+            format!(
+                "See also: {}",
+                related
+                    .iter()
+                    .map(|issue_type| issue_type.text().name)
+                    .collect::<Vec<&str>>()
+                    .join(", ")
+            )
+        }))
+        .collect::<Vec<String>>()
+        .join(
+            "
 
 ",
-            )
-            + "
+        ) + "
 "
     }
 
@@ -232,11 +356,25 @@ impl IssueType {
     }
 
     #[must_use]
+    pub fn related(self) -> Vec<Self> {
+        RULE_FAMILIES
+            .iter()
+            .filter(|family| family.contains(&self))
+            .flat_map(|family| family.iter().copied())
+            .filter(|issue_type| *issue_type != self)
+            .collect()
+    }
+
+    #[must_use]
     pub const fn text(self) -> IssueText {
         match self {
             Self::Error(issue) => issue.text(),
+            Self::Layout(issue) => issue.text(),
+            Self::Manifest(issue) => issue.text(),
+            Self::Rustfmt(issue) => issue.text(),
             Self::Test(issue) => issue.text(),
             Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
+            Self::AttributeAppliedInNoConfiguration => ATTRIBUTE_APPLIED_IN_NO_CONFIGURATION,
             Self::BenchmarkTargetExcludedFromBenchmarks => {
                 BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS
             }
@@ -261,8 +399,8 @@ impl IssueType {
             Self::ConfinedPackageUserNotReachingIt => CONFINED_PACKAGE_USER_NOT_REACHING_IT,
             Self::DuplicatedFunctionBody => DUPLICATED_FUNCTION_BODY,
             Self::FailedMacroExpansion => FAILED_MACRO_EXPANSION,
-            Self::FunctionUsedOnlyByBenchmarks => FUNCTION_USED_ONLY_BY_BENCHMARKS,
-            Self::FunctionUsedOnlyByTests => FUNCTION_USED_ONLY_BY_TESTS,
+            Self::ItemUsedOnlyByBenchmarks => ITEM_USED_ONLY_BY_BENCHMARKS,
+            Self::ItemUsedOnlyByTests => ITEM_USED_ONLY_BY_TESTS,
             Self::GlobImport => GLOB_IMPORT,
             Self::ImplWithoutLocalType => IMPL_WITHOUT_LOCAL_TYPE,
             Self::IncludedSourceFile => INCLUDED_SOURCE_FILE,
@@ -305,6 +443,7 @@ impl IssueType {
             Self::TestCrateUsedByProduction => TEST_CRATE_USED_BY_PRODUCTION,
             Self::TestOnlyCodeInProduction => TEST_ONLY_CODE_IN_PRODUCTION,
             Self::TestsOnlyPackageWithoutTestLibraries => TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES,
+            Self::ToolAttribute => TOOL_ATTRIBUTE,
             Self::TupleInSignature => TUPLE_IN_SIGNATURE,
             Self::UncoveredCode => UNCOVERED_CODE,
             Self::UndestructuredParameter => UNDESTRUCTURED_PARAMETER,
@@ -315,7 +454,7 @@ impl IssueType {
             Self::UnneededNextestConfiguration => UNNEEDED_NEXTEST_CONFIGURATION,
             Self::UnparsableMacroExpansion => UNPARSABLE_MACRO_EXPANSION,
             Self::UnprefixedTypeParameter => UNPREFIXED_TYPE_PARAMETER,
-            Self::UnreachableTestFile => UNREACHABLE_TEST_FILE,
+            Self::UnreachableSourceFile => UNREACHABLE_SOURCE_FILE,
             Self::UnresolvedExternCrate => UNRESOLVED_EXTERN_CRATE,
             Self::UnresolvedMacroCall => UNRESOLVED_MACRO_CALL,
             Self::UnresolvedMethodCall => UNRESOLVED_METHOD_CALL,
@@ -325,7 +464,97 @@ impl IssueType {
             Self::UnvettedClippySetting => UNVETTED_CLIPPY_SETTING,
             Self::UnvettedCriterionMethod => UNVETTED_CRITERION_METHOD,
             Self::UnvettedNextestSetting => UNVETTED_NEXTEST_SETTING,
+            Self::VacuousNegatedConfiguration => VACUOUS_NEGATED_CONFIGURATION,
         }
+    }
+
+    const fn ungrouped() -> [Self; 84] {
+        [
+            Self::AdditionalPublicItem,
+            Self::AttributeAppliedInNoConfiguration,
+            Self::BenchmarkTargetExcludedFromBenchmarks,
+            Self::BenchmarkTargetRunByTests,
+            Self::BenchmarkTargetWithLibtestHarness,
+            Self::BenchmarkTargetWithoutCriterionBenchmark,
+            Self::BenchmarksOnlyPackageWithoutLibraries,
+            Self::ClippyConfigurationAmbiguous,
+            Self::ClippyConfigurationMissing,
+            Self::CodeActiveInNoConfiguration,
+            Self::CodeWithoutCoverageData,
+            Self::ConfigurationSelectionMacro,
+            Self::ConfinedPackageReachedOutsideItsUsers,
+            Self::ConfinedPackageUserListedTwice,
+            Self::ConfinedPackageUserNotAMember,
+            Self::ConfinedPackageUserNotReachingIt,
+            Self::DuplicatedFunctionBody,
+            Self::FailedMacroExpansion,
+            Self::ItemUsedOnlyByBenchmarks,
+            Self::ItemUsedOnlyByTests,
+            Self::GlobImport,
+            Self::ImplWithoutLocalType,
+            Self::IncludedSourceFile,
+            Self::InvalidMacroDefinition,
+            Self::ItemOutOfOrder,
+            Self::LintAllowedInManifest,
+            Self::LintSuppression,
+            Self::MethodOutOfOrder,
+            Self::MisplacedBlanketImpl,
+            Self::MisplacedForeignTypeImpl,
+            Self::MisplacedImpl,
+            Self::MisplacedTraitObjectImpl,
+            Self::ModuleCycle,
+            Self::ModuleFileInsideBlock,
+            Self::ModuleNotNamedAfterItsItem,
+            Self::MustUseBenchmarkOutput,
+            Self::NegatedConfiguration,
+            Self::NextestConfigurationMissing,
+            Self::NextestOverride,
+            Self::NextestTimeoutNotEnforced,
+            Self::NonBenchmarkItemInBenchmarkTarget,
+            Self::NonConstantInConstantsModule,
+            Self::NonDocComment,
+            Self::NonTestItemInTestTarget,
+            Self::PackageDependencyCycle,
+            Self::PackageDependsOnItself,
+            Self::ProceduralFunction,
+            Self::PublicAssociatedConstant,
+            Self::PublicConstantOutsideConstantsModule,
+            Self::PublishableTestCrate,
+            Self::Reexport,
+            Self::ReferencedTest,
+            Self::RequiredClippySettingMissing,
+            Self::RequiredLintNotDenied,
+            Self::SharedModuleFile,
+            Self::SingleLetterName,
+            Self::SplitIntegrationTests,
+            Self::TestCrateDeclaredTwice,
+            Self::TestCrateNotAMember,
+            Self::TestCrateUsedByProduction,
+            Self::TestOnlyCodeInProduction,
+            Self::TestsOnlyPackageWithoutTestLibraries,
+            Self::ToolAttribute,
+            Self::TupleInSignature,
+            Self::UncoveredCode,
+            Self::UndestructuredParameter,
+            Self::UndeterminedBenchmarkOutput,
+            Self::UnimplementedBuiltinMacro,
+            Self::UnknownConfinedPackage,
+            Self::UnmappedItem,
+            Self::UnneededNextestConfiguration,
+            Self::UnparsableMacroExpansion,
+            Self::UnprefixedTypeParameter,
+            Self::UnreachableSourceFile,
+            Self::UnresolvedExternCrate,
+            Self::UnresolvedMacroCall,
+            Self::UnresolvedMethodCall,
+            Self::UnresolvedModule,
+            Self::UnresolvedPath,
+            Self::UnsafeCode,
+            Self::UnvettedClippySetting,
+            Self::UnvettedCriterionMethod,
+            Self::UnvettedNextestSetting,
+            Self::VacuousNegatedConfiguration,
+        ]
     }
 
     fn values(self) -> Vec<String> {
@@ -357,6 +586,18 @@ impl IssueType {
             Self::UnvettedClippySetting => vec![format!(
                 "Settings that only add restrictions: {}",
                 RESTRICTING_CLIPPY_SETTINGS.join(", ")
+            )],
+            Self::Rustfmt(
+                RustfmtIssue::ConfigurationAmbiguous
+                | RustfmtIssue::ConfigurationInvalid
+                | RustfmtIssue::ConfigurationMissing
+                | RustfmtIssue::ConfigurationUnreadable,
+            ) => vec![format!(
+                "Rustfmt configuration files: {RUSTFMT_CONFIGURATION_FILE}, {RUSTFMT_HIDDEN_CONFIGURATION_FILE}"
+            )],
+            Self::Rustfmt(RustfmtIssue::UnvettedSetting) => vec![format!(
+                "Vetted settings: {}",
+                VETTED_RUSTFMT_SETTINGS.join(", ")
             )],
             Self::UnvettedNextestSetting => vec![format!(
                 "Vetted settings: {}; in a profile: {}; in a slow-timeout: {}",
@@ -397,18 +638,21 @@ impl From<&ViolationKind> for IssueType {
                 Self::UnvettedCriterionMethod
             }
             ViolationKind::Error(violation) => Self::Error(ErrorIssue::from(violation)),
-            ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Benchmarks) => {
-                Self::FunctionUsedOnlyByBenchmarks
-            }
-            ViolationKind::Test(TestViolation::Ignored) => Self::Test(TestIssue::Ignored),
+            ViolationKind::ItemUsedOnlyBy {
+                users: NonProductionUsers::Benchmarks,
+                ..
+            } => Self::ItemUsedOnlyByBenchmarks,
+            ViolationKind::Layout(violation) => Self::Layout(LayoutIssue::from(violation)),
+            ViolationKind::Test(violation) => Self::Test(TestIssue::from(violation)),
             ViolationKind::NonBenchmarkItemInBenchmarkTarget => {
                 Self::NonBenchmarkItemInBenchmarkTarget
             }
             ViolationKind::ConfigurationSelectionMacro => Self::ConfigurationSelectionMacro,
             ViolationKind::FailedMacroExpansion => Self::FailedMacroExpansion,
-            ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Tests) => {
-                Self::FunctionUsedOnlyByTests
-            }
+            ViolationKind::ItemUsedOnlyBy {
+                users: NonProductionUsers::Tests,
+                ..
+            } => Self::ItemUsedOnlyByTests,
             ViolationKind::GlobImport => Self::GlobImport,
             ViolationKind::ImplWithoutLocalType => Self::ImplWithoutLocalType,
             ViolationKind::ItemOutOfOrder { .. } => Self::ItemOutOfOrder,
@@ -438,10 +682,6 @@ impl From<&ViolationKind> for IssueType {
             }
             ViolationKind::Reexport => Self::Reexport,
             ViolationKind::SingleLetterName => Self::SingleLetterName,
-            ViolationKind::Test(TestViolation::SerializationRoundTrip) => {
-                Self::Test(TestIssue::SerializationRoundTrip)
-            }
-            ViolationKind::Test(TestViolation::Sleeping) => Self::Test(TestIssue::Sleeping),
             ViolationKind::TestOnlyCodeInProduction => Self::TestOnlyCodeInProduction,
             ViolationKind::TupleInSignature => Self::TupleInSignature,
             ViolationKind::UndestructuredParameter { .. } => Self::UndestructuredParameter,
@@ -456,6 +696,11 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::UnresolvedPath => Self::UnresolvedPath,
             ViolationKind::IncludedSourceFile { .. } => Self::IncludedSourceFile,
             ViolationKind::UnsafeCode => Self::UnsafeCode,
+            ViolationKind::ToolAttribute { .. } => Self::ToolAttribute,
+            ViolationKind::AttributeAppliedInNoConfiguration => {
+                Self::AttributeAppliedInNoConfiguration
+            }
+            ViolationKind::VacuousNegatedConfiguration { .. } => Self::VacuousNegatedConfiguration,
             ViolationKind::ReferencedTest => Self::ReferencedTest,
         }
     }
@@ -477,7 +722,7 @@ impl From<&PackageViolation> for IssueType {
                 Self::UnknownConfinedPackage
             }
             PackageViolation::IntegrationTests(_) => Self::SplitIntegrationTests,
-            PackageViolation::UnreachableTestFile { .. } => Self::UnreachableTestFile,
+            PackageViolation::UnreachableSourceFile { .. } => Self::UnreachableSourceFile,
             PackageViolation::NextestPresence(NextestPresenceViolation::Unneeded { .. }) => {
                 Self::UnneededNextestConfiguration
             }
@@ -490,10 +735,12 @@ impl From<&PackageViolation> for IssueType {
             PackageViolation::Confinement(ConfinementViolation::UserNotReachingIt { .. }) => {
                 Self::ConfinedPackageUserNotReachingIt
             }
-            PackageViolation::ClippyConfigurationAmbiguous { .. } => {
+            PackageViolation::Clippy(ClippyViolation::ConfigurationAmbiguous { .. }) => {
                 Self::ClippyConfigurationAmbiguous
             }
-            PackageViolation::ClippyConfigurationMissing { .. } => Self::ClippyConfigurationMissing,
+            PackageViolation::Clippy(ClippyViolation::ConfigurationMissing { .. }) => {
+                Self::ClippyConfigurationMissing
+            }
             PackageViolation::LintAllowedInManifest { .. } => Self::LintAllowedInManifest,
             PackageViolation::NextestPresence(NextestPresenceViolation::Missing { .. }) => {
                 Self::NextestConfigurationMissing
@@ -519,110 +766,37 @@ impl From<&PackageViolation> for IssueType {
                 ..
             }) => Self::TestsOnlyPackageWithoutTestLibraries,
             PackageViolation::RequiredLintNotDenied { .. } => Self::RequiredLintNotDenied,
-            PackageViolation::RequiredClippySettingMissing { .. } => {
+            PackageViolation::Clippy(ClippyViolation::RequiredSettingMissing { .. }) => {
                 Self::RequiredClippySettingMissing
             }
-            PackageViolation::UnvettedClippySetting { .. } => Self::UnvettedClippySetting,
+            PackageViolation::Clippy(ClippyViolation::UnvettedSetting { .. }) => {
+                Self::UnvettedClippySetting
+            }
             PackageViolation::UnvettedNextestSetting { .. } => Self::UnvettedNextestSetting,
+            PackageViolation::Rustfmt(violation) => Self::Rustfmt(RustfmtIssue::from(violation)),
+            PackageViolation::Manifest(violation) => Self::Manifest(ManifestIssue::from(violation)),
         }
     }
 }
 
 impl ValueEnum for IssueType {
     fn value_variants<'variants>() -> &'variants [Self] {
-        &[
-            Self::AdditionalPublicItem,
-            Self::BenchmarkTargetExcludedFromBenchmarks,
-            Self::BenchmarkTargetRunByTests,
-            Self::BenchmarkTargetWithLibtestHarness,
-            Self::BenchmarkTargetWithoutCriterionBenchmark,
-            Self::BenchmarksOnlyPackageWithoutLibraries,
-            Self::ClippyConfigurationAmbiguous,
-            Self::ClippyConfigurationMissing,
-            Self::CodeActiveInNoConfiguration,
-            Self::CodeWithoutCoverageData,
-            Self::ConfigurationSelectionMacro,
-            Self::ConfinedPackageReachedOutsideItsUsers,
-            Self::ConfinedPackageUserListedTwice,
-            Self::ConfinedPackageUserNotAMember,
-            Self::ConfinedPackageUserNotReachingIt,
-            Self::DuplicatedFunctionBody,
-            Self::Error(ErrorIssue::ErrorSourceOutsideChain),
-            Self::Error(ErrorIssue::ErrorTypeNotAnEnum),
-            Self::FailedMacroExpansion,
-            Self::FunctionUsedOnlyByBenchmarks,
-            Self::FunctionUsedOnlyByTests,
-            Self::GlobImport,
-            Self::Error(ErrorIssue::HandwrittenErrorType),
-            Self::Test(TestIssue::Ignored),
-            Self::ImplWithoutLocalType,
-            Self::IncludedSourceFile,
-            Self::InvalidMacroDefinition,
-            Self::ItemOutOfOrder,
-            Self::LintAllowedInManifest,
-            Self::LintSuppression,
-            Self::Error(ErrorIssue::MacroGeneratedErrorType),
-            Self::MethodOutOfOrder,
-            Self::MisplacedBlanketImpl,
-            Self::MisplacedForeignTypeImpl,
-            Self::MisplacedImpl,
-            Self::MisplacedTraitObjectImpl,
-            Self::ModuleCycle,
-            Self::ModuleFileInsideBlock,
-            Self::ModuleNotNamedAfterItsItem,
-            Self::Error(ErrorIssue::MultipleErrorTypes),
-            Self::MustUseBenchmarkOutput,
-            Self::NegatedConfiguration,
-            Self::NextestConfigurationMissing,
-            Self::NextestOverride,
-            Self::NextestTimeoutNotEnforced,
-            Self::NonBenchmarkItemInBenchmarkTarget,
-            Self::NonConstantInConstantsModule,
-            Self::NonDocComment,
-            Self::NonTestItemInTestTarget,
-            Self::PackageDependencyCycle,
-            Self::PackageDependsOnItself,
-            Self::ProceduralFunction,
-            Self::PublicAssociatedConstant,
-            Self::PublicConstantOutsideConstantsModule,
-            Self::PublishableTestCrate,
-            Self::Reexport,
-            Self::ReferencedTest,
-            Self::RequiredClippySettingMissing,
-            Self::RequiredLintNotDenied,
-            Self::Test(TestIssue::SerializationRoundTrip),
-            Self::SharedModuleFile,
-            Self::SingleLetterName,
-            Self::Test(TestIssue::Sleeping),
-            Self::Error(ErrorIssue::SourceInErrorMessage),
-            Self::SplitIntegrationTests,
-            Self::TestCrateDeclaredTwice,
-            Self::TestCrateNotAMember,
-            Self::TestCrateUsedByProduction,
-            Self::TestOnlyCodeInProduction,
-            Self::TestsOnlyPackageWithoutTestLibraries,
-            Self::TupleInSignature,
-            Self::UncoveredCode,
-            Self::UndestructuredParameter,
-            Self::UndeterminedBenchmarkOutput,
-            Self::UnimplementedBuiltinMacro,
-            Self::UnknownConfinedPackage,
-            Self::UnmappedItem,
-            Self::UnneededNextestConfiguration,
-            Self::UnparsableMacroExpansion,
-            Self::UnprefixedTypeParameter,
-            Self::UnreachableTestFile,
-            Self::UnresolvedExternCrate,
-            Self::UnresolvedMacroCall,
-            Self::UnresolvedMethodCall,
-            Self::UnresolvedModule,
-            Self::UnresolvedPath,
-            Self::UnsafeCode,
-            Self::Error(ErrorIssue::UntypedResultError),
-            Self::UnvettedClippySetting,
-            Self::UnvettedCriterionMethod,
-            Self::UnvettedNextestSetting,
-        ]
+        static ISSUE_TYPES: OnceLock<Vec<IssueType>> = OnceLock::new();
+
+        ISSUE_TYPES.get_or_init(|| {
+            let mut issue_types: Vec<Self> = Self::ungrouped()
+                .into_iter()
+                .chain(ErrorIssue::variants().map(Self::Error))
+                .chain(LayoutIssue::variants().map(Self::Layout))
+                .chain(ManifestIssue::variants().map(Self::Manifest))
+                .chain(RustfmtIssue::variants().map(Self::Rustfmt))
+                .chain(TestIssue::variants().map(Self::Test))
+                .collect();
+
+            issue_types.sort_by_key(|issue_type| issue_type.text().name);
+
+            issue_types
+        })
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {

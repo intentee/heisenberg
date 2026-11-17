@@ -18,16 +18,20 @@ fn private_function_its_attribute_expansion_calls_is_file_local() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok([
-            "------------------------------\n\
-            No errors found!\n\
+        Ok(["TestOutsideTestModule: 1 violation\n\
+            A test outside a test module is compiled into the same scope as production code, so nothing separates the code that runs in production from the code that tests it. Move the test into the #[cfg(test)] mod tests of its file.\n\
+            \n\
+            - src/trials.rs:5:3: Test is written outside a test module\n    \
+            #[trial]\n\
+            \n\
+            ------------------------------\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
-            NextestPresenceEvaluation::Evaluated
-                .host_footer(2, 4)
+            NextestPresenceEvaluation::Evaluated.host_footer(2, 4)
                 .as_str()
         ]
         .concat()
         .as_str())
     );
-    assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

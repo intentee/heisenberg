@@ -25,7 +25,7 @@ fn environment_variable_declared_in_the_configuration_has_its_value_in_the_analy
             include!(concat!(env!(\"GENERATED\"), \"/items.rs\"));\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

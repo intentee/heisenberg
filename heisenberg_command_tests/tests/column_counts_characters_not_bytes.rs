@@ -31,7 +31,7 @@ fn column_counts_characters_not_bytes() {
             const LABEL: &str = \"żółw\"; use std::fmt::*;\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

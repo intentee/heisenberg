@@ -37,7 +37,7 @@ fn single_letter_parameter_names_are_violations() {
             values.iter().fold(x, |total, &v| total + v) + values.iter().map(|y| y + 1).sum::<u8>()\n\
             \n\
             ------------------------------\n\
-            7 errors found\n\
+            7 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 5).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

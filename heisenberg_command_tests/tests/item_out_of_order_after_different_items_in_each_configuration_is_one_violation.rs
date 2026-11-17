@@ -34,7 +34,7 @@ fn item_out_of_order_after_different_items_in_each_configuration_is_one_violatio
             Item belongs before TITLE: imports from vendor crates precede private helpers (only in item_out_of_order_after_configured_items lib on {HOST_CONFIGURATION}-without-features)\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 1 crate targets, 2 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 1 crate targets, 2 modules\n\

@@ -1,3 +1,7 @@
+---
+kind: directive
+---
+
 # Configuration Cannot Sidestep Rules
 
 - Heisenberg validates every configuration that can relax its rules or work around them, whether or not it relies on that configuration: manifest lints, clippy configurations, test runner configurations, and its own settings.

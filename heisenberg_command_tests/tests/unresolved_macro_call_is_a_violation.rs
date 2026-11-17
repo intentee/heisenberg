@@ -34,7 +34,7 @@ fn unresolved_macro_call_is_a_violation() {
             #[derive(MissingDerive)]\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()
         ]

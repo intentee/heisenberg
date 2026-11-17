@@ -5,11 +5,14 @@ use std::io::Write;
 
 use clap::Parser;
 
+use crate::catalogue_command::CatalogueCommand;
+use crate::catalogue_format::CatalogueFormat;
 use crate::explain_command::ExplainCommand;
 use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::heisenberg_exit_status::HeisenbergExitStatus;
 use crate::heisenberg_subcommand::HeisenbergSubcommand;
 use crate::rendered_report::RenderedReport;
+use crate::rule_catalogue::RuleCatalogue;
 
 fn written(
     output: &mut dyn Write,
@@ -55,6 +58,20 @@ impl HeisenbergCommand {
         errors: &mut dyn Write,
     ) -> Result<HeisenbergExitStatus, io::Error> {
         let outcome = match &self.subcommand {
+            HeisenbergSubcommand::Catalogue(CatalogueCommand {
+                format: CatalogueFormat::Json,
+            }) => RuleCatalogue::new(|_| true)
+                .write_json(output)
+                .map(|()| HeisenbergExitStatus::Explained)
+                .map_err(HeisenbergCommandError::WriteCatalogueDocument),
+            HeisenbergSubcommand::Catalogue(CatalogueCommand {
+                format: CatalogueFormat::Text,
+            }) => written(
+                output,
+                &RuleCatalogue::new(|_| true).text(),
+                HeisenbergExitStatus::Explained,
+                HeisenbergCommandError::WriteCatalogue,
+            ),
             HeisenbergSubcommand::Check(check) => reported(
                 output,
                 check.execute(environment).map(|report| report.render()),

@@ -10,7 +10,8 @@ use crate::resolution_cache::ResolutionCache;
 
 pub struct DefinitionUsages<'usages, 'database> {
     pub semantics: &'usages Semantics<'database, RootDatabase>,
-    searched: ResolutionCache<ModuleDef, Rc<UsageSearchResult>>,
+    searched: ResolutionCache<Definition<'database>, Rc<UsageSearchResult>>,
+    searched_with_self: ResolutionCache<Definition<'database>, Rc<UsageSearchResult>>,
 }
 
 impl<'usages, 'database> DefinitionUsages<'usages, 'database> {
@@ -18,12 +19,23 @@ impl<'usages, 'database> DefinitionUsages<'usages, 'database> {
         Self {
             semantics,
             searched: ResolutionCache::default(),
+            searched_with_self: ResolutionCache::default(),
         }
     }
 
     pub fn all(&self, definition: ModuleDef) -> Rc<UsageSearchResult> {
+        self.of(Definition::from(definition))
+    }
+
+    pub fn of(&self, definition: Definition<'database>) -> Rc<UsageSearchResult> {
         self.searched.resolve(&definition, || {
-            Rc::new(Definition::from(definition).usages(self.semantics).all())
+            Rc::new(definition.usages(self.semantics).all())
+        })
+    }
+
+    pub fn with_self_references(&self, definition: Definition<'database>) -> Rc<UsageSearchResult> {
+        self.searched_with_self.resolve(&definition, || {
+            Rc::new(definition.usages(self.semantics).include_self_refs().all())
         })
     }
 }

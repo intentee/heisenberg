@@ -18,14 +18,14 @@ fn function_used_only_by_tests_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["FunctionUsedOnlyByTests: 1 violation\n\
-            Production code holds only what production uses. Move a function that only tests use into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
+        Ok(["ItemUsedOnlyByTests: 1 violation\n\
+            Production code holds only what production uses. Move an item that only tests use into the test module that uses it, or into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
             \n\
             - library/src/counter.rs:6:18: Function is used only by tests\n        \
             pub const fn for_tests() -> Self {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(4, 6).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

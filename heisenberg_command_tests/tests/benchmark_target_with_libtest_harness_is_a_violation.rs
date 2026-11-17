@@ -24,7 +24,7 @@ fn benchmark_target_with_libtest_harness_is_a_violation() {
             - Cargo.toml: Benchmark target bench \"measurement\" uses libtest's harness, which runs no benchmark on stable Rust\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

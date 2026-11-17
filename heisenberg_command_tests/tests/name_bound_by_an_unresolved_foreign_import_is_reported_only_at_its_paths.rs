@@ -18,8 +18,13 @@ fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok([
-            "UnresolvedPath: 1 violation\n\
+        Ok(["ImportInsideBlock: 1 violation\n\
+            The imports of a file are read in one place, at its top, and a name means the same thing throughout the file. Move the import to the top of the module.\n\
+            \n\
+            - src/lib.rs:12:9: Import is written inside a block\n            \
+            use shaped::backend::Generated as Local;\n\
+            \n\
+            UnresolvedPath: 1 violation\n\
             The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
             - src/lib.rs:1:5: Path into shaped::backend compiles, but rust-analyzer cannot resolve it\n    \
@@ -29,7 +34,7 @@ fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
             also unresolved at src/lib.rs:23:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()
         ]

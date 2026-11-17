@@ -34,7 +34,7 @@ fn public_constant_is_a_violation_in_any_module_but_the_constants_module() {
             pub const ALPHA_MASK_THRESHOLD: f32 = 0.5;\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated
                 .host_footer(1, 4)

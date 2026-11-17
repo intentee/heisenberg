@@ -7,5 +7,4 @@ pub struct VettedCrates {
     pub benchmark_harness: HashSet<Crate>,
     pub error_derive: HashSet<Crate>,
     pub error_runtime: HashSet<Crate>,
-    pub serialization: HashSet<Crate>,
 }

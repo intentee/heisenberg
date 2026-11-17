@@ -34,7 +34,7 @@ fn public_constant_outside_the_constants_module_is_a_violation() {
             pub const DEFAULT: u8 = 6;\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated
                 .host_footer(1, 7)

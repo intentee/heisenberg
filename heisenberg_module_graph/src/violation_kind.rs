@@ -2,32 +2,40 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::configuration_atom::ConfigurationAtom;
 use crate::constants::CONSTANTS_MODULE_NAME;
 use crate::error_violation::ErrorViolation;
 use crate::harness_violation::HarnessViolation;
 use crate::impl_placement::ImplPlacement;
 use crate::item_placement::ItemPlacement;
+use crate::layout_violation::LayoutViolation;
 use crate::method_placement::MethodPlacement;
 use crate::non_production_users::NonProductionUsers;
 use crate::test_violation::TestViolation;
+use crate::used_item::UsedItem;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ViolationKind {
     AdditionalPublicItem,
+    AttributeAppliedInNoConfiguration,
     BenchmarkHarness(HarnessViolation),
     ConfigurationSelectionMacro,
     Error(ErrorViolation),
     FailedMacroExpansion,
-    FunctionUsedOnlyBy(NonProductionUsers),
     GlobImport,
     InvalidMacroDefinition,
     ImplWithoutLocalType,
     IncludedSourceFile {
         file: String,
     },
+    ItemUsedOnlyBy {
+        item: UsedItem,
+        users: NonProductionUsers,
+    },
     ItemOutOfOrder {
         placement: ItemPlacement,
     },
+    Layout(LayoutViolation),
     LintSuppression,
     MethodOutOfOrder {
         placement: MethodPlacement,
@@ -54,6 +62,9 @@ pub enum ViolationKind {
     SingleLetterName,
     Test(TestViolation),
     TestOnlyCodeInProduction,
+    ToolAttribute {
+        tool: String,
+    },
     TupleInSignature,
     UndestructuredParameter {
         type_name: String,
@@ -68,6 +79,9 @@ pub enum ViolationKind {
     UnresolvedModule,
     UnresolvedPath,
     UnsafeCode,
+    VacuousNegatedConfiguration {
+        atom: ConfigurationAtom,
+    },
 }
 
 impl Display for ViolationKind {
@@ -82,7 +96,7 @@ impl Display for ViolationKind {
             ),
             Self::Error(violation) => violation.fmt(formatter),
             Self::FailedMacroExpansion => formatter.write_str("Macro expansion failed"),
-            Self::FunctionUsedOnlyBy(users) => users.fmt(formatter),
+            Self::ItemUsedOnlyBy { item, users } => write!(formatter, "{item} {users}"),
             Self::GlobImport => formatter.write_str("Glob import"),
             Self::InvalidMacroDefinition => formatter.write_str("Macro definition is invalid"),
             Self::ImplWithoutLocalType => formatter
@@ -91,6 +105,7 @@ impl Display for ViolationKind {
                 write!(formatter, "Included file {file} is not a build script output")
             }
             Self::ItemOutOfOrder { placement } => placement.fmt(formatter),
+            Self::Layout(violation) => violation.fmt(formatter),
             Self::LintSuppression => formatter.write_str("Attribute suppresses lints"),
             Self::MethodOutOfOrder { placement } => placement.fmt(formatter),
             Self::ModuleFileInsideBlock => {
@@ -133,7 +148,7 @@ impl Display for ViolationKind {
             Self::Reexport => formatter.write_str("Re-export"),
             Self::SingleLetterName => formatter.write_str("Name is a single character"),
             Self::TestOnlyCodeInProduction => formatter
-                .write_str("Code exists only under cfg(test) outside a test module"),
+                .write_str("Code depends on cfg(test) outside a test module"),
             Self::Test(violation) => violation.fmt(formatter),
             Self::TupleInSignature => formatter.write_str("Tuple type in a signature"),
             Self::UndestructuredParameter { type_name } => write!(
@@ -158,6 +173,14 @@ impl Display for ViolationKind {
             Self::UnsafeCode => {
                 formatter.write_str("Unsafe code in a crate that integrates no foreign code")
             }
+            Self::AttributeAppliedInNoConfiguration => {
+                formatter.write_str("Conditional attribute applies in no declared configuration")
+            }
+            Self::ToolAttribute { tool } => write!(formatter, "Attribute of the {tool} tool"),
+            Self::VacuousNegatedConfiguration { atom } => write!(
+                formatter,
+                "Predicate negates {atom}, which no declared configuration sets"
+            ),
         }
     }
 }

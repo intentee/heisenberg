@@ -29,7 +29,7 @@ fn function_under_an_attribute_macro_is_measured_through_its_expansion() {
             not executed at src/lib.rs:6:55\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(1, 1, 5).as_str()
         ]

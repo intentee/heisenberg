@@ -11,6 +11,21 @@ pub struct ErrorTypes<'types, 'database> {
 }
 
 impl<'database> ErrorTypes<'_, 'database> {
+    pub fn holds_an_error(&self, candidate: &Type<'database>) -> bool {
+        self.implements_error(candidate)
+            || candidate.as_dyn_trait() == Some(self.standard_items.error_trait)
+            || (matches!(
+                candidate.as_adt(),
+                Some(Adt::Enum(wrapper)) if wrapper == self.standard_items.option
+            ) || matches!(
+                candidate.as_adt(),
+                Some(Adt::Struct(wrapper)) if wrapper == self.standard_items.owned_box
+            )) && candidate
+                .type_arguments()
+                .next()
+                .is_some_and(|wrapped| self.holds_an_error(&wrapped))
+    }
+
     pub fn implements_error(&self, candidate: &Type<'database>) -> bool {
         candidate.impls_trait(self.semantics.db, self.standard_items.error_trait, &[])
     }

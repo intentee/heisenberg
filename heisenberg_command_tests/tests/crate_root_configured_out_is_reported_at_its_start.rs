@@ -28,7 +28,7 @@ fn crate_root_configured_out_is_reported_at_its_start() {
             #![cfg(any())]\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", full_run_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

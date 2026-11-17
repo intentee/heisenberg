@@ -31,7 +31,7 @@ fn build_script_output_that_cargo_holds_is_reused_by_the_next_check() {
         crate::second uses crate::first at src/second.rs:5:9\n\
         \n\
         ------------------------------\n\
-        1 errors found\n\
+        1 errors found in 1 rule\n\
         ------------------------------\n", full_run_footer(2, 4).as_str()]
     .concat();
 

@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use clap::ValueEnum;
+
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::crate_module_graph::CrateModuleGraph;
 use heisenberg_module_graph::folded_finding::FoldedFinding;
@@ -17,27 +19,21 @@ use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::configuration_list::ConfigurationList;
 use heisenberg_project_model::configuration_reach::ConfigurationReach;
 use heisenberg_project_model::confinement_breach::ConfinementBreach;
+use heisenberg_project_model::constants::SUPPORTED_RUST_VERSION;
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::run_scope::RunScope;
 
 use crate::analysis_context::AnalysisContext;
 use crate::analysis_contexts::AnalysisContexts;
+use crate::compliance_summary::ComplianceSummary;
 use crate::configuration_analysis::ConfigurationAnalysis;
 use crate::configuration_fingerprint::ConfigurationFingerprint;
 use crate::configuration_function_body::ConfigurationFunctionBody;
-use crate::constants::BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES;
-use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
-use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
-use crate::constants::NEXTEST_CONFIGURATION_MISSING;
-use crate::constants::SUPPORTED_RUST_VERSION;
-use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
-use crate::constants::UNNEEDED_NEXTEST_CONFIGURATION;
-use crate::constants::UNREACHABLE_TEST_FILE;
 use crate::cycle_shape::CycleShape;
 use crate::inactive_code::InactiveCode;
 use crate::issue::Issue;
 use crate::issue_report::IssueReport;
-use crate::issue_text::IssueText;
+use crate::issue_type::IssueType;
 use crate::module_inclusion::ModuleInclusion;
 use crate::nextest_presence_verdict::NextestPresenceVerdict;
 use crate::rendered_report::RenderedReport;
@@ -121,13 +117,26 @@ impl CheckReport {
             )
             .collect();
 
+        let summary = self.compliance_summary();
+
         if self.scope.is_partial() {
-            footer.extend(self.partial_run_lines());
+            footer.push(format!(
+                "Not analysed: {}",
+                ConfigurationList {
+                    configurations: &self.scope.left_out_configurations,
+                }
+            ));
+            footer.extend(summary.partial_run_lines());
+            footer.push(format!(
+                "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in every analysed configuration"
+            ));
         } else {
             footer.push(format!(
                 "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in every declared configuration"
             ));
         }
+
+        footer.extend(summary.summary_lines());
 
         IssueReport {
             contexts: &self.analysis_contexts(),
@@ -161,6 +170,29 @@ impl CheckReport {
                 .map(|ConfigurationAnalysis { configuration, .. }| configuration.clone())
                 .collect(),
             files,
+        }
+    }
+
+    fn compliance_summary(&self) -> ComplianceSummary {
+        let rules: Vec<IssueType> = IssueType::value_variants()
+            .iter()
+            .copied()
+            .filter(|issue_type| !issue_type.measures_coverage())
+            .collect();
+
+        if self.scope.is_partial() {
+            ComplianceSummary::new_partial(
+                &rules,
+                match self.nextest_presence {
+                    NextestPresenceVerdict::NotEvaluated => &[],
+                    NextestPresenceVerdict::Compliant | NextestPresenceVerdict::Violation(_) => &[
+                        IssueType::NextestConfigurationMissing,
+                        IssueType::UnneededNextestConfiguration,
+                    ],
+                },
+            )
+        } else {
+            ComplianceSummary::new_full(&rules)
         }
     }
 
@@ -371,6 +403,8 @@ impl CheckReport {
 
         if !self.scope.is_partial() {
             issues.extend(self.inactive_code_issues(&mut violations));
+
+            self.report_every_configuration_findings(&mut violations);
         }
 
         issues.extend(self.unresolved_foreign_reference_issues(&mut violations));
@@ -402,46 +436,46 @@ impl CheckReport {
         issues
     }
 
-    fn partial_run_lines(&self) -> Vec<String> {
-        let RunScope {
-            left_out_configurations,
-        } = &self.scope;
-        let full_run_rules: Vec<&str> = [
-            CODE_ACTIVE_IN_NO_CONFIGURATION,
-            CONFINED_PACKAGE_USER_NOT_REACHING_IT,
-        ]
-        .into_iter()
-        .chain(match self.nextest_presence {
-            NextestPresenceVerdict::NotEvaluated => {
-                vec![
-                    NEXTEST_CONFIGURATION_MISSING,
-                    UNNEEDED_NEXTEST_CONFIGURATION,
-                ]
-            }
-            NextestPresenceVerdict::Compliant | NextestPresenceVerdict::Violation(_) => Vec::new(),
-        })
-        .chain([UNREACHABLE_TEST_FILE])
-        .map(|IssueText { name, .. }| name)
-        .collect();
+    fn report_every_configuration_findings<'report>(
+        &'report self,
+        violations: &mut BTreeMap<&'report Violation, ViolationOccurrences>,
+    ) {
+        let refuted: BTreeSet<&Violation> = self
+            .analyses
+            .iter()
+            .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
+            .flat_map(|CrateModuleGraph { findings, .. }| &findings.every_configuration.refuted)
+            .collect();
 
-        [
-            format!(
-                "Not analysed: {}",
-                ConfigurationList {
-                    configurations: left_out_configurations,
+        for ConfigurationAnalysis {
+            configuration,
+            graphs,
+            ..
+        } in &self.analyses
+        {
+            for CrateModuleGraph {
+                crate_target,
+                findings,
+                ..
+            } in graphs
+            {
+                for finding in findings
+                    .every_configuration
+                    .held
+                    .iter()
+                    .filter(|finding| !refuted.contains(finding))
+                {
+                    violations
+                        .entry(finding)
+                        .or_default()
+                        .reported
+                        .insert(AnalysisContext {
+                            configuration: configuration.clone(),
+                            crate_target: crate_target.clone(),
+                        });
                 }
-            ),
-            format!(
-                "Not evaluated in a partial run: {}, the empty-library checks of {} and {}",
-                full_run_rules.join(", "),
-                TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES.name,
-                BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES.name
-            ),
-            format!(
-                "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in every analysed configuration"
-            ),
-        ]
-        .into()
+            }
+        }
     }
 
     fn unresolved_foreign_reference_issues<'report>(

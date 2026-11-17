@@ -26,7 +26,7 @@ fn glob_import_is_a_violation() {
             use inner::*;\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated
                 .host_footer(1, 2)

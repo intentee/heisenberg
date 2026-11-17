@@ -25,7 +25,7 @@ fn blanket_impl_outside_the_file_of_its_trait_is_a_violation() {
             impl<TIterator: Iterator> Counting for TIterator {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

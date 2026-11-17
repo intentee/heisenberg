@@ -29,7 +29,7 @@ fn path_in_std_macro_arguments_closes_a_cycle() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

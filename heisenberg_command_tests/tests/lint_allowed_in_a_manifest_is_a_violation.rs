@@ -25,7 +25,7 @@ fn lint_allowed_in_a_manifest_is_a_violation() {
             - Cargo.toml: Package lint_allowed_in_a_manifest allows too_many_lines in its clippy lints\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

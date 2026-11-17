@@ -43,7 +43,7 @@ fn must_use_benchmark_output_is_a_violation() {
             bencher.to_async(ImmediateExecutor).iter(|| async { parsed() });\n\
             \n\
             ------------------------------\n\
-            10 errors found\n\
+            10 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

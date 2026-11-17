@@ -1,3 +1,7 @@
+---
+kind: directive
+---
+
 # Rules Follow Their Intent
 
 - A rule enforces what it is for, not only its wording. Its check, its message and its explanation must agree with that intent, and a construct that satisfies the intent is compliant.

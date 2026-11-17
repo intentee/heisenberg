@@ -25,7 +25,7 @@ fn derive_attribute_does_not_make_a_function_a_test() {
             pub fn derived_helper() {}\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

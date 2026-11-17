@@ -28,7 +28,7 @@ fn ignored_test_is_a_violation() {
             #[cfg_attr(test, ignore = \"the answer is not checked\")]\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(1, 2).as_str()
         ]

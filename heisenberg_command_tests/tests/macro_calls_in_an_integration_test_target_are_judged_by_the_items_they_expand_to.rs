@@ -26,7 +26,7 @@ fn macro_calls_in_an_integration_test_target_are_judged_by_the_items_they_expand
             impl block at tests/generating.rs:23:6\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

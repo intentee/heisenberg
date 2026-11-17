@@ -2447,6 +2447,8 @@ dependencies = [
  "heisenberg_workspace_build",
  "humantime",
  "rayon",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 

@@ -37,7 +37,6 @@ use crate::inactive_code_site::InactiveCodeSite;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
 use crate::module_paths::ModulePaths;
-use crate::serialization_traits::SerializationTraits;
 use crate::standard_items::StandardItems;
 use crate::vetted_crates::VettedCrates;
 
@@ -98,7 +97,6 @@ impl ModuleDependencies<'_, '_> {
     fn graphs(
         &self,
         vetted_crates: &VettedCrates,
-        serialization_traits: &SerializationTraits,
         members: &[ResolvedMemberCrate],
         workspace_files: &BTreeSet<FileId>,
         non_production_files: &NonProductionFiles,
@@ -158,7 +156,6 @@ impl ModuleDependencies<'_, '_> {
                             test_gated_code: &test_gated_code,
                             test_modules: &test_modules,
                             trait_result_errors: &trait_result_errors,
-                            serialization_traits,
                             unpublished_packages,
                             vetted_crates,
                             workspace_files,
@@ -201,10 +198,6 @@ impl ModuleDependencies<'_, '_> {
             test: self.category_files(members, CodeCategory::Test),
         };
         let file_modules = self.file_modules(&workspace_files);
-        let database = &self.project.database;
-        let serialization_traits = attach_db(database, || {
-            SerializationTraits::new(database, &vetted_crates.serialization)
-        })?;
         let shared_files: BTreeSet<FileId> = file_modules
             .iter()
             .filter(|(_, modules)| modules.len() > 1)
@@ -219,7 +212,6 @@ impl ModuleDependencies<'_, '_> {
             .collect();
         self.graphs(
             vetted_crates,
-            &serialization_traits,
             &members
                 .iter()
                 .filter(
@@ -258,7 +250,6 @@ impl ModuleDependencies<'_, '_> {
 
                     self.graphs(
                         vetted_crates,
-                        &serialization_traits,
                         &[member],
                         &workspace_files,
                         &non_production_files,
@@ -317,10 +308,6 @@ impl ModuleDependencies<'_, '_> {
 
                             if packages.error_runtime_roots.contains(&root) {
                                 vetted.error_runtime.insert(krate);
-                            }
-
-                            if packages.serialization_roots.contains(&root) {
-                                vetted.serialization.insert(krate);
                             }
 
                             vetted

@@ -24,7 +24,7 @@ fn package_cycle_through_dev_dependencies_is_a_violation() {
             - alpha/Cargo.toml: Packages alpha v0.1.0, beta v0.1.0 depend on each other through dev-dependencies\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

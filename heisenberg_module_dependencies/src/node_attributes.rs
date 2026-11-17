@@ -22,12 +22,16 @@ use heisenberg_project_model::constants::REQUIRED_LINT_GROUPS;
 use crate::attribute_directives::AttributeDirectives;
 use crate::builtin_attribute::BuiltinAttribute;
 use crate::path_resolutions::PathResolutions;
+use crate::tool_attribute::ToolAttribute;
+use crate::tool_directive::ToolDirective;
 
 const IGNORING_ATTRIBUTES: [&str; 1] = ["ignore"];
 
 const LOWERING_ATTRIBUTES: [&str; 1] = ["warn"];
 
 const SUPPRESSING_ATTRIBUTES: [&str; 2] = ["allow", "expect"];
+
+const VETTED_TOOLS: [&str; 2] = ["clippy", "rustfmt"];
 
 fn is_required_lint(path: &[String]) -> bool {
     REQUIRED_LINT_GROUPS
@@ -57,6 +61,16 @@ impl NodeAttributes<'_, '_> {
                 directives.suppressions.push(meta);
             } else if attribute.is_named(&IGNORING_ATTRIBUTES) {
                 directives.ignores.push(meta);
+            } else if let Some(tool) = (ToolAttribute {
+                meta: &meta,
+                paths: self.paths,
+                semantics: self.semantics,
+            })
+            .tool(&VETTED_TOOLS)
+            {
+                directives
+                    .tool_attributes
+                    .push(ToolDirective { meta, tool });
             }
 
             ControlFlow::Continue(())

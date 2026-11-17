@@ -7,10 +7,10 @@ use clap::Args;
 use heisenberg_absolute_path::absolute_path::AbsolutePath;
 use heisenberg_project_model::configuration_selection::ConfigurationSelection;
 use heisenberg_project_model::constants::CARGO_MANIFEST_FILE;
+use heisenberg_project_model::constants::SUPPORTED_RUST_VERSION;
 use heisenberg_project_model::project_model::ProjectModel;
 
 use crate::constants::DEFAULT_JOBS;
-use crate::constants::SUPPORTED_RUST_VERSION;
 
 #[derive(Args, Debug)]
 pub struct ProjectArguments {

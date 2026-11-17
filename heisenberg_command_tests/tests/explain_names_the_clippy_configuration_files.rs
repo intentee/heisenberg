@@ -24,13 +24,18 @@ fn explain_names_the_clippy_configuration_files() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "ClippyConfigurationMissing: A workspace member without a clippy configuration\n\
+            "Rule 3.2 ClippyConfigurationMissing: A workspace member without a clippy configuration\n\
+        Section 3, Lints and formatting. Scope: workspace. Evaluated in each analysed configuration.\n\
         \n\
         A workspace member with no clippy configuration file in its directory or an ancestor within the workspace.\n\
         \n\
         Clippy configuration files: clippy.toml, .clippy.toml\n\
         \n\
-        Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart. Add a clippy.toml with the test allowances.\n\
+        Rationale: Tests may fail fast while production code may not, and clippy needs a configuration to tell them apart.\n\
+        \n\
+        Remedy: Add a clippy.toml with the test allowances.\n\
+        \n\
+        See also: ClippyConfigurationAmbiguous, RequiredClippySettingMissing, UnvettedClippySetting\n\
         "
         )
     );

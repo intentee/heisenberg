@@ -26,7 +26,7 @@ fn module_file_repeated_in_one_crate_is_a_violation() {
             crate::second in module_file_repeated_in_crate lib, not analysed: the crate already analyses the file as crate::first\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

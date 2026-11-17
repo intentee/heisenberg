@@ -25,7 +25,7 @@ fn single_letter_lifetime_in_proc_macro_attribute_arguments_is_a_violation() {
             #[identity::emit(impl<'b> From<&'b str> for Holder { fn from(_name: &'b str) -> Self { Self } })]\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -26,7 +26,7 @@ fn impl_block_of_a_flagged_type_is_part_of_its_issue() {
             impl block at tests/helping.rs:1:6\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

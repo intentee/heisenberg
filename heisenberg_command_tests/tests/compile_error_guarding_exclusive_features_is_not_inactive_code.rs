@@ -35,7 +35,7 @@ fn compile_error_guarding_exclusive_features_is_not_inactive_code() {
             std::thread_local! {{\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}-shared: 1 crate targets, 2 modules\n\
             Analysed on {HOST_CONFIGURATION}-static: 1 crate targets, 2 modules\n\

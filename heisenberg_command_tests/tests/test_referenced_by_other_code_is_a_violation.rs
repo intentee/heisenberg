@@ -25,7 +25,7 @@ fn test_referenced_by_other_code_is_a_violation() {
             fn multiplies() { assert!(!\"multiplies\".is_empty()); }\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

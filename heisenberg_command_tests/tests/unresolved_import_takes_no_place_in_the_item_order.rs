@@ -26,7 +26,7 @@ fn unresolved_import_takes_no_place_in_the_item_order() {
             use missing::Thing;\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()
         ]

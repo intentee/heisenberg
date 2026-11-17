@@ -10,10 +10,9 @@ pub enum NonProductionUsers {
 
 impl Display for NonProductionUsers {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Benchmarks => formatter
-                .write_str("Function is used only by benchmarks, or by benchmarks and tests"),
-            Self::Tests => formatter.write_str("Function is used only by tests"),
-        }
+        formatter.write_str(match self {
+            Self::Benchmarks => "only by benchmarks, or by benchmarks and tests",
+            Self::Tests => "only by tests",
+        })
     }
 }

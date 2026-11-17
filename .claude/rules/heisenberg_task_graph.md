@@ -1,3 +1,7 @@
+---
+kind: directive
+---
+
 # Task Graph
 
 - Heisenberg runs as a dependency graph of tasks on one bounded worker pool.

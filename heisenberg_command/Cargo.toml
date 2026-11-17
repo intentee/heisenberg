@@ -16,6 +16,8 @@ heisenberg_project_model = { workspace = true }
 heisenberg_workspace_build = { workspace = true }
 humantime = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

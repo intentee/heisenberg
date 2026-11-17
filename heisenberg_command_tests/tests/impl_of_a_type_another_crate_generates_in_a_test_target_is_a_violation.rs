@@ -25,7 +25,7 @@ fn impl_of_a_type_another_crate_generates_in_a_test_target_is_a_violation() {
             impl Generated {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(3, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

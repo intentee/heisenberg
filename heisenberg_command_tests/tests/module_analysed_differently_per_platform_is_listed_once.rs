@@ -42,7 +42,7 @@ fn module_analysed_differently_per_platform_is_listed_once() {
              {INCLUSIONS}\
              \n\
              ------------------------------\n\
-             1 errors found\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, HOST_MODULES)

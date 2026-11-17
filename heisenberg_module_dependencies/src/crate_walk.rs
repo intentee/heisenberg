@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -30,10 +31,8 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
 use crate::path_resolutions::PathResolutions;
-use crate::serialization_traits::SerializationTraits;
 use crate::standard_items::StandardItems;
 use crate::template_captures::TemplateCaptures;
-use crate::test_assertions::TestAssertions;
 use crate::token_origin::TokenOrigin;
 use crate::vetted_crates::VettedCrates;
 use crate::walked_module::WalkedModule;
@@ -47,7 +46,6 @@ pub struct CrateWalk<'walk> {
     pub krate: Crate,
     pub module_paths: &'walk ModulePaths,
     pub non_production_files: &'walk NonProductionFiles,
-    pub serialization_traits: &'walk SerializationTraits,
     pub source_files: &'walk SourceFiles,
     pub standard_items: &'walk StandardItems,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
@@ -72,7 +70,7 @@ impl CrateWalk<'_> {
         let production_options = self.test_modules.production_options(database, self.krate);
         let template_captures = TemplateCaptures::new(&semantics);
         let usages = DefinitionUsages::new(&semantics);
-        let test_assertions = TestAssertions::default();
+        let runs_libtest_tests = Cell::new(false);
         let mut walked = WalkedModule::default();
 
         ModuleWalk {
@@ -102,7 +100,6 @@ impl CrateWalk<'_> {
             paths: &paths,
             production_options: &production_options,
             semantics: &semantics,
-            serialization_traits: self.serialization_traits,
             template_captures: &template_captures,
             test_gated_code: self.test_gated_code,
             trait_result_errors: self.trait_result_errors,
@@ -113,7 +110,7 @@ impl CrateWalk<'_> {
             },
             standard_items: self.standard_items,
             unpublished_packages: self.unpublished_packages,
-            test_assertions: &test_assertions,
+            runs_libtest_tests: &runs_libtest_tests,
             error_derive_crates: &self.vetted_crates.error_derive,
             error_runtime_crates: &self.vetted_crates.error_runtime,
             usages: &usages,

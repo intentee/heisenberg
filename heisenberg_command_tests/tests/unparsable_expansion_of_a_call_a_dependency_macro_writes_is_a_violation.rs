@@ -29,7 +29,7 @@ fn unparsable_expansion_of_a_call_a_dependency_macro_writes_is_a_violation() {
             syntax error at src/lib.rs:1:1: expected a name\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

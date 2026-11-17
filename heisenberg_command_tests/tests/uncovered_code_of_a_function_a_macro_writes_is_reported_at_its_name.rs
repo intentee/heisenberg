@@ -29,7 +29,7 @@ fn uncovered_code_of_a_function_a_macro_writes_is_reported_at_its_name() {
             not executed at src/lib.rs:4:50\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(1, 1, 5).as_str()
         ]

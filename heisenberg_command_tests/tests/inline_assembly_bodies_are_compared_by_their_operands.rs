@@ -35,7 +35,7 @@ fn inline_assembly_bodies_are_compared_by_their_operands() {
             unsafe {\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 2 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()
         ]

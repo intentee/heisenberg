@@ -1,3 +1,5 @@
+use clap::ValueEnum;
+
 use heisenberg_coverage_measurement::measured_code::MeasuredCode;
 use heisenberg_coverage_measurement::measured_coverage::MeasuredCoverage;
 use heisenberg_coverage_measurement::measured_function::MeasuredFunction;
@@ -5,13 +7,15 @@ use heisenberg_coverage_measurement::measured_region::MeasuredRegion;
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_project_model::configuration_list::ConfigurationList;
+use heisenberg_project_model::constants::SUPPORTED_RUST_VERSION;
 use heisenberg_project_model::run_scope::RunScope;
 
 use crate::analysis_contexts::AnalysisContexts;
+use crate::compliance_summary::ComplianceSummary;
 use crate::configuration_coverage::ConfigurationCoverage;
-use crate::constants::SUPPORTED_RUST_VERSION;
 use crate::issue::Issue;
 use crate::issue_report::IssueReport;
+use crate::issue_type::IssueType;
 use crate::rendered_report::RenderedReport;
 
 fn function_issue(MeasuredFunction { location, regions }: &MeasuredFunction) -> Option<Issue> {
@@ -89,6 +93,17 @@ impl CoverageReport {
         footer.push(format!(
             "Precondition: rustc {SUPPORTED_RUST_VERSION} compiles the workspace in the measured configuration, whose tests the coverage export records"
         ));
+
+        footer.extend(
+            ComplianceSummary::new_full(
+                &IssueType::value_variants()
+                    .iter()
+                    .copied()
+                    .filter(|issue_type| issue_type.measures_coverage())
+                    .collect::<Vec<IssueType>>(),
+            )
+            .summary_lines(),
+        );
 
         IssueReport {
             contexts: &AnalysisContexts::default(),

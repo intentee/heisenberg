@@ -26,7 +26,7 @@ fn entry_points_are_exempt_from_duplicated_function_bodies() {
             duplicate at beta/src/lib.rs:1:8\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(8, 8).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

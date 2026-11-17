@@ -26,7 +26,7 @@ fn invalid_macro_definition_is_a_violation() {
             macro_rules! invalid_definition {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated
                 .host_footer(1, 1)

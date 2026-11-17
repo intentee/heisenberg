@@ -27,6 +27,13 @@ impl NonProductionCode<'_, '_> {
     }
 
     #[must_use]
+    pub fn is_in_a_non_production_file(&self, node: &SyntaxNode) -> bool {
+        let file = self.original_file(node);
+
+        self.files.benchmark.contains(&file) || self.files.test.contains(&file)
+    }
+
+    #[must_use]
     pub fn is_test(&self, node: &SyntaxNode) -> bool {
         self.files.test.contains(&self.original_file(node)) || self.modules.contains(node)
     }

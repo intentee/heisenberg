@@ -1,4 +1,5 @@
 ---
+kind: directive
 paths:
   - "**/Makefile"
 ---
@@ -12,3 +13,5 @@ paths:
 - Keep all the real targets above phony targets.
 - Make sure each Makefile target has enough dependencies to be able to run from a clean state.
 - Make sure there are no scripts or logic like loops in Makefile.
+- Declare `.PHONY: target-name` on the line directly above each phony target, one declaration per target.
+- Use file paths as dependencies instead of phony aliases.

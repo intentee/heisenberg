@@ -1,13 +1,11 @@
-use std::collections::BTreeMap;
-use std::fs;
-use std::io;
-
 use ra_ap_paths::Utf8Path;
 use ra_ap_paths::Utf8PathBuf;
+use std::collections::BTreeMap;
 use toml::Table;
 
 use crate::constants::CLIPPY_CONFIGURATION_FILE;
 use crate::constants::CLIPPY_HIDDEN_CONFIGURATION_FILE;
+use crate::optional_text::optional_text;
 use crate::project_model_error::ProjectModelError;
 
 fn parse(file: Utf8PathBuf, text: &str) -> Result<ClippyConfigurationFile, ProjectModelError> {
@@ -21,14 +19,10 @@ fn parse(file: Utf8PathBuf, text: &str) -> Result<ClippyConfigurationFile, Proje
 }
 
 fn read(path: &Utf8Path) -> Result<Option<String>, ProjectModelError> {
-    match fs::read_to_string(path) {
-        Ok(text) => Ok(Some(text)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(source) => Err(ProjectModelError::ClippyConfigurationUnreadable {
-            path: path.as_std_path().to_path_buf(),
-            source,
-        }),
-    }
+    optional_text(path).map_err(|source| ProjectModelError::ClippyConfigurationUnreadable {
+        path: path.as_std_path().to_path_buf(),
+        source,
+    })
 }
 
 #[derive(Clone)]

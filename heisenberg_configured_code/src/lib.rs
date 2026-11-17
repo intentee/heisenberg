@@ -1,10 +1,14 @@
 pub mod ancestry;
 mod attribute_owner;
+pub mod conditional_attribute;
 pub mod configured_node;
+pub mod negated_atom;
 pub mod negated_configuration;
 pub mod non_production_code;
 pub mod non_production_files;
 mod production_options;
+pub mod test_mentions;
 pub mod test_module_code;
 pub mod test_modules;
+pub mod test_predicate;
 pub mod visit_active_metas;

@@ -31,7 +31,7 @@ fn non_test_item_in_an_integration_test_target_is_a_violation() {
             pub fn helpers() -> super::Library {\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -25,7 +25,7 @@ fn conversion_from_a_local_type_belongs_with_that_type() {
             impl From<SequenceLength> for u64 {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

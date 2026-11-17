@@ -155,7 +155,7 @@ impl DeclaredOutDirs<'_> {
                 package: package.to_owned(),
             }),
             [] => Err(ProjectModelError::OutDirPackageVersionUnresolved {
-                declared: version.clone(),
+                declared: Box::new(version.clone()),
                 manifest_path: self.manifest_path.to_path_buf(),
                 package: package.to_owned(),
                 resolved: named
@@ -171,7 +171,7 @@ impl DeclaredOutDirs<'_> {
                     .iter()
                     .map(|PackageDocument { metadata, .. }| metadata.id.repr.clone())
                     .collect(),
-                version: version.clone(),
+                version: Box::new(version.clone()),
             }),
         }
     }

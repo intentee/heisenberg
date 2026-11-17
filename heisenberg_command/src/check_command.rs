@@ -15,6 +15,7 @@ use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::clippy_requirements::ClippyRequirements;
 use heisenberg_project_model::configuration::Configuration;
+use heisenberg_project_model::dependency_requirements::DependencyRequirements;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::manifest_lint_allowances::ManifestLintAllowances;
 use heisenberg_project_model::nextest_requirements::NextestRequirements;
@@ -22,6 +23,8 @@ use heisenberg_project_model::nextest_review::NextestReview;
 use heisenberg_project_model::package_rules::PackageRules;
 use heisenberg_project_model::resolved_project::ResolvedProject;
 use heisenberg_project_model::run_scope::RunScope;
+use heisenberg_project_model::rust_versions::RustVersions;
+use heisenberg_project_model::rustfmt_requirements::RustfmtRequirements;
 
 use crate::check_report::CheckReport;
 use crate::configuration_analysis::ConfigurationAnalysis;
@@ -30,7 +33,7 @@ use crate::heisenberg_command_error::HeisenbergCommandError;
 use crate::nextest_presence_verdict::NextestPresenceVerdict;
 use crate::project_arguments::ProjectArguments;
 use crate::tool_review::ToolReview;
-use crate::unreachable_test_files::unreachable_test_files;
+use crate::unreachable_source_files::unreachable_source_files;
 
 fn empty_libraries(analyses: &[ConfigurationAnalysis]) -> BTreeSet<String> {
     let mut libraries: BTreeMap<&str, bool> = BTreeMap::new();
@@ -111,10 +114,19 @@ impl ConfigurationPipeline for CheckCommand {
         scope: &RunScope,
         _: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError> {
-        let test_directory_files = if scope.is_partial() {
+        let member_source_files = if scope.is_partial() {
             BTreeSet::new()
         } else {
-            project.files.under(&project.packages.test_directories)
+            project
+                .files
+                .member_sources(&project.packages.member_directories)
+        };
+        let build_script_output_files = if scope.is_partial() {
+            BTreeSet::new()
+        } else {
+            project
+                .files
+                .relative_paths(&project.build_script_output_files)
         };
         let confinement = project.packages.confinement.reach(&project.build);
 
@@ -125,6 +137,7 @@ impl ConfigurationPipeline for CheckCommand {
                 source: Box::new(source),
             })
             .map(|graphs| ConfigurationAnalysis {
+                build_script_output_files,
                 configuration: configuration.clone(),
                 confinement,
                 cycles: graphs
@@ -132,7 +145,7 @@ impl ConfigurationPipeline for CheckCommand {
                     .flat_map_iter(|graph| ModuleCycles { graph }.find())
                     .collect(),
                 graphs,
-                test_directory_files,
+                member_source_files,
             })
     }
 
@@ -177,6 +190,11 @@ impl ConfigurationPipeline for CheckCommand {
         }: &Self::Prerequisite,
     ) -> Self::Report {
         let nextest_presence = NextestPresenceVerdict::new(presence, &analyses, scope);
+        let module_files: BTreeSet<&String> = analyses
+            .iter()
+            .flat_map(|ConfigurationAnalysis { graphs, .. }| graphs)
+            .flat_map(|CrateModuleGraph { module_files, .. }| module_files)
+            .collect();
         let package_violations = clippy_violations
             .iter()
             .chain(nextest_violations)
@@ -186,7 +204,7 @@ impl ConfigurationPipeline for CheckCommand {
             .chain(if scope.is_partial() {
                 Vec::new()
             } else {
-                unreachable_test_files(&analyses)
+                unreachable_source_files(&analyses)
             })
             .chain(if scope.is_partial() {
                 Vec::new()
@@ -199,6 +217,25 @@ impl ConfigurationPipeline for CheckCommand {
             })
             .chain(
                 ManifestLintAllowances {
+                    resolved: &project.resolved,
+                }
+                .violations(),
+            )
+            .chain(
+                DependencyRequirements {
+                    resolved: &project.resolved,
+                }
+                .violations(),
+            )
+            .chain(
+                RustVersions {
+                    resolved: &project.resolved,
+                }
+                .violations(),
+            )
+            .chain(
+                RustfmtRequirements {
+                    module_files: &module_files,
                     resolved: &project.resolved,
                 }
                 .violations(),

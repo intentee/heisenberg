@@ -47,7 +47,7 @@ fn warned_clippy_lint_is_denied_only_under_denied_warnings() {
             - Cargo.toml: Package clippy_lint_warned_under_warned_warnings does not deny warnings\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(warned.status, HeisenbergExitStatus::Violations);

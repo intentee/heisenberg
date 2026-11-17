@@ -1,4 +1,5 @@
 ---
+kind: directive
 paths:
   - ".github/workflows/**/*"
 ---
@@ -12,3 +13,6 @@ paths:
 - Treat GitHub workflows as a coding project. Use composable actions, factor similar concerns into actions.
 - Encapsulate functionalities in composable actions.
 - Keep the workflows clean and purposeful.
+- Keep clippy, the tests and every other check as separate jobs; never merge jobs to save build time.
+- Pin every action to a full commit SHA or a version tag, never to a branch.
+- Each platform builds and tests its own target; never cross-compile.

@@ -16,6 +16,16 @@ const NESTED_PLATFORM_CODE: &str = "";
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const HOST_MODULES: usize = 2;
 
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const UNREACHABLE_SOURCE_FILES: &str = "UnreachableSourceFile: 3 violations\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const OTHER_PLATFORM_MODULE_FILE: &str =
+    "- src/windows_only.rs: Source file is a module file of no crate target\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const ERRORS: usize = 9;
+
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
 const OTHER_PLATFORM_MODULE: &str = "";
 
@@ -25,6 +35,15 @@ const NESTED_PLATFORM_CODE: &str = "- src/windows_only.rs:5:12: Code is active i
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
 const HOST_MODULES: usize = 3;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const UNREACHABLE_SOURCE_FILES: &str = "UnreachableSourceFile: 2 violations\n";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const OTHER_PLATFORM_MODULE_FILE: &str = "";
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const ERRORS: usize = 8;
 
 #[test]
 fn code_active_in_no_declared_configuration_is_a_violation() {
@@ -58,8 +77,15 @@ fn code_active_in_no_declared_configuration_is_a_violation() {
              return;\n\
              {NESTED_PLATFORM_CODE}\
              \n\
+             {UNREACHABLE_SOURCE_FILES}\
+             A source file that no target includes is never compiled or analysed, so its code and its tests never run and nothing reports it. Declare the file as a module of a crate target, or remove it.\n\
+             \n\
+             - src/configured_out.rs: Source file is a module file of no crate target\n\
+             - src/mac.rs: Source file is a module file of no crate target\n\
+             {OTHER_PLATFORM_MODULE_FILE}\
+             \n\
              ------------------------------\n\
-             6 errors found\n\
+             {ERRORS} errors found in 2 rules\n\
              ------------------------------\n\
              {footer}",
             footer = full_run_footer(1, HOST_MODULES)

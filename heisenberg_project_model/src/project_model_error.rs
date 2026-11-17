@@ -279,14 +279,14 @@ pub enum ProjectModelError {
         manifest_path: AbsPathBuf,
         package: String,
         packages: Vec<String>,
-        version: Version,
+        version: Box<Version>,
     },
     #[error(
         "`{manifest_path}` declares an out-dir for `{package}` {declared}, and the workspace resolves `{package}` {}: declare the build script output of the resolved version",
         resolved.join(", ")
     )]
     OutDirPackageVersionUnresolved {
-        declared: Version,
+        declared: Box<Version>,
         manifest_path: AbsPathBuf,
         package: String,
         resolved: Vec<String>,

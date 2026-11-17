@@ -25,7 +25,7 @@ fn public_item_named_after_its_module_is_its_item_wherever_it_is_written() {
             pub struct CardLayoutProps;\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

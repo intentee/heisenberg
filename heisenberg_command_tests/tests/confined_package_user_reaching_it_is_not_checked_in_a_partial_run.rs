@@ -62,7 +62,7 @@ fn confined_package_user_reaching_it_is_not_checked_in_a_partial_run() {
             - Cargo.toml: Confined package absent names no package that the workspace resolves\n\
             \n\
             ------------------------------\n\
-            11 errors found\n\
+            11 errors found in 5 rules\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Not analysed: {HOST_CONFIGURATION}-without-features\n\

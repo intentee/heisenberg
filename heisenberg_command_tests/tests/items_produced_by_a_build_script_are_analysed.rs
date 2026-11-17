@@ -27,7 +27,7 @@ fn items_produced_by_a_build_script_are_analysed() {
             pub struct Item;\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

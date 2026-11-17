@@ -30,7 +30,7 @@ fn name_bound_by_an_unresolved_import_belongs_to_the_import_issue() {
             fn unknown(_value: Unknown) {}\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()
         ]

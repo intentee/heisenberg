@@ -34,7 +34,7 @@ fn library_with_only_inactive_items_is_empty() {
             could move without a dependency cycle to library\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", full_run_footer(3, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

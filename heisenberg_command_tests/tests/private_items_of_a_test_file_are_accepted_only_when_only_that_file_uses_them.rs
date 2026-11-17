@@ -36,7 +36,7 @@ fn private_items_of_a_test_file_are_accepted_only_when_only_that_file_uses_them(
             test \"unused_helper\"\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 2 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(4, 5).as_str()
         ]

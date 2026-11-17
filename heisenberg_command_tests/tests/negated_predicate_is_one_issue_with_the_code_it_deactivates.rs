@@ -29,7 +29,7 @@ fn negated_predicate_is_one_issue_with_the_code_it_deactivates() {
             code active in no declared configuration at src/lib.rs:7:8\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", full_run_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

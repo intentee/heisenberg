@@ -25,7 +25,7 @@ fn impl_of_a_local_trait_object_belongs_beside_its_trait() {
             impl dyn ManagedProcess {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

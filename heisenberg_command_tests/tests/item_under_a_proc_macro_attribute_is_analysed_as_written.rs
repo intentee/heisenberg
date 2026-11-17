@@ -30,7 +30,7 @@ fn item_under_a_proc_macro_attribute_is_analysed_as_written() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -1,3 +1,7 @@
+---
+kind: directive
+---
+
 # Declared Inputs and Determinism
 
 - Every source file, build input, and supported configuration must be explicitly accounted for. Anything that introduces ambiguity, depends on undeclared inputs, or prevents reliable analysis must result in a hard error.

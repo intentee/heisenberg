@@ -2,14 +2,19 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::module_path::ModulePath;
 use crate::untyped_error_name::UntypedErrorName;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorViolation {
     Handwritten,
+    HandwrittenDisplay,
     MacroGenerated,
+    MessageFunction,
+    MessageOnTheEnum,
     MultipleTypes { count: usize },
     NotAnEnum,
+    OutsideItsModule { module: ModulePath },
     SourceInMessage,
     SourceOutsideChain,
     UntypedResult { error: UntypedErrorName },
@@ -19,6 +24,19 @@ impl Display for ErrorViolation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Handwritten => formatter.write_str("Error type is implemented by hand"),
+            Self::HandwrittenDisplay => {
+                formatter.write_str("Error type formats its message by hand")
+            }
+            Self::MessageFunction => {
+                formatter.write_str("Error message is formatted by a function")
+            }
+            Self::MessageOnTheEnum => {
+                formatter.write_str("Error message is written on the enum instead of its variants")
+            }
+            Self::OutsideItsModule { module } => write!(
+                formatter,
+                "Error type is defined in {module} instead of a module file named after it"
+            ),
             Self::MacroGenerated => formatter
                 .write_str("Error type is implemented by a macro other than thiserror::Error"),
             Self::MultipleTypes { count } => {

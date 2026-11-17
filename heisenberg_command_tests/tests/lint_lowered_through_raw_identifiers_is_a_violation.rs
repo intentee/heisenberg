@@ -27,7 +27,7 @@ fn lint_lowered_through_raw_identifiers_is_a_violation() {
             #[warn(r#clippy::r#pedantic)]\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

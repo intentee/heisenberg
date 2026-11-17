@@ -49,7 +49,7 @@ fn mutually_exclusive_features_are_analysed_in_separate_configurations() {
             crate::shared::session uses crate::shared::loader at src/shared/session.rs:5:9\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}-shared: 1 crate targets, 4 modules\n\
             Analysed on {HOST_CONFIGURATION}-static: 1 crate targets, 4 modules\n\

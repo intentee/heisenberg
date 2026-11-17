@@ -25,7 +25,7 @@ fn unvetted_clippy_setting_is_a_violation() {
             - clippy.toml: Clippy configuration sets too-many-lines-threshold, which Heisenberg has not vetted\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

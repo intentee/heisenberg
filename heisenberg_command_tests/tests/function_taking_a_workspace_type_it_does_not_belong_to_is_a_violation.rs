@@ -33,7 +33,7 @@ fn function_taking_a_workspace_type_it_does_not_belong_to_is_a_violation() {
             fn line_count(Report { lines }: &Report) -> u8 {\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 8).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

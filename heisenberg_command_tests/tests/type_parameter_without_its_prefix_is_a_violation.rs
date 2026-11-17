@@ -27,7 +27,7 @@ fn type_parameter_without_its_prefix_is_a_violation() {
             pub struct Pair<Node, Tx> {\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

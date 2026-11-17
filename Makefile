@@ -119,13 +119,15 @@ fetch:
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmark_target_excluded_from_benchmarks/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmark_target_run_by_tests/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/benchmarks_package_without_libraries/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/dependency_requirement_of_a_root_package/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/dependency_requirements/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/error_messages_and_modules/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/error_types/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/error_types_in_test_code/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/every_target_kind/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/function_used_only_by_benchmarks/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/must_use_benchmark_output/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/non_benchmark_item_in_benchmark_target/Cargo.toml
-	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/serialization_round_trip_tests/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/tests_and_benchmarks_package_without_libraries/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/undetermined_benchmark_output/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/unvetted_criterion_method/Cargo.toml

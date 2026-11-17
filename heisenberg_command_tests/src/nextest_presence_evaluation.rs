@@ -20,11 +20,22 @@ impl NextestPresenceEvaluation {
     #[must_use]
     pub fn partial_run_footer_end(self) -> String {
         format!(
-            "Not evaluated in a partial run: CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt, {}UnreachableTestFile, the empty-library checks of TestsOnlyPackageWithoutTestLibraries and BenchmarksOnlyPackageWithoutLibraries\n\
-            Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration\n",
+            "Not evaluated in a partial run: AttributeAppliedInNoConfiguration, CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt, {}UnreachableSourceFile, VacuousNegatedConfiguration\n\
+            Evaluated in part in a partial run: BenchmarksOnlyPackageWithoutLibraries, TestsOnlyPackageWithoutTestLibraries\n\
+            Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration\n\
+            Rules: {} evaluated, 2 evaluated in part, {} not evaluated\n\
+            Heisenberg 0.1.0\n",
             match self {
                 Self::Evaluated => "",
                 Self::NotEvaluated => "NextestConfigurationMissing, UnneededNextestConfiguration, ",
+            },
+            match self {
+                Self::Evaluated => 99,
+                Self::NotEvaluated => 97,
+            },
+            match self {
+                Self::Evaluated => 5,
+                Self::NotEvaluated => 7,
             }
         )
     }

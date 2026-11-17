@@ -28,8 +28,13 @@ fn negated_predicate_of_a_configured_out_module_file_is_reported_at_its_declarat
             pub mod gated;\n      \
             code active in no declared configuration at src/lib.rs:1:9\n\
             \n\
+            UnreachableSourceFile: 1 violation\n\
+            A source file that no target includes is never compiled or analysed, so its code and its tests never run and nothing reports it. Declare the file as a module of a crate target, or remove it.\n\
+            \n\
+            - src/gated.rs: Source file is a module file of no crate target\n\
+            \n\
             ------------------------------\n\
-            1 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", full_run_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

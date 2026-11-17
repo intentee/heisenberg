@@ -6,6 +6,7 @@ use cargo::workspace::Package;
 use cargo::workspace::PackageId;
 use cargo::workspace::Target;
 use cargo::workspace::Workspace;
+use cargo_util_schemas::manifest::InheritableField;
 use cargo_util_schemas::manifest::InheritableLints;
 use cargo_util_schemas::manifest::TomlManifest;
 use serde_json::from_value;
@@ -17,6 +18,7 @@ use crate::absolute_utf8_path::absolute_utf8_path;
 use crate::dependency_document::DependencyDocument;
 use crate::dependency_kind_document::DependencyKindDocument;
 use crate::lints_source::LintsSource;
+use crate::manifest_dependencies::ManifestDependencies;
 use crate::package_document::PackageDocument;
 use crate::project_model_error::ProjectModelError;
 use crate::workspace_document::WorkspaceDocument;
@@ -75,6 +77,27 @@ impl CargoMetadataDocument<'_, '_> {
                                 },
                                 metadata,
                                 metadata_json,
+                                rust_version_source: if package
+                                    .manifest()
+                                    .original_toml()
+                                    .and_then(|TomlManifest { package, .. }| package.as_ref())
+                                    .and_then(|package| package.rust_version.as_ref())
+                                    .is_some_and(InheritableField::is_inherited)
+                                {
+                                    LintsSource::Workspace
+                                } else {
+                                    LintsSource::Package
+                                },
+                                unpinned_dependencies: package
+                                    .manifest()
+                                    .original_toml()
+                                    .filter(|_| self.workspace.is_member(package))
+                                    .map_or_else(Vec::new, |manifest| {
+                                        ManifestDependencies { manifest }.unpinned()
+                                    }),
+                                written_rust_version: package
+                                    .rust_version()
+                                    .map(ToString::to_string),
                             })
                         })
                         .map_err(|source| {
@@ -101,6 +124,13 @@ impl CargoMetadataDocument<'_, '_> {
                 ProjectModelError::RelativeTargetDirectory,
             )
             .map(|target_directory| WorkspaceDocument {
+                unpinned_dependencies: self
+                    .workspace
+                    .root_maybe()
+                    .original_toml()
+                    .map_or_else(Vec::new, |manifest| {
+                        ManifestDependencies { manifest }.unpinned()
+                    }),
                 default_members: self
                     .workspace
                     .default_members()

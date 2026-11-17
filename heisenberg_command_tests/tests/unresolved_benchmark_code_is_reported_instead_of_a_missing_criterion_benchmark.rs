@@ -35,7 +35,7 @@ fn unresolved_benchmark_code_is_reported_instead_of_a_missing_criterion_benchmar
             use criterion::Criterion;\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            4 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

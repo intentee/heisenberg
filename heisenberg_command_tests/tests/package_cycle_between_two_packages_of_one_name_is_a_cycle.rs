@@ -24,7 +24,7 @@ fn package_cycle_between_two_packages_of_one_name_is_a_cycle() {
             - Cargo.toml: Packages twin v0.1.0, twin v0.2.0 depend on each other through dev-dependencies\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

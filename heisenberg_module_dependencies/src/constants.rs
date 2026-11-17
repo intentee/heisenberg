@@ -1,12 +1,8 @@
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
-pub const DESERIALIZE_OWNED_TRAIT_PATH: [&str; 2] = ["de", "DeserializeOwned"];
-
-pub const DESERIALIZE_TRAIT_PATH: [&str; 2] = ["de", "Deserialize"];
-
-pub const EQUALITY_ASSERTION_MACROS: [&str; 2] = ["assert_eq", "debug_assert_eq"];
-
 pub const ERROR_DISPLAY_METHOD: &str = "as_display";
+
+pub const ERROR_MESSAGE_FUNCTION: &str = "fmt";
 
 pub const ERROR_MESSAGE_HELPER: &str = "error";
 
@@ -18,16 +14,9 @@ pub const ERROR_TRAIT_PATH: [&str; 2] = ["error", "Error"];
 
 pub const LIFETIME_PREFIX: char = '\'';
 
-pub const ROUND_TRIP_TRANSPARENT_METHODS: [&str; 5] =
-    ["as_bytes", "as_slice", "as_str", "expect", "unwrap"];
+pub const OWNED_BOX_PATH: [&str; 2] = ["boxed", "Box"];
 
-pub const SERIALIZE_TRAIT_PATH: [&str; 2] = ["ser", "Serialize"];
-
-pub const STANDARD_SLEEP_MS_PATH: [&str; 2] = ["thread", "sleep_ms"];
-
-pub const STANDARD_SLEEP_PATH: [&str; 2] = ["thread", "sleep"];
-
-pub const TEXT_DECODING_METHOD: &str = "parse";
+pub const TEST_MODULE_NAME: &str = "tests";
 
 pub const TRANSPARENT_ERROR_MESSAGE: &str = "transparent";
 

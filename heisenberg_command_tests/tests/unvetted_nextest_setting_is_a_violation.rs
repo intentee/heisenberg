@@ -27,7 +27,7 @@ fn unvetted_nextest_setting_is_a_violation() {
             - .config/nextest.toml: Nextest configuration sets store, which Heisenberg has not vetted\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            4 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -41,7 +41,7 @@ fn issue_holding_in_only_some_crates_names_them() {
             test \"second\"\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 3 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(4, 7).as_str()
         ]

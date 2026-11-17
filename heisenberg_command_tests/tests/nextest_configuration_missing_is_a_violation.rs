@@ -25,7 +25,7 @@ fn nextest_configuration_missing_is_a_violation() {
             - Cargo.toml: Workspace has no .config/nextest.toml\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(1, 2).as_str()
         ]

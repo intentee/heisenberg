@@ -39,7 +39,7 @@ fn cycle_behind_a_selected_feature_is_found() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 1 crate targets, 3 modules\n\
             Not analysed: {LEFT_OUT_CONFIGURATIONS}\n\

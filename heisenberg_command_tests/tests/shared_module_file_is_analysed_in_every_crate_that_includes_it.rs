@@ -57,7 +57,7 @@ fn shared_module_file_is_analysed_in_every_crate_that_includes_it() {
             test \"second\"\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 4 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(3, 9).as_str()
         ]

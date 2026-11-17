@@ -27,7 +27,7 @@ fn path_into_a_build_script_shaped_dependency_module_is_unresolved() {
             also unresolved at src/lib.rs:2:5\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()
         ]

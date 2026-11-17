@@ -31,7 +31,7 @@ fn build_script_and_analysis_see_the_same_selected_features() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             {footer}", footer = NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4)).as_str())
     );

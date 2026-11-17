@@ -34,7 +34,7 @@ fn paths_written_inside_an_own_macro_are_checked() {
             let _item = configured_item!();\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", full_run_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

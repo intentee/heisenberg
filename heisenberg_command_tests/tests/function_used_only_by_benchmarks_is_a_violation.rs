@@ -18,14 +18,14 @@ fn function_used_only_by_benchmarks_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["FunctionUsedOnlyByBenchmarks: 1 violation\n\
-            Production code holds only what production uses. Move a function that only benchmarks use, or benchmarks and tests, into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
+        Ok(["ItemUsedOnlyByBenchmarks: 1 violation\n\
+            Production code holds only what production uses. Move an item that only benchmarks use, or benchmarks and tests, into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
             \n\
             - src/lib.rs:2:8: Function is used only by benchmarks, or by benchmarks and tests\n    \
             pub fn sum(limit: u64) -> u64 {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

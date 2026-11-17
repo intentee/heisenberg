@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::io;
 use std::num::ParseIntError;
 
@@ -25,6 +26,8 @@ pub enum LookupFailure {
     Field { source: ParseIntError },
     #[error("the record has {} characters", .source.to_string().len())]
     Record { source: ParseIntError },
+    #[error("the text cannot be parsed: {}", .source.to_string())]
+    Text { source: ParseIntError },
     #[error("the line is beyond {}", LIMIT)]
     Line { source: ParseIntError },
     #[error("the column {} cannot be parsed", .position.saturating_add(1))]
@@ -57,4 +60,8 @@ pub enum LookupFailure {
     },
     #[error("the reason is lost: {reason}")]
     Reason { reason: io::Error },
+    #[error("the optional cause is lost")]
+    Optional { cause: Option<io::Error> },
+    #[error("the erased cause is lost")]
+    Erased { cause: Box<dyn Error + Send + Sync> },
 }

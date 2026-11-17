@@ -36,7 +36,7 @@ fn path_in_an_included_file_closes_a_cycle_at_the_include() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

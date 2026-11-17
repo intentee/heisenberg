@@ -20,11 +20,14 @@ fn explain_prints_the_definition_and_the_purpose_of_a_rule() {
 
     assert_eq!(
         str::from_utf8(&output),
-        Ok("GlobImport: A glob import\n\
+        Ok("Rule 5.2 GlobImport: A glob import\n\
+        Section 5, Modules and items. Scope: module file. Evaluated in each analysed configuration.\n\
         \n\
         A glob import.\n\
         \n\
-        Glob imports hide where names come from. Import each name explicitly.\n\
+        Rationale: Glob imports hide where names come from.\n\
+        \n\
+        Remedy: Import each name explicitly.\n\
         ")
     );
     assert_eq!(errors, b"");

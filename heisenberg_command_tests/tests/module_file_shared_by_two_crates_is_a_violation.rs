@@ -34,7 +34,7 @@ fn module_file_shared_by_two_crates_is_a_violation() {
             test \"second\"\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(3, 5).as_str()
         ]

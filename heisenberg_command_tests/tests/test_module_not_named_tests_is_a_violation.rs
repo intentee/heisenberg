@@ -1,0 +1,32 @@
+use std::str;
+
+use heisenberg_command::heisenberg_exit_status::HeisenbergExitStatus;
+use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
+use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
+use heisenberg_command_tests::nextest_presence_evaluation::NextestPresenceEvaluation;
+
+#[test]
+fn test_module_not_named_tests_is_a_violation() {
+    let outcome = HeisenbergCheck {
+        workspace: &FixtureWorkspace {
+            name: "test_module_not_named_tests",
+        }
+        .path(),
+    }
+    .run()
+    .expect("the arguments must parse");
+
+    assert_eq!(
+        str::from_utf8(&outcome.output),
+        Ok(["TestModuleNotNamedTests: 1 violation\n\
+            One name marks the unit tests of every file, so they are found without reading attributes. Name the module tests, and merge the test modules of a file into it.\n\
+            \n\
+            - src/lib.rs:4:5: Test module is not named tests\n    \
+            mod checks {\n\
+            \n\
+            ------------------------------\n\
+            1 errors found in 1 rule\n\
+            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 2).as_str()].concat().as_str())
+    );
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
+}

@@ -24,13 +24,18 @@ fn explain_names_the_nextest_limits() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "NextestTimeoutNotEnforced: A nextest profile whose slow-timeout exceeds the limits\n\
+            "Rule 8.5 NextestTimeoutNotEnforced: A nextest profile whose slow-timeout exceeds the limits\n\
+        Section 8, Tests. Scope: workspace. Evaluated in each analysed configuration.\n\
         \n\
         A nextest profile whose slow-timeout flags a test as slow later than the slow limit, terminates it later than the termination limit or never, or counts a timed out test as passing. The default profile sets a slow-timeout, since the one nextest ships never terminates a test, and a profile that sets none inherits the slow-timeout of its parent.\n\
         \n\
         Limits: slow after at most 10s, terminated after at most 20s\n\
         \n\
-        A test that runs longer than the limits shows slow code or a slow test. Make the code and the test faster instead of relaxing the timeout.\n\
+        Rationale: A test that runs longer than the limits shows slow code or a slow test.\n\
+        \n\
+        Remedy: Make the code and the test faster instead of relaxing the timeout.\n\
+        \n\
+        See also: NextestConfigurationMissing, NextestOverride, UnneededNextestConfiguration, UnvettedNextestSetting\n\
         "
         )
     );

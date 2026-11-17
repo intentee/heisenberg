@@ -37,7 +37,7 @@ fn visibility_is_decided_semantically() {
             pub(crate) use std::fmt::Write;\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 3 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

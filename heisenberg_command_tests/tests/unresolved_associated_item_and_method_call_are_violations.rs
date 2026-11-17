@@ -35,7 +35,7 @@ fn unresolved_associated_item_and_method_call_are_violations() {
             missing_function().unknown();\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            4 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -24,7 +24,7 @@ fn package_depending_on_itself_is_a_violation() {
             - Cargo.toml: Package package_depending_on_itself v0.1.0 depends on itself through dev-dependencies\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

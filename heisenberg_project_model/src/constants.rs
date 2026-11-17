@@ -1,14 +1,45 @@
 use std::time::Duration;
 
+use cargo_metadata::semver::Version;
+
 use crate::harness_methods::HarnessMethods;
 use crate::lint_tool::LintTool;
 use crate::required_clippy_setting::RequiredClippySetting;
 use crate::required_lint::RequiredLint;
 use crate::supported_target::SupportedTarget;
 
-pub const SERIALIZATION_PACKAGES: [&str; 2] = ["serde", "serde_core"];
+pub const SUPPORTED_RUST_VERSION: Version = Version::new(1, 99, 1);
 
-pub const TESTS_DIRECTORY: &str = "tests";
+pub const VETTED_RUSTFMT_SETTINGS: [&str; 28] = [
+    "array_width",
+    "attr_fn_like_width",
+    "chain_width",
+    "edition",
+    "fn_args_layout",
+    "fn_call_width",
+    "fn_params_layout",
+    "force_explicit_abi",
+    "hard_tabs",
+    "hex_literal_case",
+    "match_arm_leading_pipes",
+    "match_block_trailing_comma",
+    "max_width",
+    "merge_derives",
+    "newline_style",
+    "remove_nested_parens",
+    "reorder_imports",
+    "reorder_modules",
+    "short_array_element_width_threshold",
+    "single_line_if_else_max_width",
+    "single_line_let_else_max_width",
+    "struct_lit_width",
+    "struct_variant_width",
+    "style_edition",
+    "tab_spaces",
+    "use_field_init_shorthand",
+    "use_small_heuristics",
+    "use_try_shorthand",
+];
 
 pub const SUPPORTED_TARGETS: [SupportedTarget; 3] = [
     SupportedTarget::AArch64AppleDarwin,
@@ -227,6 +258,12 @@ pub const RESTRICTING_CLIPPY_SETTINGS: [&str; 5] = [
 ];
 
 pub const RUSTC_VARIABLE: &str = "RUSTC";
+
+pub const RUST_SOURCE_EXTENSION: &str = "rs";
+
+pub const RUSTFMT_CONFIGURATION_FILE: &str = "rustfmt.toml";
+
+pub const RUSTFMT_HIDDEN_CONFIGURATION_FILE: &str = ".rustfmt.toml";
 
 pub const RUSTDOC_VARIABLE: &str = "RUSTDOC";
 

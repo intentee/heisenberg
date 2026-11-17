@@ -10,6 +10,8 @@ pub const CARGO_HOME_VARIABLE: &str = "HEISENBERG_CARGO_HOME";
 
 pub const CARGO_TARGET_DIRECTORY_KEY: &str = "target-dir";
 
+pub const CATALOGUE_SUBCOMMAND: &str = "catalogue";
+
 pub const CHECK_SUBCOMMAND: &str = "check";
 
 pub const CONFIGURATION_ARGUMENT: &str = "--configuration";
@@ -20,7 +22,7 @@ pub const COVERAGE_EXPORT_ARGUMENT: &str = "--coverage-export";
 
 pub const COVERAGE_EXPORT_FILE: &str = "llvm-cov.json";
 
-pub const COVERAGE_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in the measured configuration, whose tests the coverage export records\n";
+pub const COVERAGE_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in the measured configuration, whose tests the coverage export records\nRules: 2 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
 
 pub const EXPLAIN_SUBCOMMAND: &str = "explain";
 
@@ -52,8 +54,7 @@ pub const FIRST_REGION_KIND_POINTER: &str = "/data/0/functions/0/regions/0/7";
 
 pub const FIRST_REGION_LINE_POINTER: &str = "/data/0/functions/0/regions/0/0";
 
-pub const FULL_RUN_FOOTER_END: &str =
-    "Precondition: rustc 1.99.1 compiles the workspace in every declared configuration\n";
+pub const FULL_RUN_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in every declared configuration\nRules: 106 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
 
 pub const FUNCTION_FIRST_FILE_POINTER: &str = "/filenames/0";
 

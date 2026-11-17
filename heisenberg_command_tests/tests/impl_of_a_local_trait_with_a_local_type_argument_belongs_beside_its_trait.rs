@@ -25,7 +25,7 @@ fn impl_of_a_local_trait_with_a_local_type_argument_belongs_beside_its_trait() {
             impl Convert<Local> for u32 {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

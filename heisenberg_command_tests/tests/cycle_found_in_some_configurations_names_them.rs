@@ -39,7 +39,7 @@ fn cycle_found_in_some_configurations_names_them() {
             crate::second uses crate::first at src/second.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 1 crate targets, 3 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 1 crate targets, 3 modules\n\

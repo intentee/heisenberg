@@ -57,7 +57,7 @@ fn shared_module_file_names_the_platforms_it_is_shared_on() {
              crate::support in module_file_shared_on_some_platforms test \"first\"\n\
              \n\
              ------------------------------\n\
-             {ERRORS} errors found\n\
+             {ERRORS} errors found in 1 rule\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::Evaluated.host_footer(3, HOST_MODULES)

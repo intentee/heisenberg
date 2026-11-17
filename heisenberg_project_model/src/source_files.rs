@@ -14,6 +14,8 @@ use ra_ap_vfs::VfsPath;
 
 use heisenberg_task_graph::once_map::OnceMap;
 
+use crate::constants::CARGO_MANIFEST_FILE;
+use crate::constants::RUST_SOURCE_EXTENSION;
 use crate::project_model_error::ProjectModelError;
 use crate::source_file::SourceFile;
 use crate::workspace_path::WorkspacePath;
@@ -91,14 +93,38 @@ impl SourceFiles {
     }
 
     #[must_use]
-    pub fn under(&self, directories: &[AbsPathBuf]) -> BTreeSet<String> {
+    pub fn member_sources(&self, member_directories: &[AbsPathBuf]) -> BTreeSet<String> {
+        let package_directories: BTreeSet<&Utf8Path> = self
+            .files
+            .values()
+            .filter(|SourceFile { path, .. }| path.file_name() == Some(CARGO_MANIFEST_FILE))
+            .filter_map(|SourceFile { path, .. }| AsRef::<Utf8Path>::as_ref(path).parent())
+            .chain(member_directories.iter().map(AsRef::<Utf8Path>::as_ref))
+            .collect();
+
         self.files
             .values()
             .filter(|SourceFile { path, .. }| {
-                directories
-                    .iter()
-                    .any(|directory| path.starts_with(directory))
+                path.extension() == Some(RUST_SOURCE_EXTENSION)
+                    && AsRef::<Utf8Path>::as_ref(path)
+                        .ancestors()
+                        .skip(1)
+                        .find(|directory| package_directories.contains(directory))
+                        .is_some_and(|package_directory| {
+                            member_directories.iter().any(|member_directory| {
+                                AsRef::<Utf8Path>::as_ref(member_directory) == package_directory
+                            })
+                        })
             })
+            .map(|SourceFile { relative_path, .. }| relative_path.clone())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn relative_paths(&self, files: &BTreeSet<FileId>) -> BTreeSet<String> {
+        files
+            .iter()
+            .filter_map(|file_id| self.files.get(file_id))
             .map(|SourceFile { relative_path, .. }| relative_path.clone())
             .collect()
     }

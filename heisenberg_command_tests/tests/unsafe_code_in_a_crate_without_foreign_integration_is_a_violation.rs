@@ -31,7 +31,7 @@ fn unsafe_code_in_a_crate_without_foreign_integration_is_a_violation() {
             pub const unsafe fn unchecked() -> u8 {\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            4 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

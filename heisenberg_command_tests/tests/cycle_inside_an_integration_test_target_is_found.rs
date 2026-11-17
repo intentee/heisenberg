@@ -45,7 +45,7 @@ fn cycle_inside_an_integration_test_target_is_found() {
             pub fn back() {\n\
             \n\
             ------------------------------\n\
-            5 errors found\n\
+            5 errors found in 3 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

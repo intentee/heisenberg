@@ -37,7 +37,7 @@ fn module_file_skipped_in_some_configurations_names_them() {
             crate::third in module_file_skipped_in_some_configurations lib (only on {HOST_CONFIGURATION}-late), not analysed: the crate already analyses the file as crate::second\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}-early: 1 crate targets, 3 modules\n\
             Analysed on {HOST_CONFIGURATION}-late: 1 crate targets, 3 modules\n\

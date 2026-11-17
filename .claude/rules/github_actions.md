@@ -1,4 +1,5 @@
 ---
+kind: directive
 paths:
   - ".github/actions/**/*"
 ---

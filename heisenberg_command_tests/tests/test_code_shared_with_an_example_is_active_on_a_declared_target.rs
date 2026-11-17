@@ -30,7 +30,7 @@ fn test_code_shared_with_an_example_is_active_on_a_declared_target() {
              crate::support in test_code_shared_with_an_example test \"first\"\n\
              \n\
              ------------------------------\n\
-             1 errors found\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n",
             full_run_footer(3, 5).as_str()
         ]

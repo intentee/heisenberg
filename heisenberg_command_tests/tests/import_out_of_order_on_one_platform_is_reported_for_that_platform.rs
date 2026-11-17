@@ -33,7 +33,7 @@ fn import_out_of_order_on_one_platform_is_reported_for_that_platform() {
              {PLATFORM_IMPORT}\
              \n\
              ------------------------------\n\
-             1 errors found\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2)

@@ -29,7 +29,7 @@ fn lint_table_inherited_from_the_workspace_is_reported_once_at_the_workspace_man
             - Cargo.toml: Workspace does not deny clippy::panic\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

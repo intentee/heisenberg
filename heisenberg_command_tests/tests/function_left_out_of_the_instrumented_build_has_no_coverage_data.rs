@@ -30,7 +30,7 @@ fn function_left_out_of_the_instrumented_build_has_no_coverage_data() {
             pub fn uninstrumented() -> u32 {\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(1, 3, 3).as_str()
         ]

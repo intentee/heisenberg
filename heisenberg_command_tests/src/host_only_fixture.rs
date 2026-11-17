@@ -1,6 +1,7 @@
 use std::fs;
 use std::fs::DirEntry;
 use std::fs::File;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -15,7 +16,6 @@ use crate::constants::CARGO_CONFIGURATION_FILE;
 use crate::constants::CARGO_TARGET_DIRECTORY_KEY;
 use crate::constants::HOST_ONLY_BUILDS_DIRECTORY;
 use crate::constants::HOST_TRIPLE;
-use crate::failure_in::failure_in;
 use crate::fixture_configuration::FixtureConfiguration;
 use crate::fixture_out_dir::FixtureOutDir;
 use crate::fixture_workspace::FixtureWorkspace;
@@ -27,14 +27,20 @@ fn copied_entry(entry: &DirEntry, destination: &Path) -> Result<(), HeisenbergCh
 
     entry
         .file_type()
-        .map_err(failure_in(entry.path(), HeisenbergCheckError::FixtureCopy))
+        .map_err(|source| HeisenbergCheckError::FixtureCopy {
+            path: entry.path(),
+            source,
+        })
         .and_then(|file_type| {
             if file_type.is_dir() {
                 copied_directory(&entry.path(), &copy)
             } else {
                 fs::copy(entry.path(), &copy)
                     .map(drop)
-                    .map_err(failure_in(entry.path(), HeisenbergCheckError::FixtureCopy))
+                    .map_err(|source| HeisenbergCheckError::FixtureCopy {
+                        path: entry.path(),
+                        source,
+                    })
                     .and_then(|()| preserved_timestamp(&entry.path(), &copy))
             }
         })
@@ -42,23 +48,23 @@ fn copied_entry(entry: &DirEntry, destination: &Path) -> Result<(), HeisenbergCh
 
 fn copied_directory(source: &Path, destination: &Path) -> Result<(), HeisenbergCheckError> {
     fs::create_dir(destination)
-        .map_err(failure_in(
-            destination.to_path_buf(),
-            HeisenbergCheckError::FixtureCopy,
-        ))
+        .map_err(|source| HeisenbergCheckError::FixtureCopy {
+            path: destination.to_path_buf(),
+            source,
+        })
         .and_then(|()| {
-            fs::read_dir(source).map_err(failure_in(
-                source.to_path_buf(),
-                HeisenbergCheckError::FixtureCopy,
-            ))
+            fs::read_dir(source).map_err(|error| HeisenbergCheckError::FixtureCopy {
+                path: source.to_path_buf(),
+                source: error,
+            })
         })
         .and_then(|entries| {
             entries.into_iter().try_for_each(|entry| {
                 entry
-                    .map_err(failure_in(
-                        source.to_path_buf(),
-                        HeisenbergCheckError::FixtureCopy,
-                    ))
+                    .map_err(|error| HeisenbergCheckError::FixtureCopy {
+                        path: source.to_path_buf(),
+                        source: error,
+                    })
                     .and_then(|entry| copied_entry(&entry, destination))
             })
         })
@@ -73,10 +79,22 @@ fn preserved_timestamp(source: &Path, copy: &Path) -> Result<(), HeisenbergCheck
                 .open(copy)
                 .and_then(|file| file.set_modified(modified))
         })
-        .map_err(failure_in(
-            source.to_path_buf(),
-            HeisenbergCheckError::FixtureTimestamp,
-        ))
+        .map_err(|error| HeisenbergCheckError::FixtureTimestamp {
+            path: source.to_path_buf(),
+            source: error,
+        })
+}
+
+fn removed_out_dir(directory: &Path) -> Result<(), HeisenbergCheckError> {
+    match fs::remove_dir_all(directory) {
+        Err(source) if source.kind() != ErrorKind::NotFound => {
+            Err(HeisenbergCheckError::FixtureOutDirRemoval {
+                path: directory.to_path_buf(),
+                source,
+            })
+        }
+        _ => Ok(()),
+    }
 }
 
 fn written_cargo_configuration(
@@ -108,10 +126,12 @@ fn written_cargo_configuration(
         .and_then(|text| {
             fs::create_dir(&directory)
                 .and_then(|()| fs::write(&file, text))
-                .map_err(failure_in(
-                    file.clone(),
-                    HeisenbergCheckError::FixtureCargoConfigurationWrite,
-                ))
+                .map_err(
+                    |source| HeisenbergCheckError::FixtureCargoConfigurationWrite {
+                        path: file.clone(),
+                        source,
+                    },
+                )
         })
         .and_then(|()| preserved_timestamp(timestamp_source, &file))
 }
@@ -136,10 +156,10 @@ fn host_configuration(
             target
                 .try_into::<String>()
                 .map_err(Box::new)
-                .map_err(failure_in(
-                    context.clone(),
-                    HeisenbergCheckError::FixtureConfigurationTarget,
-                ))
+                .map_err(|source| HeisenbergCheckError::FixtureConfigurationTarget {
+                    configuration: context.clone(),
+                    source,
+                })
         })
         .and_then(move |target| {
             table
@@ -151,10 +171,10 @@ fn host_configuration(
                 .and_then(|name| {
                     name.try_into::<String>()
                         .map_err(Box::new)
-                        .map_err(failure_in(
-                            context,
-                            HeisenbergCheckError::FixtureConfigurationName,
-                        ))
+                        .map_err(|source| HeisenbergCheckError::FixtureConfigurationName {
+                            configuration: context,
+                            source,
+                        })
                 })
                 .map(move |name| {
                     (target == HOST_TRIPLE).then_some(HostConfiguration { name, table })
@@ -172,16 +192,25 @@ fn host_out_dir(
         .clone()
         .try_into::<Table>()
         .map_err(Box::new)
-        .map_err(failure_in(
-            FixtureOutDir {
+        .map_err(|source| HeisenbergCheckError::FixtureOutDirConfigurations {
+            out_dir: FixtureOutDir {
                 manifest_path: manifest_path.to_path_buf(),
                 package: package.to_owned(),
             },
-            HeisenbergCheckError::FixtureOutDirConfigurations,
-        ))
-        .map(|mut declared| {
-            declared.retain(|name, _| host_names.iter().any(|host_name| host_name == name));
-            out_dir["configurations"] = Value::Table(declared);
+            source,
+        })
+        .and_then(|mut declared| {
+            declared
+                .iter()
+                .filter(|(name, _)| !host_names.iter().any(|host_name| host_name == *name))
+                .filter_map(|(_, configuration)| {
+                    configuration.get("directory").and_then(Value::as_str)
+                })
+                .try_for_each(|directory| removed_out_dir(&manifest_path.with_file_name(directory)))
+                .map(|()| {
+                    declared.retain(|name, _| host_names.iter().any(|host_name| host_name == name));
+                    out_dir["configurations"] = Value::Table(declared);
+                })
         })
 }
 
@@ -193,10 +222,10 @@ fn host_out_dirs(
     out_dirs
         .clone()
         .try_into::<Table>()
-        .map_err(failure_in(
-            manifest_path.to_path_buf(),
-            HeisenbergCheckError::FixtureOutDirs,
-        ))
+        .map_err(|source| HeisenbergCheckError::FixtureOutDirs {
+            path: manifest_path.to_path_buf(),
+            source,
+        })
         .and_then(|mut declared| {
             declared
                 .iter_mut()
@@ -211,10 +240,10 @@ fn host_settings(settings: &mut Value, manifest_path: &Path) -> Result<(), Heise
     settings["configurations"]
         .clone()
         .try_into::<Vec<Table>>()
-        .map_err(failure_in(
-            manifest_path.to_path_buf(),
-            HeisenbergCheckError::FixtureConfigurations,
-        ))
+        .map_err(|source| HeisenbergCheckError::FixtureConfigurations {
+            path: manifest_path.to_path_buf(),
+            source,
+        })
         .and_then(|configurations| {
             configurations
                 .into_iter()
@@ -265,16 +294,19 @@ impl HostOnlyFixture<'_> {
         cleared_path(&copy)
             .and_then(|()| copied_directory(&source, &copy))
             .and_then(|()| {
-                fs::read_to_string(&manifest_path).map_err(failure_in(
-                    manifest_path.clone(),
-                    HeisenbergCheckError::FixtureManifestRead,
-                ))
+                fs::read_to_string(&manifest_path).map_err(|source| {
+                    HeisenbergCheckError::FixtureManifestRead {
+                        path: manifest_path.clone(),
+                        source,
+                    }
+                })
             })
             .and_then(|text| {
-                text.parse::<Table>().map_err(failure_in(
-                    manifest_path.clone(),
-                    HeisenbergCheckError::FixtureManifest,
-                ))
+                text.parse::<Table>()
+                    .map_err(|source| HeisenbergCheckError::FixtureManifest {
+                        path: manifest_path.clone(),
+                        source,
+                    })
             })
             .and_then(|mut manifest| {
                 manifest
@@ -291,10 +323,12 @@ impl HostOnlyFixture<'_> {
                     })
             })
             .and_then(|text| {
-                fs::write(&manifest_path, text).map_err(failure_in(
-                    manifest_path.clone(),
-                    HeisenbergCheckError::FixtureManifestWrite,
-                ))
+                fs::write(&manifest_path, text).map_err(|source| {
+                    HeisenbergCheckError::FixtureManifestWrite {
+                        path: manifest_path.clone(),
+                        source,
+                    }
+                })
             })
             .and_then(|()| preserved_timestamp(&source_manifest, &manifest_path))
             .and_then(|()| {

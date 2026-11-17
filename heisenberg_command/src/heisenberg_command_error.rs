@@ -2,6 +2,7 @@ use std::error::Error as StdError;
 use std::io;
 use std::iter;
 
+use serde_json::Error as SerdeJsonError;
 use thiserror::Error;
 
 use heisenberg_analysis_threads::analysis_threads_error::AnalysisThreadsError;
@@ -47,6 +48,10 @@ pub enum HeisenbergCommandError {
     },
     #[error("the analysis cannot run on the worker pool")]
     WorkerPool(#[source] AnalysisThreadsError),
+    #[error("the catalogue cannot be written")]
+    WriteCatalogue(#[source] io::Error),
+    #[error("the catalogue cannot be written as JSON")]
+    WriteCatalogueDocument(#[source] SerdeJsonError),
     #[error("the explanation cannot be written")]
     WriteExplanation(#[source] io::Error),
     #[error("the report cannot be written")]

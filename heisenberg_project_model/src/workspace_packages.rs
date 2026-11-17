@@ -14,8 +14,6 @@ use crate::confinement_model::ConfinementModel;
 use crate::constants::BENCHMARK_HARNESS_PACKAGE;
 use crate::constants::ERROR_DERIVE_PACKAGE;
 use crate::constants::ERROR_RUNTIME_PACKAGE;
-use crate::constants::SERIALIZATION_PACKAGES;
-use crate::constants::TESTS_DIRECTORY;
 use crate::crate_package::CratePackage;
 use crate::declared_confined_packages::DeclaredConfinedPackages;
 use crate::declared_test_crates::DeclaredTestCrates;
@@ -42,9 +40,8 @@ pub struct WorkspacePackages {
     pub error_derive_roots: HashSet<VfsPath>,
     pub error_runtime_roots: HashSet<VfsPath>,
     pub member_targets: HashMap<VfsPath, CrateTarget>,
-    pub serialization_roots: HashSet<VfsPath>,
     pub test_crates: BTreeSet<String>,
-    pub test_directories: Vec<AbsPathBuf>,
+    pub member_directories: Vec<AbsPathBuf>,
     pub unpublished_packages: BTreeSet<String>,
 }
 
@@ -96,15 +93,11 @@ impl WorkspacePackages {
                      }| { (VfsPath::from(root.clone()), crate_target.clone()) },
                 )
                 .collect(),
-            serialization_roots: SERIALIZATION_PACKAGES
-                .iter()
-                .flat_map(|name| vetted_roots(resolved, name, &TargetKind::Lib))
-                .collect(),
             test_crates: declared_test_crates.test_crates(resolved),
-            test_directories: resolved
+            member_directories: resolved
                 .members()
                 .filter_map(|PackageDocument { metadata, .. }| metadata.manifest_path.parent())
-                .map(|directory| AbsPathBuf::assert(directory.join(TESTS_DIRECTORY)))
+                .map(|directory| AbsPathBuf::assert(directory.to_path_buf()))
                 .collect(),
             unpublished_packages: resolved
                 .members()

@@ -25,7 +25,7 @@ fn impl_of_a_foreign_trait_for_no_single_type_of_its_crate_is_a_violation() {
             impl Pair<First, Second> for u32 {}\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -34,7 +34,7 @@ fn custom_harness_target_is_built_without_libtest_and_enters_through_main() {
             pub fn shared_helper() -> u8 {\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", full_run_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

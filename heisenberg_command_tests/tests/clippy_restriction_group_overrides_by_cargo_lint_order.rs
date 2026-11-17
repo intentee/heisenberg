@@ -46,7 +46,7 @@ fn clippy_restriction_group_overrides_by_cargo_lint_order() {
             - same_priority/Cargo.toml: Package same_priority does not deny clippy::unwrap_used\n\
             \n\
             ------------------------------\n\
-            19 errors found\n\
+            19 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(6, 6).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

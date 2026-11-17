@@ -28,7 +28,7 @@ fn unexecuted_code_outside_every_function_is_uncovered_code() {
             pub static DOUBLE: fn(u32) -> u32 = |value| value * 2;\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(1, 1, 4).as_str()
         ]

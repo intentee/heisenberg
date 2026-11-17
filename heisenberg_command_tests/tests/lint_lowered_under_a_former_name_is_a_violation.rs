@@ -25,7 +25,7 @@ fn lint_lowered_under_a_former_name_is_a_violation() {
             #[warn(clippy::result_expect_used)]\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

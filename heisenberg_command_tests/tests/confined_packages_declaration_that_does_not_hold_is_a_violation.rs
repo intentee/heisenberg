@@ -72,7 +72,7 @@ fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
             - Cargo.toml: Confined package absent names no package that the workspace resolves\n\
             \n\
             ------------------------------\n\
-            12 errors found\n\
+            12 errors found in 6 rules\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 19 crate targets, 22 modules\n\

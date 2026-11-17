@@ -1,0 +1,12 @@
+[package]
+name = "host_only_fixture_with_out_dir_configurations_that_are_no_table"
+edition = "2024"
+version = "0.1.0"
+
+[workspace]
+
+[workspace.metadata.heisenberg]
+configurations = []
+
+[workspace.metadata.heisenberg.out_dirs.bindings]
+configurations = 1

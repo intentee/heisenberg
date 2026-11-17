@@ -29,7 +29,7 @@ fn path_resolved_inside_a_dependency_macro_closes_a_cycle_at_the_call() {
             crate::home uses crate::caller at src/home.rs:5:9\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

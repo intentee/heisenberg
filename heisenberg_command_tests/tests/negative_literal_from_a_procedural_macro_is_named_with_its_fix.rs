@@ -30,7 +30,7 @@ fn negative_literal_from_a_procedural_macro_is_named_with_its_fix() {
              literal -1i32 at literal_emitter/src/lib.rs:31:8 cannot be read back by rust-analyzer, as a negative number that a procedural macro emits as one literal token cannot; emit the sign as a separate - token\n\
              \n\
              ------------------------------\n\
-             1 errors found\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()
         ]

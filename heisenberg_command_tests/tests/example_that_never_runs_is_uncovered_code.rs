@@ -28,7 +28,7 @@ fn example_that_never_runs_is_uncovered_code() {
             fn main() {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(2, 2, 7).as_str()
         ]

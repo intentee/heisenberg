@@ -25,7 +25,7 @@ fn procedural_macro_entry_points_are_exempt_only_from_the_rules_rust_forces() {
             fn passthrough(item: TokenStream) -> TokenStream {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

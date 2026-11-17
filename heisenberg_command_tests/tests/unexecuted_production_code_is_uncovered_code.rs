@@ -38,7 +38,7 @@ fn unexecuted_production_code_is_uncovered_code() {
             not executed at src/lib.rs:14:31\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            4 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(1, 4, 22).as_str()
         ]

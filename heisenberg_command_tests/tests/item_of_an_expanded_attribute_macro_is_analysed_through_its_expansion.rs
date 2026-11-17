@@ -31,7 +31,7 @@ fn item_of_an_expanded_attribute_macro_is_analysed_through_its_expansion() {
             pub const MAXIMUM: u8 = 9;\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

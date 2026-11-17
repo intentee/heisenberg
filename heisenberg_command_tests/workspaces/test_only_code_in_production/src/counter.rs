@@ -1,4 +1,7 @@
 #[cfg(test)]
+use std::mem;
+
+#[cfg(test)]
 const fn module_helper() -> u8 {
     1
 }
@@ -13,11 +16,25 @@ impl Counter {
         Self { value: 0 }
     }
 
+    #[cfg_attr(test, must_use)]
+    pub const fn attributed(&self) -> u8 {
+        self.value
+    }
+
     pub const fn incremented(&self) -> u8 {
         #[cfg(test)]
         assert!(self.value < u8::MAX);
 
         self.value + 1
+    }
+
+    #[cfg(any(test, feature = "probe"))]
+    pub const fn probed(&self) -> u8 {
+        self.value
+    }
+
+    pub const fn under_test(&self) -> bool {
+        cfg!(any(all(feature = "probe", not(test)))) && self.value == 0
     }
 }
 
@@ -29,28 +46,19 @@ impl Counter {
 }
 
 #[cfg(test)]
-mod checks {
-    #[test]
-    fn module_helper_returns_one() {
-        assert_eq!(super::module_helper(), 1);
-    }
-}
-
-#[cfg(test)]
 mod tests {
-    #[test]
-    fn counter_increments() {
-        assert_eq!(super::Counter::for_tests().doubled(), 0);
+    use super::Counter;
+    use super::mem;
+    use super::module_helper;
+
+    #[cfg(test)]
+    const fn nested_helper() -> u8 {
+        module_helper()
     }
 
     #[test]
-    fn sample_doubles() {
-        assert_eq!(
-            super::Counter {
-                value: crate::sample_value::sample_value()
-            }
-            .doubled(),
-            6
-        );
+    fn counter_starts_at_zero() {
+        assert_eq!(Counter::for_tests().doubled(), 0);
+        assert_eq!(mem::size_of::<Counter>(), usize::from(nested_helper()));
     }
 }

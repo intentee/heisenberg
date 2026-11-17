@@ -26,7 +26,7 @@ fn clippy_lint_not_denied_is_a_violation() {
             - Cargo.toml: Package clippy_lint_not_denied does not deny warnings\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -39,15 +39,15 @@ fn test_crate_declaration_that_does_not_hold_is_a_violation() {
             - library/Cargo.toml: Package library depends on test crate used through a normal or build dependency\n\
             \n\
             TestOnlyCodeInProduction: 2 violations\n\
-            Production code holds only what production runs. Keep test-only code in a #[cfg(test)] module, such as the inline mod tests of the file it tests, and move test libraries shared by several packages into a test crate.\n\
+            Production code holds only what production runs, and behaves the same whether or not it is under test. Keep test-only code in the inline #[cfg(test)] mod tests of the file it tests, and move test libraries shared by several packages into a test crate.\n\
             \n\
-            - published/src/lib.rs:2:10: Code exists only under cfg(test) outside a test module\n    \
+            - published/src/lib.rs:2:10: Code depends on cfg(test) outside a test module\n    \
             const fn sample() -> u8 {\n\
-            - used/src/lib.rs:2:10: Code exists only under cfg(test) outside a test module\n    \
+            - used/src/lib.rs:2:10: Code depends on cfg(test) outside a test module\n    \
             const fn sample() -> u8 {\n\
             \n\
             ------------------------------\n\
-            6 errors found\n\
+            6 errors found in 5 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(3, 5).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

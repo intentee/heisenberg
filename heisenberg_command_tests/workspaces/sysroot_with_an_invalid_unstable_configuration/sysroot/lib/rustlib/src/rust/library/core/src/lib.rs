@@ -6,6 +6,10 @@ pub mod error {
     pub trait Error {}
 }
 
+pub mod fmt {
+    pub trait Display {}
+}
+
 pub mod iter {
     pub mod traits {
         pub mod collect {
@@ -15,6 +19,13 @@ pub mod iter {
         pub mod iterator {
             pub trait Iterator {}
         }
+    }
+}
+
+pub mod option {
+    pub enum Option<TValue> {
+        None,
+        Some(TValue),
     }
 }
 

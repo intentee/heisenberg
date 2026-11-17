@@ -1,7 +1,4 @@
 pub mod counter;
+pub mod probe;
 pub mod run;
-
-#[cfg(test)]
-mod sample_value;
-#[cfg(test)]
-mod tests;
+pub mod step;

@@ -37,7 +37,7 @@ fn item_without_a_mapped_definition_is_a_violation() {
             trait Measured {\n\
             \n\
             ------------------------------\n\
-            7 errors found\n\
+            7 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

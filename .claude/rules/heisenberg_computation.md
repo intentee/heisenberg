@@ -1,3 +1,7 @@
+---
+kind: directive
+---
+
 # Compute Once
 
 - Heisenberg computes nothing it does not use and nothing more than once. Within a run, each result is computed only when something consumes it, exactly once, and then shared, and a cheaper exact check runs first whenever it decides the outcome.

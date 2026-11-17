@@ -28,7 +28,7 @@ fn nextest_configuration_of_a_workspace_without_libtest_tests_is_a_violation() {
             - .config/nextest.toml: Nextest configuration of a workspace that runs no test under libtest's harness\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             full_run_footer(1, 2).as_str()
         ]

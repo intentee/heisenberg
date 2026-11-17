@@ -25,7 +25,7 @@ fn item_reading_a_nested_tuple_field_in_a_proc_macro_call_is_analysed_as_written
             pub fn second() -> u8 {\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

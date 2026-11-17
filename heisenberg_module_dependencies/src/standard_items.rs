@@ -1,8 +1,9 @@
+use ra_ap_hir::Adt;
 use ra_ap_hir::Crate;
 use ra_ap_hir::Enum;
-use ra_ap_hir::Function;
 use ra_ap_hir::ModuleDef;
 use ra_ap_hir::Semantics;
+use ra_ap_hir::Struct;
 use ra_ap_hir::Trait;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::famous_defs::FamousDefs;
@@ -10,8 +11,7 @@ use ra_ap_ide_db::famous_defs::FamousDefs;
 use heisenberg_module_graph::crate_target::CrateTarget;
 
 use crate::constants::ERROR_TRAIT_PATH;
-use crate::constants::STANDARD_SLEEP_MS_PATH;
-use crate::constants::STANDARD_SLEEP_PATH;
+use crate::constants::OWNED_BOX_PATH;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::required_standard_item::RequiredStandardItem;
 use crate::standard_item::standard_item;
@@ -23,19 +23,12 @@ fn missing<TItem>(
     item.is_none().then_some(required)
 }
 
-fn standard_function(database: &RootDatabase, krate: Crate, path: &[&str]) -> Option<Function> {
-    match standard_item(database, krate, path) {
-        Some(ModuleDef::Function(function)) => Some(function),
-        _ => None,
-    }
-}
-
 pub struct StandardItems {
+    pub display: Trait,
     pub error_trait: Trait,
-    pub from_str: Trait,
-    pub library_crates: Vec<Crate>,
+    pub option: Enum,
+    pub owned_box: Struct,
     pub result: Enum,
-    pub sleeps: Vec<Function>,
     pub to_string: Trait,
 }
 
@@ -48,7 +41,6 @@ impl StandardItems {
         let database = semantics.db;
         let famous = FamousDefs(semantics, krate);
         let core = famous.core();
-        let std = famous.std();
         let error_trait =
             core.and_then(
                 |core| match standard_item(database, core, &ERROR_TRAIT_PATH) {
@@ -56,49 +48,45 @@ impl StandardItems {
                     _ => None,
                 },
             );
-        let from_str = famous.core_convert_FromStr();
+        let display = famous.core_fmt_Display();
+        let option = famous.core_option_Option();
+        let owned_box = famous.alloc().and_then(|alloc| {
+            match standard_item(database, alloc, &OWNED_BOX_PATH) {
+                Some(ModuleDef::Adt(Adt::Struct(owned_box))) => Some(owned_box),
+                _ => None,
+            }
+        });
         let result = famous.core_result_Result();
         let to_string = famous.alloc_string_ToString();
-        let sleep = std.and_then(|std| standard_function(database, std, &STANDARD_SLEEP_PATH));
-        let sleep_ms =
-            std.and_then(|std| standard_function(database, std, &STANDARD_SLEEP_MS_PATH));
-        let missing_sleeps: Vec<RequiredStandardItem> = std
-            .into_iter()
-            .flat_map(|_| {
-                [
-                    missing(sleep.as_ref(), RequiredStandardItem::Sleep),
-                    missing(sleep_ms.as_ref(), RequiredStandardItem::SleepMs),
-                ]
-            })
-            .flatten()
-            .collect();
 
-        if let Some(error_trait) = error_trait
-            && let Some(from_str) = from_str
+        if let Some(display) = display
+            && let Some(error_trait) = error_trait
+            && let Some(option) = option
+            && let Some(owned_box) = owned_box
             && let Some(result) = result
             && let Some(to_string) = to_string
-            && missing_sleeps.is_empty()
         {
             Ok(Self {
+                display,
                 error_trait,
-                from_str,
-                library_crates: core.into_iter().chain(famous.alloc()).chain(std).collect(),
+                option,
+                owned_box,
                 result,
-                sleeps: sleep.into_iter().chain(sleep_ms).collect(),
                 to_string,
             })
         } else {
             Err(ModuleDependenciesError::StandardItemsMissing {
                 crate_target: crate_target.clone(),
                 items: [
+                    missing(display.as_ref(), RequiredStandardItem::Display),
                     missing(error_trait.as_ref(), RequiredStandardItem::ErrorTrait),
-                    missing(from_str.as_ref(), RequiredStandardItem::FromStr),
+                    missing(option.as_ref(), RequiredStandardItem::Option),
+                    missing(owned_box.as_ref(), RequiredStandardItem::OwnedBox),
                     missing(result.as_ref(), RequiredStandardItem::Result),
                     missing(to_string.as_ref(), RequiredStandardItem::ToString),
                 ]
                 .into_iter()
                 .flatten()
-                .chain(missing_sleeps)
                 .collect(),
             })
         }

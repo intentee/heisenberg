@@ -29,7 +29,7 @@ fn unvetted_criterion_method_is_a_violation() {
             config = Criterion::default().measurement_time(Duration::from_secs(1));\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

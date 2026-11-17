@@ -43,7 +43,7 @@ fn item_following_an_item_of_a_later_group_is_a_violation() {
             use Shape::Circle;\n\
             \n\
             ------------------------------\n\
-            10 errors found\n\
+            10 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 14).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

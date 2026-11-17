@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use ra_ap_hir::AsAssocItem;
 use ra_ap_hir::Crate;
 use ra_ap_hir::Field;
 use ra_ap_hir::HirFileId;
@@ -16,11 +17,13 @@ use ra_ap_syntax::AstToken;
 use ra_ap_syntax::NodeOrToken;
 use ra_ap_syntax::SyntaxKind;
 use ra_ap_syntax::SyntaxNode;
+use ra_ap_syntax::SyntaxToken;
 use ra_ap_syntax::ast;
 use ra_ap_syntax::ast::HasAttrs;
 use rayon::iter::Either;
 
 use crate::constants::ERROR_DISPLAY_METHOD;
+use crate::constants::ERROR_MESSAGE_FUNCTION;
 use crate::constants::ERROR_MESSAGE_HELPER;
 use crate::constants::ERROR_SOURCE_FIELD;
 use crate::constants::ERROR_SOURCE_HELPERS;
@@ -58,6 +61,13 @@ pub struct ErrorDerive<'derive, 'database> {
 }
 
 impl<'database> ErrorDerive<'_, 'database> {
+    pub fn enum_messages(&self, written: &ast::Enum) -> Vec<ast::Attr> {
+        written
+            .attrs()
+            .filter(|attribute| self.is_helper(attribute, &[ERROR_MESSAGE_HELPER]))
+            .collect()
+    }
+
     pub fn generates(&self, expansion: MacroCallId) -> bool {
         let definition = expansion.lookup(self.semantics.db).def;
 
@@ -65,6 +75,14 @@ impl<'database> ErrorDerive<'_, 'database> {
             definition.kind,
             MacroDefKind::ProcMacro(_, _, ProcMacroKind::CustomDerive)
         ) && self.derive_crates.contains(&Crate::from(definition.krate))
+    }
+
+    pub fn message_functions(&self, written: &ast::Enum) -> Vec<ast::Attr> {
+        written
+            .attrs()
+            .chain(Self::variants(written).flat_map(|variant| variant.attrs()))
+            .filter(|attribute| self.is_message_function(attribute))
+            .collect()
     }
 
     pub fn sources(&self, written: &ast::Enum, expansion: MacroCallId) -> DerivedSources {
@@ -81,7 +99,7 @@ impl<'database> ErrorDerive<'_, 'database> {
                     .iter()
                     .filter(|VariantField { definition, .. }| {
                         source != Some(*definition)
-                            && self.error_types.implements_error(&definition.ty(database))
+                            && self.error_types.holds_an_error(&definition.ty(database))
                             && !(source.is_some()
                                 && self.formats_in_its_message(expansion, *definition))
                     })
@@ -193,10 +211,14 @@ impl<'database> ErrorDerive<'_, 'database> {
                 |SubstitutedResolution {
                      resolution: method, ..
                  }| {
-                    (method.name(database).as_str() == ERROR_DISPLAY_METHOD
+                    ((method.name(database).as_str() == ERROR_DISPLAY_METHOD
                         && self
                             .runtime_crates
                             .contains(&method.module(database).krate(database)))
+                        || method
+                            .as_assoc_item(database)
+                            .and_then(|item| item.container_or_implemented_trait(database))
+                            == Some(self.error_types.standard_items.to_string))
                     .then(|| call.receiver())
                     .flatten()
                     .and_then(|receiver| self.displayed_binding(receiver))
@@ -295,34 +317,48 @@ impl<'database> ErrorDerive<'_, 'database> {
             })
     }
 
+    fn is_message_function(&self, attribute: &ast::Attr) -> bool {
+        matches!(
+            self.message_tokens(attribute).as_slice(),
+            [name, assignment, ..] if name.kind() == SyntaxKind::IDENT
+                && name.text() == ERROR_MESSAGE_FUNCTION
+                && assignment.kind() == SyntaxKind::EQ
+        )
+    }
+
     fn is_transparent(&self, owner: &impl HasAttrs) -> bool {
         owner.attrs().any(|attribute| {
-            self.is_helper(&attribute, &[ERROR_MESSAGE_HELPER])
-                && attribute
-                    .meta()
-                    .and_then(|meta| ast::TokenTreeMeta::cast(meta.syntax().clone()))
-                    .and_then(|meta| meta.token_tree())
-                    .is_some_and(|arguments| {
-                        let delimiters = [
-                            arguments.left_delimiter_token(),
-                            arguments.right_delimiter_token(),
-                        ];
-                        let tokens: Vec<_> = arguments
-                            .token_trees_and_tokens()
-                            .filter_map(NodeOrToken::into_token)
-                            .filter(|token| {
-                                !token.kind().is_trivia()
-                                    && !delimiters.contains(&Some(token.clone()))
-                            })
-                            .collect();
-
-                        matches!(
-                            tokens.as_slice(),
-                            [only] if only.kind() == SyntaxKind::IDENT
-                                && only.text() == TRANSPARENT_ERROR_MESSAGE
-                        )
-                    })
+            matches!(
+                self.message_tokens(&attribute).as_slice(),
+                [only] if only.kind() == SyntaxKind::IDENT
+                    && only.text() == TRANSPARENT_ERROR_MESSAGE
+            )
         })
+    }
+
+    fn message_tokens(&self, attribute: &ast::Attr) -> Vec<SyntaxToken> {
+        if self.is_helper(attribute, &[ERROR_MESSAGE_HELPER]) {
+            attribute
+                .meta()
+                .and_then(|meta| ast::TokenTreeMeta::cast(meta.syntax().clone()))
+                .and_then(|meta| meta.token_tree())
+                .map_or_else(Vec::new, |arguments| {
+                    let delimiters = [
+                        arguments.left_delimiter_token(),
+                        arguments.right_delimiter_token(),
+                    ];
+
+                    arguments
+                        .token_trees_and_tokens()
+                        .filter_map(NodeOrToken::into_token)
+                        .filter(|token| {
+                            !token.kind().is_trivia() && !delimiters.contains(&Some(token.clone()))
+                        })
+                        .collect()
+                })
+        } else {
+            Vec::new()
+        }
     }
 
     fn source(

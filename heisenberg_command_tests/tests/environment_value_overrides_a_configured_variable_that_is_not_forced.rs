@@ -31,7 +31,7 @@ fn environment_value_overrides_a_configured_variable_that_is_not_forced() {
             include!(concat!(env!(\"GENERATED\"), \"/items.rs\"));\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -25,7 +25,7 @@ fn integration_tests_that_cargo_discovers_are_a_violation() {
             - Cargo.toml: Package builds integration test targets with libtest's harness without setting autotests = false\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(2, 3).as_str()
         ]

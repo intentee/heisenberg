@@ -39,7 +39,7 @@ fn negated_predicate_of_a_module_file_active_on_one_platform_is_reported_where_i
              {NEGATED_PREDICATE}\
              \n\
              ------------------------------\n\
-             1 errors found\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, HOST_MODULES)

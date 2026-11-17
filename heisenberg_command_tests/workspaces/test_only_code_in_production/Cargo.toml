@@ -3,6 +3,9 @@ name = "test_only_code_in_production"
 edition = "2024"
 version = "0.1.0"
 
+[features]
+probe = []
+
 [workspace]
 
 [lints.rust]

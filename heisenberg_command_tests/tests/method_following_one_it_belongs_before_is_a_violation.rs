@@ -47,7 +47,7 @@ fn method_following_one_it_belongs_before_is_a_violation() {
             fn average(&self) -> u8;\n\
             \n\
             ------------------------------\n\
-            12 errors found\n\
+            12 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

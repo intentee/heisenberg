@@ -24,13 +24,18 @@ fn explain_names_the_vetted_nextest_settings() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n\
+            "Rule 8.19 UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n\
+        Section 8, Tests. Scope: workspace. Evaluated in each analysed configuration.\n\
         \n\
         A nextest configuration setting other than the slow-timeout and those that only control concurrency, failure handling and reporting, which can retry, skip or exempt tests, or let a test run past its timeout.\n\
         \n\
         Vetted settings: nextest-version; in a profile: fail-fast, failure-output, final-status-level, global-timeout, inherits, junit, slow-timeout, status-level, success-output, test-threads; in a slow-timeout: on-timeout, period, terminate-after\n\
         \n\
-        Every test runs and passes on its first attempt within the limits. Remove the setting, and make the tests that needed it faster or reliable.\n\
+        Rationale: Every test runs and passes on its first attempt within the limits.\n\
+        \n\
+        Remedy: Remove the setting, and make the tests that needed it faster or reliable.\n\
+        \n\
+        See also: NextestConfigurationMissing, NextestOverride, NextestTimeoutNotEnforced, UnneededNextestConfiguration\n\
         "
         )
     );

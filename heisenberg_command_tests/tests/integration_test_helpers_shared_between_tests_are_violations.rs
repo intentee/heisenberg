@@ -45,7 +45,7 @@ fn integration_test_helpers_shared_between_tests_are_violations() {
             test \"second_shared\"\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 3 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated.host_footer(5, 9).as_str()
         ]

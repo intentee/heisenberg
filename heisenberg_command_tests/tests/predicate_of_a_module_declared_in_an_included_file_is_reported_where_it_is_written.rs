@@ -31,7 +31,7 @@ fn predicate_of_a_module_declared_in_an_included_file_is_reported_where_it_is_wr
             #![cfg_attr(not(test), allow(dead_code))]\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -1,3 +1,7 @@
+---
+kind: directive
+---
+
 # Typed Failures
 
 - Heisenberg never panics. Every failure it meets is a typed error.

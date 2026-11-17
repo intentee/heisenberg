@@ -38,7 +38,7 @@ fn format_templates_are_compared_by_what_their_captures_resolve_to() {
             format!(\"{missing}\")\n\
             \n\
             ------------------------------\n\
-            4 errors found\n\
+            4 errors found in 2 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 10).as_str()
         ]

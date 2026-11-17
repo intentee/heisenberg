@@ -66,7 +66,12 @@ impl IssueReport<'_> {
         lines.push(if issues.is_empty() {
             "No errors found!".to_owned()
         } else {
-            format!("{} errors found", issues.len())
+            format!(
+                "{} errors found in {} {}",
+                issues.len(),
+                sections.len(),
+                if sections.len() == 1 { "rule" } else { "rules" }
+            )
         });
         lines.push(SEPARATOR.to_owned());
         lines.extend(footer);

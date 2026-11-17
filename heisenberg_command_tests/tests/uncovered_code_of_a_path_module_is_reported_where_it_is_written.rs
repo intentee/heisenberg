@@ -29,7 +29,7 @@ fn uncovered_code_of_a_path_module_is_reported_where_it_is_written() {
             not executed at shared/clamp.rs:2:22\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n",
             coverage_footer(1, 2, 9).as_str()
         ]

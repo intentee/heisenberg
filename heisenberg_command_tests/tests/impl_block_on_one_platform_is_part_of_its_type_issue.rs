@@ -33,7 +33,7 @@ fn impl_block_on_one_platform_is_part_of_its_type_issue() {
              {UNIX_IMPL_BLOCK}\
              \n\
              ------------------------------\n\
-             1 errors found\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::Evaluated.host_footer(2, 2)

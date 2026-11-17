@@ -4,6 +4,7 @@ use heisenberg_module_cycles::non_empty::NonEmpty;
 
 use crate::analysis_contexts::AnalysisContexts;
 use crate::issue::Issue;
+use crate::issue_text::IssueText;
 use crate::issue_type::IssueType;
 
 pub struct IssueSection<'section> {
@@ -22,8 +23,15 @@ impl IssueSection<'_> {
             "violations"
         };
 
-        iter::once(format!("{}: {count} {noun}", issue_type.text().name))
-            .chain([issue_type.text().purpose.to_owned(), String::new()])
+        let IssueText {
+            name,
+            rationale,
+            remedy,
+            ..
+        } = issue_type.text();
+
+        iter::once(format!("{name}: {count} {noun}"))
+            .chain([format!("{rationale} {remedy}"), String::new()])
             .chain(issues.iter().flat_map(|issue| issue.lines(contexts)))
             .collect()
     }

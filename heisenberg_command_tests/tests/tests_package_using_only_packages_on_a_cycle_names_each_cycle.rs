@@ -34,7 +34,7 @@ fn tests_package_using_only_packages_on_a_cycle_names_each_cycle() {
             cannot move to library: library v0.1.0 -> harness v0.1.0 -> library v0.1.0\n\
             \n\
             ------------------------------\n\
-            2 errors found\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", full_run_footer(4, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

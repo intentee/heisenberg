@@ -38,7 +38,7 @@ fn derive_macro_output_closing_a_cycle_is_found() {
             crate::second uses crate::first at src/second.rs:3:9\n\
             \n\
             ------------------------------\n\
-            3 errors found\n\
+            3 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

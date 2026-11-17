@@ -27,7 +27,7 @@ fn unresolved_paths_into_a_module_whose_include_failed_are_part_of_that_failure(
             unresolved paths into bindings_sys: 2, the first at bindings/src/lib.rs:2:18\n\
             \n\
             ------------------------------\n\
-            1 errors found\n\
+            1 errors found in 1 rule\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(3, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

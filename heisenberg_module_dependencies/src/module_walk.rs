@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::cell::OnceCell;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -5,6 +6,7 @@ use std::collections::HashSet;
 use std::iter;
 use std::sync::Arc;
 
+use ra_ap_cfg::CfgAtom;
 use ra_ap_cfg::CfgExpr;
 use ra_ap_cfg::CfgOptions;
 use ra_ap_hir::Adt;
@@ -31,6 +33,7 @@ use ra_ap_hir::Semantics;
 use ra_ap_hir::Trait;
 use ra_ap_hir::Type;
 use ra_ap_hir::TypeAlias;
+use ra_ap_hir::Variant;
 use ra_ap_hir_def::FunctionId;
 use ra_ap_hir_def::MacroId;
 use ra_ap_hir_def::rustc_abi::ExternAbi;
@@ -44,7 +47,6 @@ use ra_ap_hir_expand::name::AsName as _;
 use ra_ap_hir_expand::name::Name;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
-use ra_ap_ide_db::search::FileReference;
 use ra_ap_paths::AbsPath;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::AstToken;
@@ -63,20 +65,26 @@ use ra_ap_syntax::ast::HasVisibility as _;
 use ra_ap_vfs::FileId;
 
 use heisenberg_configured_code::ancestry::Ancestry;
+use heisenberg_configured_code::conditional_attribute::ConditionalAttribute;
 use heisenberg_configured_code::configured_node::ConfiguredNode;
+use heisenberg_configured_code::negated_atom::NegatedAtom;
 use heisenberg_configured_code::negated_configuration::NegatedConfiguration;
 use heisenberg_configured_code::non_production_code::NonProductionCode;
+use heisenberg_configured_code::test_predicate::TestPredicate;
 use heisenberg_expanded_code::code_tokens::code_tokens;
+use heisenberg_module_graph::configuration_atom::ConfigurationAtom;
 use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_module_graph::error_violation::ErrorViolation;
+use heisenberg_module_graph::every_configuration_findings::EveryConfigurationFindings;
 use heisenberg_module_graph::foreign_module::ForeignModule;
 use heisenberg_module_graph::harness_violation::HarnessViolation;
 use heisenberg_module_graph::impl_placement::ImplPlacement;
 use heisenberg_module_graph::inactive_focus::InactiveFocus;
 use heisenberg_module_graph::item_group::ItemGroup;
 use heisenberg_module_graph::item_placement::ItemPlacement;
+use heisenberg_module_graph::layout_violation::LayoutViolation;
 use heisenberg_module_graph::method_placement::MethodPlacement;
 use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
@@ -87,6 +95,7 @@ use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::test_violation::TestViolation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::untyped_error_name::UntypedErrorName;
+use heisenberg_module_graph::used_item::UsedItem;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_module_graph::violation_set::ViolationSet;
@@ -107,8 +116,8 @@ use crate::attribute_directives::AttributeDirectives;
 use crate::attributed_item::AttributedItem;
 use crate::benchmark_harness::BenchmarkHarness;
 use crate::benchmark_output::BenchmarkOutput;
-use crate::constants::EQUALITY_ASSERTION_MACROS;
 use crate::constants::LIFETIME_PREFIX;
+use crate::constants::TEST_MODULE_NAME;
 use crate::constants_module::ConstantsModule;
 use crate::constructor::Constructor;
 use crate::covered_code::CoveredCode;
@@ -133,6 +142,7 @@ use crate::item_definition::ItemDefinition;
 use crate::item_expansion::ItemExpansion;
 use crate::item_focus::ItemFocus;
 use crate::item_order::ItemOrder;
+use crate::item_references::ItemReferences;
 use crate::local_impl_home::LocalImplHome;
 use crate::local_macro::LocalMacro;
 use crate::local_macro_import::LocalMacroImport;
@@ -158,8 +168,6 @@ use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
 use crate::qualified_names::QualifiedNames;
-use crate::round_trips::RoundTrips;
-use crate::serialization_traits::SerializationTraits;
 use crate::signature_scope::SignatureScope;
 use crate::signature_tuple::SignatureTuple;
 use crate::standard_items::StandardItems;
@@ -167,13 +175,13 @@ use crate::substituted_resolution::SubstitutedResolution;
 use crate::subtree::Subtree;
 use crate::subtree_origin::SubtreeOrigin;
 use crate::template_captures::TemplateCaptures;
-use crate::test_assertions::TestAssertions;
-use crate::test_site::TestSite;
 use crate::test_target_findings::TestTargetFindings;
 use crate::test_target_items::TestTargetItems;
 use crate::token_origin::TokenOrigin;
+use crate::tool_directive::ToolDirective;
 use crate::trait_arguments::trait_arguments;
 use crate::unsafe_code_findings::UnsafeCodeFindings;
+use crate::used_definition::UsedDefinition;
 use crate::walked_module::WalkedModule;
 use crate::written_token::WrittenToken;
 
@@ -193,11 +201,10 @@ pub struct ModuleWalk<'walk, 'database> {
     pub options: &'walk CfgOptions,
     pub paths: &'walk PathResolutions<'walk, 'database>,
     pub production_options: &'walk CfgOptions,
+    pub runs_libtest_tests: &'walk Cell<bool>,
     pub semantics: &'walk Semantics<'database, RootDatabase>,
-    pub serialization_traits: &'walk SerializationTraits,
     pub standard_items: &'walk StandardItems,
     pub template_captures: &'walk TemplateCaptures<'walk, 'database>,
-    pub test_assertions: &'walk TestAssertions,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
     pub token_origin: &'walk TokenOrigin<'walk, 'database>,
     pub trait_result_errors:
@@ -266,7 +273,10 @@ impl<'database> ModuleWalk<'_, 'database> {
                                 .written_in(&root)
                                 .map(|bodies| walked.function_bodies.extend(bodies))
                             })
-                            .and_then(|()| self.test_findings(walked))
+                            .map(|()| {
+                                walked.crate_findings.runs_libtest_tests |=
+                                    self.runs_libtest_tests.get();
+                            })
                     } else {
                         Ok(())
                     }
@@ -302,6 +312,7 @@ impl<'database> ModuleWalk<'_, 'database> {
         let AttributeDirectives {
             ignores,
             suppressions,
+            tool_attributes,
         } = NodeAttributes {
             node,
             options: self.options,
@@ -310,7 +321,7 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
         .directives();
 
-        self.record_test(node, origin);
+        self.record_test(node);
 
         suppressions
             .iter()
@@ -338,6 +349,20 @@ impl<'database> ModuleWalk<'_, 'database> {
                         )
                     }),
             )
+            .chain(
+                tool_attributes
+                    .iter()
+                    .filter(|ToolDirective { meta, .. }| {
+                        self.is_written_by_the_workspace(meta.syntax())
+                    })
+                    .map(|ToolDirective { meta, tool }| {
+                        self.attribute_violation(
+                            meta,
+                            ViolationKind::ToolAttribute { tool: tool.clone() },
+                            origin,
+                        )
+                    }),
+            )
             .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
             .map(|found| violations.extend(found))
     }
@@ -350,6 +375,45 @@ impl<'database> ModuleWalk<'_, 'database> {
     ) -> Result<Violation, ModuleDependenciesError> {
         self.locate(meta.syntax(), origin)
             .map(|location| Violation { kind, location })
+    }
+
+    fn conditional_attributes(
+        &self,
+        configured: &ConfiguredNode<'_>,
+        origin: &SubtreeOrigin,
+        ModuleFindings {
+            every_configuration: EveryConfigurationFindings { held, refuted },
+            ..
+        }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        let in_production = ConfiguredNode {
+            node: configured.node,
+            options: self.production_options,
+        }
+        .conditional_attributes();
+
+        configured
+            .conditional_attributes()
+            .into_iter()
+            .zip(in_production)
+            .filter(|(ConditionalAttribute { meta, .. }, _)| {
+                !self.token_origin.is_foreign_text(meta.syntax())
+            })
+            .try_for_each(|(under_test, in_production)| {
+                self.locate(under_test.meta.syntax(), origin)
+                    .map(|location| {
+                        let attribute = Violation {
+                            kind: ViolationKind::AttributeAppliedInNoConfiguration,
+                            location,
+                        };
+
+                        if under_test.applies || in_production.applies {
+                            refuted.insert(attribute);
+                        } else {
+                            held.insert(attribute);
+                        }
+                    })
+            })
     }
 
     fn configured_out(
@@ -557,7 +621,9 @@ impl<'database> ModuleWalk<'_, 'database> {
             options: self.options,
         };
 
-        self.negated_attributes(&configured, origin, &mut walked.findings)
+        self.vacuous_negations(&configured, origin, &mut walked.findings)
+            .and_then(|()| self.conditional_attributes(&configured, origin, &mut walked.findings))
+            .and_then(|()| self.negated_attributes(&configured, origin, &mut walked.findings))
             .and_then(|negations| {
                 let predicate = self
                     .inactive_code
@@ -588,6 +654,14 @@ impl<'database> ModuleWalk<'_, 'database> {
                         .and_then(|()| self.test_only_code(node, origin))
                         .and_then(|test_only| {
                             walked.findings.violations.extend(test_only);
+                            self.test_outside_a_test_module(node, origin)
+                        })
+                        .and_then(|misplaced_test| {
+                            walked.findings.violations.extend(misplaced_test);
+                            self.items_used_outside_production(node, origin)
+                        })
+                        .and_then(|used_outside_production| {
+                            walked.findings.violations.extend(used_outside_production);
                             self.item(node, origin, preorder, pending, walked)
                         })
                 }
@@ -633,6 +707,14 @@ impl<'database> ModuleWalk<'_, 'database> {
                         })
                     })
                     .and_then(|()| {
+                        self.error_message_violations(&written, origin)
+                            .map(|misplaced| violations.extend(misplaced))
+                    })
+                    .and_then(|()| {
+                        self.error_module_violation(&written, origin)
+                            .map(|misplaced| violations.extend(misplaced))
+                    })
+                    .and_then(|()| {
                         error_derive
                             .sources_in_messages(expansion, &sources)
                             .iter()
@@ -647,6 +729,33 @@ impl<'database> ModuleWalk<'_, 'database> {
                     })
             }
             _ => Ok(()),
+        }
+    }
+
+    fn error_display(
+        &self,
+        node: &SyntaxNode,
+        definition: &ItemDefinition,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        match definition {
+            ItemDefinition::Impl(implementation)
+                if implementation.trait_(database) == Some(self.standard_items.display)
+                    && self.semantics.hir_file_for(node).macro_file().is_none()
+                    && self
+                        .error_types()
+                        .implements_error(&implementation.self_ty(database)) =>
+            {
+                self.locate_focus(node, origin).map(|location| {
+                    Some(Violation {
+                        kind: ViolationKind::Error(ErrorViolation::HandwrittenDisplay),
+                        location,
+                    })
+                })
+            }
+            _ => Ok(None),
         }
     }
 
@@ -710,6 +819,73 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
     }
 
+    fn error_message_violations(
+        &self,
+        written: &ast::Enum,
+        origin: &SubtreeOrigin,
+    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
+        let error_derive = self.error_derive();
+
+        error_derive
+            .enum_messages(written)
+            .iter()
+            .map(|attribute| {
+                self.locate(attribute.syntax(), origin)
+                    .map(|location| Violation {
+                        kind: ViolationKind::Error(ErrorViolation::MessageOnTheEnum),
+                        location,
+                    })
+            })
+            .chain(
+                error_derive
+                    .message_functions(written)
+                    .iter()
+                    .map(|attribute| {
+                        self.locate(attribute.syntax(), origin)
+                            .map(|location| Violation {
+                                kind: ViolationKind::Error(ErrorViolation::MessageFunction),
+                                location,
+                            })
+                    }),
+            )
+            .collect()
+    }
+
+    fn error_module_violation(
+        &self,
+        written: &ast::Enum,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        self.semantics
+            .to_def(written)
+            .zip(written.name())
+            .filter(|_| !self.in_test_gated_code(written.syntax()))
+            .map_or(Ok(None), |(definition, name)| {
+                let module = definition.module(database);
+
+                self.module_name(module).and_then(|module_name| {
+                    let home = module_name.filter(|_| !module.is_inline(database));
+
+                    if home.as_ref().is_some_and(|file_module| {
+                        NameWords { name: name.text() }.are_spelled_by(file_module)
+                    }) {
+                        Ok(None)
+                    } else {
+                        self.locate_focus(written.syntax(), origin).map(|location| {
+                            Some(Violation {
+                                kind: ViolationKind::Error(ErrorViolation::OutsideItsModule {
+                                    module: self.module_paths.path(database, module),
+                                }),
+                                location,
+                            })
+                        })
+                    }
+                })
+            })
+    }
+
     const fn error_types(&self) -> ErrorTypes<'_, 'database> {
         ErrorTypes {
             semantics: self.semantics,
@@ -725,8 +901,6 @@ impl<'database> ModuleWalk<'_, 'database> {
         module_findings: &mut ModuleFindings,
     ) -> Result<(), ModuleDependenciesError> {
         let database = self.semantics.db;
-
-        self.record_assertion(call);
 
         self.semantics.to_def(call).map_or(Ok(()), |expansion| {
             let call_location = expansion.lookup(database);
@@ -819,59 +993,22 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.procedural_function(function, node, origin, is_trait_item)
             .and_then(|procedural| {
                 violations.extend(procedural);
-                self.function_used_outside_production(function, node, origin, is_trait_item)
+                if is_trait_item {
+                    Ok(None)
+                } else {
+                    self.item_used_outside_production(
+                        Definition::Function(function),
+                        UsedItem::Function,
+                        node,
+                        origin,
+                    )
+                }
             })
             .and_then(|used_outside_production| {
                 violations.extend(used_outside_production);
                 self.referenced_test(function, node, origin)
             })
             .map(|referenced| violations.extend(referenced))
-    }
-
-    fn function_used_outside_production(
-        &self,
-        function: Function,
-        node: &SyntaxNode,
-        origin: &SubtreeOrigin,
-        is_trait_item: bool,
-    ) -> Result<Option<Violation>, ModuleDependenciesError> {
-        (!is_trait_item
-            && (self
-                .unpublished_packages
-                .contains(&self.crate_target.package_name)
-                || !self.is_reachable_from_other_crates(function))
-            && !self.non_production_code.contains(node)
-            && !self.in_test_gated_code(node))
-        .then(|| {
-            self.usages
-                .all(ModuleDef::Function(function))
-                .references
-                .values()
-                .flatten()
-                .map(|FileReference { name, .. }| name.syntax().parent())
-                .collect::<Option<Vec<SyntaxNode>>>()
-        })
-        .flatten()
-        .filter(|referencing| {
-            !referencing.is_empty()
-                && referencing
-                    .iter()
-                    .all(|parent| self.non_production_code.contains(parent))
-        })
-        .map(|referencing| {
-            self.locate_focus(node, origin).map(|location| Violation {
-                kind: if referencing
-                    .iter()
-                    .any(|parent| self.non_production_code.is_benchmark(parent))
-                {
-                    ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Benchmarks)
-                } else {
-                    ViolationKind::FunctionUsedOnlyBy(NonProductionUsers::Tests)
-                },
-                location,
-            })
-        })
-        .transpose()
     }
 
     fn generic_parameter_violation(
@@ -1246,8 +1383,50 @@ impl<'database> ModuleWalk<'_, 'database> {
             .is_file_local()
     }
 
+    fn is_exported(&self, definition: Definition<'database>) -> bool {
+        let database = self.semantics.db;
+        let owner = match definition {
+            Definition::Function(function) => function
+                .as_assoc_item(database)
+                .and_then(|item| item.implementing_ty(database))
+                .and_then(|self_type| self_type.as_adt()),
+            Definition::Const(constant) => constant
+                .as_assoc_item(database)
+                .and_then(|item| item.implementing_ty(database))
+                .and_then(|self_type| self_type.as_adt()),
+            Definition::EnumVariant(variant) => Some(Adt::Enum(variant.parent_enum(database))),
+            Definition::Field(field) => Some(match field.parent_def(database) {
+                Variant::Struct(owner) => Adt::Struct(owner),
+                Variant::Union(owner) => Adt::Union(owner),
+                Variant::EnumVariant(owner) => Adt::Enum(owner.parent_enum(database)),
+            }),
+            _ => None,
+        };
+
+        definition
+            .visibility(database)
+            .is_some_and(|visibility| visibility.is_public())
+            && definition.module(database).is_some_and(|module| {
+                module.path_to_root(database).iter().all(|ancestor| {
+                    ancestor.is_crate_root(database) || ancestor.visibility(database).is_public()
+                })
+            })
+            && owner.is_none_or(|adt| adt.visibility(database).is_public())
+    }
+
     fn is_own_crate_adt(&self, adt: Adt) -> bool {
         adt.module(self.semantics.db).krate(self.semantics.db) == self.krate
+    }
+
+    fn is_production_code(&self, node: &SyntaxNode) -> bool {
+        !self.token_origin.is_foreign_text(node)
+            && !self.non_production_code.is_in_a_non_production_file(node)
+            && !Ancestry {
+                node,
+                semantics: self.semantics,
+            }
+            .enclosing()
+            .is_some_and(|enclosing| self.in_test_gated_code(&enclosing))
     }
 
     fn is_public_item_container(node: &SyntaxNode) -> bool {
@@ -1258,24 +1437,6 @@ impl<'database> ModuleWalk<'_, 'database> {
                     .parent()
                     .is_some_and(|parent| ast::Module::can_cast(parent.kind()))
             })
-    }
-
-    fn is_reachable_from_other_crates(&self, function: Function) -> bool {
-        let database = self.semantics.db;
-
-        function.visibility(database).is_public()
-            && function
-                .module(database)
-                .path_to_root(database)
-                .iter()
-                .all(|module| {
-                    module.is_crate_root(database) || module.visibility(database).is_public()
-                })
-            && function
-                .as_assoc_item(database)
-                .and_then(|item| item.implementing_ty(database))
-                .and_then(|self_type| self_type.as_adt())
-                .is_none_or(|adt| adt.visibility(database).is_public())
     }
 
     fn is_reexport(&self, node: &SyntaxNode, definition: &ItemDefinition) -> bool {
@@ -1406,6 +1567,55 @@ impl<'database> ModuleWalk<'_, 'database> {
         )
     }
 
+    fn item_used_outside_production(
+        &self,
+        definition: Definition<'database>,
+        item: UsedItem,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        ((self
+            .unpublished_packages
+            .contains(&self.crate_target.package_name)
+            || !self.is_exported(definition))
+            && !self.non_production_code.contains(node)
+            && !self.in_test_gated_code(node))
+        .then(|| {
+            ItemReferences {
+                definition,
+                item,
+                node,
+                semantics: self.semantics,
+                usages: self.usages,
+            }
+            .using_nodes()
+        })
+        .flatten()
+        .filter(|using| {
+            !using.is_empty()
+                && using.iter().all(|user| {
+                    self.non_production_code.contains(user) || self.in_test_gated_code(user)
+                })
+        })
+        .map(|using| {
+            self.locate_focus(node, origin).map(|location| Violation {
+                kind: ViolationKind::ItemUsedOnlyBy {
+                    item,
+                    users: if using
+                        .iter()
+                        .any(|user| self.non_production_code.is_benchmark(user))
+                    {
+                        NonProductionUsers::Benchmarks
+                    } else {
+                        NonProductionUsers::Tests
+                    },
+                },
+                location,
+            })
+        })
+        .transpose()
+    }
+
     fn item_violations<'items>(
         &self,
         items: impl Iterator<Item = &'items ast::Item>,
@@ -1421,6 +1631,89 @@ impl<'database> ModuleWalk<'_, 'database> {
                     })
             })
             .collect()
+    }
+
+    fn items_used_outside_production(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        let database = self.semantics.db;
+        let used = if !matches!(origin, SubtreeOrigin::SourceFile) {
+            None
+        } else if let Some(written) = ast::Struct::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .map(|definition| UsedDefinition {
+                    definition: Definition::Adt(Adt::Struct(definition)),
+                    item: UsedItem::Struct,
+                })
+        } else if let Some(written) = ast::Enum::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .map(|definition| UsedDefinition {
+                    definition: Definition::Adt(Adt::Enum(definition)),
+                    item: UsedItem::Enum,
+                })
+        } else if let Some(written) = ast::Union::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .map(|definition| UsedDefinition {
+                    definition: Definition::Adt(Adt::Union(definition)),
+                    item: UsedItem::Union,
+                })
+        } else if let Some(written) = ast::Const::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .filter(|definition| {
+                    definition
+                        .as_assoc_item(database)
+                        .is_none_or(|item| item.container_or_implemented_trait(database).is_none())
+                })
+                .map(|definition| UsedDefinition {
+                    definition: Definition::Const(definition),
+                    item: UsedItem::Constant,
+                })
+        } else if let Some(written) = ast::Static::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .map(|definition| UsedDefinition {
+                    definition: Definition::Static(definition),
+                    item: UsedItem::Static,
+                })
+        } else if let Some(written) = ast::TypeAlias::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .filter(|definition| {
+                    definition
+                        .as_assoc_item(database)
+                        .is_none_or(|item| item.container_or_implemented_trait(database).is_none())
+                })
+                .map(|definition| UsedDefinition {
+                    definition: Definition::TypeAlias(definition),
+                    item: UsedItem::TypeAlias,
+                })
+        } else if let Some(written) = ast::Variant::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .map(|definition| UsedDefinition {
+                    definition: Definition::EnumVariant(definition),
+                    item: UsedItem::Variant,
+                })
+        } else if let Some(written) = ast::RecordField::cast(node.clone()) {
+            self.semantics
+                .to_def(&written)
+                .map(|definition| UsedDefinition {
+                    definition: Definition::Field(definition),
+                    item: UsedItem::Field,
+                })
+        } else {
+            None
+        };
+
+        used.map_or(Ok(None), |UsedDefinition { definition, item }| {
+            self.item_used_outside_production(definition, item, node, origin)
+        })
     }
 
     fn locate(
@@ -2023,32 +2316,6 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
     }
 
-    fn record_assertion(&self, call: &ast::MacroCall) {
-        let database = self.semantics.db;
-
-        if self
-            .semantics
-            .resolve_macro_call(call)
-            .is_some_and(|definition| {
-                self.standard_items
-                    .library_crates
-                    .contains(&definition.module(database).krate(database))
-                    && EQUALITY_ASSERTION_MACROS.contains(&definition.name(database).as_str())
-            })
-            && let Some(written) = self
-                .semantics
-                .ancestors_with_macros(call.syntax().clone())
-                .find_map(ast::Fn::cast)
-            && let Some(function) = self.semantics.to_def(&written)
-        {
-            self.test_assertions.compare_in(
-                function,
-                self.round_trips()
-                    .compares_a_round_trip(call, written.syntax()),
-            );
-        }
-    }
-
     fn record_own_tokens(
         &self,
         file: HirFileId,
@@ -2068,30 +2335,16 @@ impl<'database> ModuleWalk<'_, 'database> {
             })
     }
 
-    fn record_test(&self, node: &SyntaxNode, origin: &SubtreeOrigin) {
-        if let Some(written) = ast::Fn::cast(node.clone()).filter(|function| {
+    fn record_test(&self, node: &SyntaxNode) {
+        if ast::Fn::cast(node.clone()).is_some_and(|function| {
             AttributedItem {
-                item: &ast::Item::Fn(function.clone()),
+                item: &ast::Item::Fn(function),
                 paths: self.paths,
                 semantics: self.semantics,
             }
             .is_libtest_test()
         }) {
-            self.test_assertions.run_test();
-
-            if written.name().is_some_and(|name| {
-                self.token_origin.is_own_text(
-                    self.semantics.hir_file_for(name.syntax()),
-                    name.syntax().text_range(),
-                )
-            }) && let Some(function) = self.semantics.to_def(&written)
-            {
-                self.test_assertions.record(TestSite {
-                    function,
-                    node: node.clone(),
-                    origin: origin.clone(),
-                });
-            }
+            self.runs_libtest_tests.set(true);
         }
     }
 
@@ -2175,16 +2428,6 @@ impl<'database> ModuleWalk<'_, 'database> {
             )
     }
 
-    const fn round_trips(&self) -> RoundTrips<'_, 'database> {
-        RoundTrips {
-            method_calls: self.method_calls,
-            paths: self.paths,
-            semantics: self.semantics,
-            serialization_traits: self.serialization_traits,
-            standard_items: self.standard_items,
-        }
-    }
-
     fn signature_violations(
         &self,
         node: &SyntaxNode,
@@ -2196,6 +2439,33 @@ impl<'database> ModuleWalk<'_, 'database> {
                     .filter(|tuple| SignatureTuple { tuple }.is_in_a_signature())
                     .map(|tuple| {
                         self.own_violation(ViolationKind::TupleInSignature, tuple.syntax(), origin)
+                    })
+                    .or_else(|| {
+                        ast::TupleFieldList::cast(node.clone())
+                            .filter(|fields| fields.fields().nth(1).is_some())
+                            .map(|fields| {
+                                self.own_violation(
+                                    ViolationKind::Layout(LayoutViolation::PositionalFields),
+                                    fields.syntax(),
+                                    origin,
+                                )
+                            })
+                    })
+                    .or_else(|| {
+                        ast::Use::cast(node.clone())
+                            .filter(|import| {
+                                import
+                                    .syntax()
+                                    .parent()
+                                    .is_some_and(|parent| ast::StmtList::can_cast(parent.kind()))
+                            })
+                            .map(|import| {
+                                self.own_violation(
+                                    ViolationKind::Layout(LayoutViolation::ImportInsideBlock),
+                                    import.syntax(),
+                                    origin,
+                                )
+                            })
                     })
                     .or_else(|| {
                         ast::PathType::cast(node.clone())
@@ -2212,82 +2482,71 @@ impl<'database> ModuleWalk<'_, 'database> {
         )
     }
 
-    fn sleep_in_test(
-        &self,
-        node: &SyntaxNode,
-        origin: &SubtreeOrigin,
-    ) -> Result<Option<Violation>, ModuleDependenciesError> {
-        ast::Path::cast(node.clone())
-            .filter(|path| {
-                matches!(
-                    self.paths.resolve(path),
-                    Some(PathResolution::Def(ModuleDef::Function(function)))
-                        if self.standard_items.sleeps.contains(&function)
-                ) && self.non_production_code.is_test(node)
-            })
-            .map_or(Ok(None), |path| {
-                self.own_violation(
-                    ViolationKind::Test(TestViolation::Sleeping),
-                    path.syntax(),
-                    origin,
-                )
-            })
-    }
-
-    fn test_findings(
-        &self,
-        WalkedModule {
-            crate_findings,
-            findings: ModuleFindings { violations, .. },
-            ..
-        }: &mut WalkedModule,
-    ) -> Result<(), ModuleDependenciesError> {
-        crate_findings.runs_libtest_tests |= self.test_assertions.runs_tests();
-
-        self.test_site_violations(
-            &self.test_assertions.round_trip_tests(),
-            &TestViolation::SerializationRoundTrip,
-        )
-        .map(|round_trips| violations.extend(round_trips))
-    }
-
     fn test_only_code(
         &self,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
     ) -> Result<Option<Violation>, ModuleDependenciesError> {
-        (self.is_test_gated(node)
-            && !self.token_origin.is_foreign_text(node)
-            && !self.non_production_code.contains(node)
-            && !Ancestry {
-                node,
-                semantics: self.semantics,
-            }
-            .enclosing()
-            .is_some_and(|enclosing| self.in_test_gated_code(&enclosing)))
-        .then(|| {
-            self.locate_focus(node, origin).map(|location| Violation {
-                kind: ViolationKind::TestOnlyCodeInProduction,
-                location,
+        let mentions = ConfiguredNode {
+            node,
+            options: self.options,
+        }
+        .test_mentions();
+        let names_test_in_a_cfg_call = ast::CfgPredExpr::cast(node.clone())
+            .and_then(|call| call.cfg_predicate())
+            .is_some_and(|predicate| {
+                TestPredicate {
+                    expression: &CfgExpr::parse_from_ast(predicate),
+                }
+                .names_test()
+            });
+
+        ((mentions.count > 0 || names_test_in_a_cfg_call) && self.is_production_code(node))
+            .then(|| {
+                let module = ast::Module::cast(node.clone());
+                let kind = match &module {
+                    Some(declaration) if declaration.item_list().is_none() => {
+                        Some(ViolationKind::Test(TestViolation::ModuleInItsOwnFile))
+                    }
+                    Some(inline) if mentions.is_a_plain_gate => inline
+                        .name()
+                        .filter(|name| name.text() != TEST_MODULE_NAME)
+                        .map(|_| ViolationKind::Test(TestViolation::ModuleNotNamedTests)),
+                    _ => Some(ViolationKind::TestOnlyCodeInProduction),
+                };
+
+                kind.map(|kind| {
+                    self.locate_focus(node, origin)
+                        .map(|location| Violation { kind, location })
+                })
+                .transpose()
             })
-        })
-        .transpose()
+            .transpose()
+            .map(Option::flatten)
     }
 
-    fn test_site_violations(
+    fn test_outside_a_test_module(
         &self,
-        sites: &[TestSite],
-        violation: &TestViolation,
-    ) -> Result<Vec<Violation>, ModuleDependenciesError> {
-        sites
-            .iter()
-            .map(|TestSite { node, origin, .. }| {
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        ast::Fn::cast(node.clone())
+            .filter(|function| {
+                AttributedItem {
+                    item: &ast::Item::Fn(function.clone()),
+                    paths: self.paths,
+                    semantics: self.semantics,
+                }
+                .has_test_attribute()
+                    && self.is_production_code(node)
+            })
+            .map(|_| {
                 self.locate_focus(node, origin).map(|location| Violation {
-                    kind: ViolationKind::Test(violation.clone()),
+                    kind: ViolationKind::Test(TestViolation::OutsideTestModule),
                     location,
                 })
             })
-            .collect()
+            .transpose()
     }
 
     fn test_target_violations(
@@ -2602,6 +2861,55 @@ impl<'database> ModuleWalk<'_, 'database> {
         })
     }
 
+    fn vacuous_negations(
+        &self,
+        configured: &ConfiguredNode<'_>,
+        origin: &SubtreeOrigin,
+        ModuleFindings {
+            every_configuration: EveryConfigurationFindings { held, refuted },
+            ..
+        }: &mut ModuleFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        configured
+            .negated_atoms()
+            .into_iter()
+            .filter(|NegatedAtom { attribute, .. }| {
+                !self.token_origin.is_foreign_text(attribute.syntax())
+            })
+            .try_for_each(
+                |NegatedAtom {
+                     atom,
+                     attribute,
+                     is_set,
+                 }| {
+                    self.locate(attribute.syntax(), origin).map(|location| {
+                        let negation = Violation {
+                            kind: ViolationKind::VacuousNegatedConfiguration {
+                                atom: match atom {
+                                    CfgAtom::Flag(name) => ConfigurationAtom::Flag {
+                                        name: name.as_str().to_owned(),
+                                    },
+                                    CfgAtom::KeyValue { key, value } => {
+                                        ConfigurationAtom::KeyValue {
+                                            key: key.as_str().to_owned(),
+                                            value: value.as_str().to_owned(),
+                                        }
+                                    }
+                                },
+                            },
+                            location,
+                        };
+
+                        if is_set {
+                            refuted.insert(negation);
+                        } else {
+                            held.insert(negation);
+                        }
+                    })
+                },
+            )
+    }
+
     fn visit(
         &self,
         node: &SyntaxNode,
@@ -2617,11 +2925,11 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.unresolved_method_call(node, origin)
             .and_then(|unresolved| {
                 findings.violations.extend(unresolved);
-                self.sleep_in_test(node, origin)
-            })
-            .and_then(|sleep| {
-                findings.violations.extend(sleep);
                 self.error_implementation(node, definition, origin, findings, crate_findings)
+            })
+            .and_then(|()| {
+                self.error_display(node, definition, origin)
+                    .map(|handwritten| findings.violations.extend(handwritten))
             })
             .and_then(|()| self.harness_call(node, origin, findings, crate_findings))
             .and_then(|()| {
