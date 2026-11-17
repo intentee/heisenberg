@@ -3,6 +3,7 @@ use heisenberg_module_graph::placement_violation::PlacementViolation;
 
 use crate::constants::ADDITIONAL_PUBLIC_ITEM;
 use crate::constants::IMPL_WITHOUT_LOCAL_TYPE;
+use crate::constants::ITEM_MORE_VISIBLE_THAN_ITS_USES;
 use crate::constants::MISPLACED_BLANKET_IMPL;
 use crate::constants::MISPLACED_FOREIGN_TYPE_IMPL;
 use crate::constants::MISPLACED_IMPL;
@@ -17,6 +18,7 @@ use crate::issue_text::IssueText;
 pub enum PlacementIssue {
     AdditionalPublicItem,
     ImplWithoutLocalType,
+    ItemMoreVisibleThanItsUses,
     MisplacedBlanketImpl,
     MisplacedForeignTypeImpl,
     MisplacedImpl,
@@ -33,6 +35,7 @@ impl PlacementIssue {
         match self {
             Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
             Self::ImplWithoutLocalType => IMPL_WITHOUT_LOCAL_TYPE,
+            Self::ItemMoreVisibleThanItsUses => ITEM_MORE_VISIBLE_THAN_ITS_USES,
             Self::MisplacedBlanketImpl => MISPLACED_BLANKET_IMPL,
             Self::MisplacedForeignTypeImpl => MISPLACED_FOREIGN_TYPE_IMPL,
             Self::MisplacedImpl => MISPLACED_IMPL,
@@ -45,10 +48,11 @@ impl PlacementIssue {
     }
 
     #[must_use]
-    pub const fn variants() -> [Self; 10] {
+    pub const fn variants() -> [Self; 11] {
         [
             Self::AdditionalPublicItem,
             Self::ImplWithoutLocalType,
+            Self::ItemMoreVisibleThanItsUses,
             Self::MisplacedBlanketImpl,
             Self::MisplacedForeignTypeImpl,
             Self::MisplacedImpl,
@@ -76,6 +80,7 @@ impl From<&PlacementViolation> for PlacementIssue {
                 Self::MisplacedTraitObjectImpl
             }
             PlacementViolation::MisplacedImpl(ImplPlacement::Type { .. }) => Self::MisplacedImpl,
+            PlacementViolation::MoreVisibleThanItsUses { .. } => Self::ItemMoreVisibleThanItsUses,
             PlacementViolation::ModuleNotNamedAfterItsItem { .. } => {
                 Self::ModuleNotNamedAfterItsItem
             }

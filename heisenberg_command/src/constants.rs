@@ -426,6 +426,23 @@ pub const INVALID_MACRO_DEFINITION: IssueText = IssueText {
     summary: "A macro definition that is not valid",
 };
 
+pub const ITEM_MORE_VISIBLE_THAN_ITS_USES: IssueText = IssueText {
+    definition: "A function, inherent method, struct, enum, union, constant, static, type alias or field of a package that cannot be published, whose visibility reaches outside its crate, that no code of another crate target refers to in any declared configuration, and that its own crate names only inside function bodies and imports. A reference inside the definition of a type, its impl blocks and the code its derives generate does not count for the type. Evaluated only when every declared configuration is analysed.",
+    evaluation: RuleEvaluation::EveryDeclaredConfiguration,
+    exceptions: &[
+        "An item of a package that can be published, whose users are outside the workspace.",
+        "An item that its crate names in a signature, a type definition or an impl header, which an exported interface may need.",
+        "A trait, a trait item, an enum variant and a module, whose visibility is not their own or is not narrowed alone.",
+    ],
+    name: "ItemMoreVisibleThanItsUses",
+    ordinal: 17,
+    rationale: "An unpublishable package has every user inside the workspace, so an item exported to crates that never use it declares an interface that does not exist: it hides which items are the crate's surface, and keeps the compiler from reporting the item once nothing in its crate uses it either.",
+    remedy: "Narrow the visibility to pub(crate), or remove the item when its own crate does not use it.",
+    scope: RuleScope::Workspace,
+    section: RuleSection::Modules,
+    summary: "An exported item that no other crate target uses",
+};
+
 pub const ITEM_OUT_OF_ORDER: IssueText = IssueText {
     definition: "An item of a module file or inline module, among the items written in module files, that follows an item of a later group. The groups, in order: module declarations; imports from vendor crates, which are std, core, alloc and every crate outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics, macro_rules! macros and macro calls; private structs, enums, unions, type aliases and traits with their impl blocks; public items with their impl blocks, and the main function that its crate target enters through; tests, the functions under the built-in test, bench or test_case attribute; inline modules. An import, like an extern crate declaration, takes the group of the crate that the first segment of each of its paths resolves to, except that an import of a macro_rules! macro of its own module, which Rust allows only after the macro, takes the group of the macro; an impl block takes the group of the type or trait it belongs to, the items of an extern block take their places one by one, and an item is public when its visibility reaches beyond its own module. The item is reported at its name, with the first earlier item of a later group.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,

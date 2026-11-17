@@ -316,6 +316,11 @@ const CATALOGUE: &str = "Heisenberg 0.1.0 rule catalogue\n\
         Applies to: all code\n  \
         Evaluated: in each analysed configuration\n\
         \n\
+        Rule 5.17 ItemMoreVisibleThanItsUses: An exported item that no other crate target uses\n  \
+        Scope: workspace\n  \
+        Applies to: production code, not to test code\n  \
+        Evaluated: only when every declared configuration is analysed\n\
+        \n\
         Section 6: Names, data and functions\n\
         \n\
         Rule 6.1 DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n  \

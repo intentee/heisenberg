@@ -660,7 +660,11 @@ impl<'database> ModuleWalk<'_, 'database> {
                         })
                         .and_then(|misplaced_test| {
                             walked.findings.violations.extend(misplaced_test);
-                            self.items_used_outside_production(node, origin)
+                            self.items_used_outside_production(
+                                node,
+                                origin,
+                                &mut walked.findings.every_configuration,
+                            )
                         })
                         .and_then(|used_outside_production| {
                             walked.findings.violations.extend(used_outside_production);
@@ -990,12 +994,68 @@ impl<'database> ModuleWalk<'_, 'database> {
             })
     }
 
+    fn export_finding(
+        &self,
+        definition: Definition<'database>,
+        item: UsedItem,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+        EveryConfigurationFindings { held, refuted }: &mut EveryConfigurationFindings,
+    ) -> Result<(), ModuleDependenciesError> {
+        if item != UsedItem::Variant
+            && self
+                .unpublished_packages
+                .contains(&self.crate_target.package_name)
+            && self.is_exported(definition)
+            && self.placement_rules_apply(node)
+        {
+            let is_needed = ItemReferences {
+                definition,
+                item,
+                node,
+                semantics: self.semantics,
+                usages: self.usages,
+            }
+            .exporting_uses()
+            .iter()
+            .any(|user| {
+                !self.token_origin.is_own_file(original_file_id(
+                    self.semantics.db,
+                    self.semantics.hir_file_for(user),
+                )) || !user.ancestors().any(|ancestor| {
+                    ast::BlockExpr::can_cast(ancestor.kind()) || ast::Use::can_cast(ancestor.kind())
+                })
+            });
+
+            self.locate_focus(node, origin).map(|location| {
+                let finding = Violation {
+                    kind: ViolationKind::Placement(PlacementViolation::MoreVisibleThanItsUses {
+                        item,
+                    }),
+                    location,
+                };
+
+                if is_needed {
+                    refuted.insert(finding);
+                } else {
+                    held.insert(finding);
+                }
+            })
+        } else {
+            Ok(())
+        }
+    }
+
     fn function(
         &self,
         function: Function,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
-        ModuleFindings { violations, .. }: &mut ModuleFindings,
+        ModuleFindings {
+            every_configuration,
+            violations,
+            ..
+        }: &mut ModuleFindings,
     ) -> Result<(), ModuleDependenciesError> {
         let database = self.semantics.db;
         let is_trait_item = function
@@ -1020,7 +1080,20 @@ impl<'database> ModuleWalk<'_, 'database> {
                 violations.extend(used_outside_production);
                 self.referenced_test(function, node, origin)
             })
-            .map(|referenced| violations.extend(referenced))
+            .and_then(|referenced| {
+                violations.extend(referenced);
+                if is_trait_item {
+                    Ok(())
+                } else {
+                    self.export_finding(
+                        Definition::Function(function),
+                        UsedItem::Function,
+                        node,
+                        origin,
+                        every_configuration,
+                    )
+                }
+            })
     }
 
     fn generic_parameter_violation(
@@ -1670,6 +1743,7 @@ impl<'database> ModuleWalk<'_, 'database> {
         &self,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
+        every_configuration: &mut EveryConfigurationFindings,
     ) -> Result<Option<Violation>, ModuleDependenciesError> {
         let database = self.semantics.db;
         let used = if !matches!(origin, SubtreeOrigin::SourceFile) {
@@ -1745,7 +1819,8 @@ impl<'database> ModuleWalk<'_, 'database> {
         };
 
         used.map_or(Ok(None), |UsedDefinition { definition, item }| {
-            self.item_used_outside_production(definition, item, node, origin)
+            self.export_finding(definition, item, node, origin, every_configuration)
+                .and_then(|()| self.item_used_outside_production(definition, item, node, origin))
         })
     }
 

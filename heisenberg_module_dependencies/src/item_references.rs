@@ -21,6 +21,17 @@ pub struct ItemReferences<'references, 'database> {
 }
 
 impl<'database> ItemReferences<'_, 'database> {
+    pub fn exporting_uses(&self) -> Vec<SyntaxNode> {
+        self.usages
+            .of(self.definition)
+            .by_file
+            .values()
+            .flatten()
+            .filter_map(|FoundReference { name, .. }| name.syntax().parent())
+            .filter(|user| !self.is_inside_its_item(user))
+            .collect()
+    }
+
     pub fn using_nodes(&self) -> Option<Vec<SyntaxNode>> {
         self.usages
             .of(self.definition)

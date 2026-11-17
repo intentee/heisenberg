@@ -41,7 +41,7 @@ fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
             enabler v0.1.0 -> both v0.1.0 -> confined v0.1.0\n\
             - forked/Cargo.toml: Package forked depends on confined package confined without being one of its users\n      \
             forked v0.1.0 -> wrapper v0.1.0 -> confined v0.1.0\n\
-            - stranger/Cargo.toml: Package stranger depends on confined package confined without being one of its users (only on {HOST_CONFIGURATION})\n      \
+            - stranger/Cargo.toml: Package stranger depends on confined package confined without being one of its users (only on x86_64-unknown-linux-gnu)\n      \
             stranger v0.1.0 -> user v0.1.0 -> wrapper v0.1.0 -> confined v0.1.0\n\
             - unlisted/Cargo.toml: Package unlisted depends on confined package confined without being one of its users\n      \
             unlisted v0.1.0 -> confined v0.1.0\n\
@@ -61,6 +61,30 @@ fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
             \n\
             - Cargo.toml: Package idle is listed as a user of confined package confined but depends on it in no declared configuration\n\
             \n\
+            ItemMoreVisibleThanItsUses: 10 violations\n\
+            An unpublishable package has every user inside the workspace, so an item exported to crates that never use it declares an interface that does not exist: it hides which items are the crate's surface, and keeps the compiler from reporting the item once nothing in its crate uses it either. Narrow the visibility to pub(crate), or remove the item when its own crate does not use it.\n\
+            \n\
+            - builder/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn builder() -> u8 {{\n\
+            - consumer/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn consumer() -> u8 {{\n\
+            - dependent/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn dependent() -> u8 {{\n\
+            - enabler/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn enabler() -> u8 {{\n\
+            - forked/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn forked() -> u8 {{\n\
+            - harness/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn harness() -> u8 {{\n\
+            - idle/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn idle() -> u8 {{\n\
+            - scriptor/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn scriptor() -> u8 {{\n\
+            - stranger/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn stranger() -> u8 {{\n\
+            - unlisted/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn unlisted() -> u8 {{\n\
+            \n\
             PackageDependencyCycle: 1 violation\n\
             Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library.\n\
             \n\
@@ -72,7 +96,7 @@ fn confined_packages_declaration_that_does_not_hold_is_a_violation() {
             - Cargo.toml: Confined package absent names no package that the workspace resolves\n\
             \n\
             ------------------------------\n\
-            12 errors found in 6 rules\n\
+            22 errors found in 7 rules\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 19 crate targets, 22 modules\n\

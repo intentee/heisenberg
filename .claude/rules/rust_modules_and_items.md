@@ -6,6 +6,7 @@ enforced_by:
   - GlobImport
   - ImplWithoutLocalType
   - ImportInsideBlock
+  - ItemMoreVisibleThanItsUses
   - ItemOutOfOrder
   - MethodOutOfOrder
   - MisplacedBlanketImpl
@@ -32,3 +33,4 @@ The statements about where items live (one public item per module, module names,
 - An impl block lives in the file of the type it belongs to; a blanket impl, an impl for a foreign type and an impl for a trait object live in the file of their trait; an impl of a foreign trait serves exactly one type of this crate. [MisplacedImpl, MisplacedBlanketImpl, MisplacedForeignTypeImpl, MisplacedTraitObjectImpl, ImplWithoutLocalType]
 - Import every name explicitly, at the top of the module: no glob imports, no imports inside blocks, no re-exports. [GlobImport, ImportInsideBlock, Reexport]
 - Modules never depend on each other in a cycle. [ModuleCycle]
+- In a package that cannot be published, an item is exported only when another crate target uses it or an exported signature names it; otherwise it is `pub(crate)`, and the compiler then reports it once nothing uses it at all. [ItemMoreVisibleThanItsUses]

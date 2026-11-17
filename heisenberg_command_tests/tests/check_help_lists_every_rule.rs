@@ -126,13 +126,13 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     cause and its direct consequences form one issue. A partial run, one that leaves out a declared\n\
     configuration, names the configurations it left out after the analysed ones and does not evaluate\n\
     AttributeAppliedInNoConfiguration, CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt,\n\
-    NextestConfigurationMissing, UnneededNextestConfiguration, UnreachableSourceFile,\n\
-    VacuousNegatedConfiguration, which hold only over every declared configuration, although it does\n\
-    evaluate NextestConfigurationMissing and UnneededNextestConfiguration when an analysed configuration\n\
-    runs a test under libtest's harness, evaluates only in part BenchmarksOnlyPackageWithoutLibraries,\n\
-    TestsOnlyPackageWithoutTestLibraries, whose empty-library checks hold only over every declared\n\
-    configuration, and names the rules it does not evaluate and those it evaluates in part; a partial\n\
-    run without issues exits as compliant.\n\
+    ItemMoreVisibleThanItsUses, NextestConfigurationMissing, UnneededNextestConfiguration,\n\
+    UnreachableSourceFile, VacuousNegatedConfiguration, which hold only over every declared\n\
+    configuration, although it does evaluate NextestConfigurationMissing and\n\
+    UnneededNextestConfiguration when an analysed configuration runs a test under libtest's harness,\n\
+    evaluates only in part BenchmarksOnlyPackageWithoutLibraries, TestsOnlyPackageWithoutTestLibraries,\n\
+    whose empty-library checks hold only over every declared configuration, and names the rules it does\n\
+    not evaluate and those it evaluates in part; a partial run without issues exits as compliant.\n\
     \n\
     Rules: every rule is mandatory and decidable, and is listed under its section with its identifier.\n  \
     1 Analysable code\n    \
@@ -207,7 +207,8 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Rule 5.13 NonConstantInConstantsModule: A public item other than a constant in crate::constants\n    \
     Rule 5.14 PublicAssociatedConstant: A public associated constant of an inherent impl\n    \
     Rule 5.15 PublicConstantOutsideConstantsModule: A public constant outside crate::constants\n    \
-    Rule 5.16 Reexport: A re-export\n  \
+    Rule 5.16 Reexport: A re-export\n    \
+    Rule 5.17 ItemMoreVisibleThanItsUses: An exported item that no other crate target uses\n  \
     6 Names, data and functions\n    \
     Rule 6.1 DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n    \
     Rule 6.2 NonDocComment: A comment that is not a doc comment\n    \

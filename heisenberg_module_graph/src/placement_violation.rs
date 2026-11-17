@@ -4,12 +4,16 @@ use std::fmt::Formatter;
 
 use crate::constants::CONSTANTS_MODULE_NAME;
 use crate::impl_placement::ImplPlacement;
+use crate::used_item::UsedItem;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PlacementViolation {
     AdditionalPublicItem,
     ImplWithoutLocalType,
     MisplacedImpl(ImplPlacement),
+    MoreVisibleThanItsUses {
+        item: UsedItem,
+    },
     ModuleNotNamedAfterItsItem {
         expected: String,
         item: String,
@@ -28,6 +32,10 @@ impl Display for PlacementViolation {
                 formatter.write_str("Impl block belongs to no single type or trait of this crate")
             }
             Self::MisplacedImpl(placement) => placement.fmt(formatter),
+            Self::MoreVisibleThanItsUses { item } => write!(
+                formatter,
+                "{item} by no other crate target, so its visibility reaches further than its uses"
+            ),
             Self::ModuleNotNamedAfterItsItem {
                 expected,
                 item,
