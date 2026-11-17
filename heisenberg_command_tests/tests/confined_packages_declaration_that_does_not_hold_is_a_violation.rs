@@ -23,7 +23,7 @@ fn expected_report() -> String {
             enabler v0.1.0 -> both v0.1.0 -> confined v0.1.0\n\
             - forked/Cargo.toml: Package forked depends on confined package confined without being one of its users\n      \
             forked v0.1.0 -> wrapper v0.1.0 -> confined v0.1.0\n\
-            - stranger/Cargo.toml: Package stranger depends on confined package confined without being one of its users (only on x86_64-unknown-linux-gnu)\n      \
+            - stranger/Cargo.toml: Package stranger depends on confined package confined without being one of its users (only on {HOST_CONFIGURATION})\n      \
             stranger v0.1.0 -> user v0.1.0 -> wrapper v0.1.0 -> confined v0.1.0\n\
             - unlisted/Cargo.toml: Package unlisted depends on confined package confined without being one of its users\n      \
             unlisted v0.1.0 -> confined v0.1.0\n\
