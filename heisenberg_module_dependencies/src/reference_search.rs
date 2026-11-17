@@ -109,11 +109,11 @@ impl<'database> ReferenceSearch<'_, 'database> {
         found
     }
 
-    fn is_in_scope(&self, scope: &ReferenceScope, TokenSite { file, offset }: &TokenSite) -> bool {
+    fn is_file_in_scope(&self, scope: &ReferenceScope, file: FileId) -> bool {
         let database = self.semantics.db;
 
         match scope {
-            ReferenceScope::Crates(crates) => self.file_modules.get(file).is_some_and(|modules| {
+            ReferenceScope::Crates(crates) => self.file_modules.get(&file).is_some_and(|modules| {
                 modules
                     .iter()
                     .any(|module| crates.contains(&module.krate(database)))
@@ -122,8 +122,8 @@ impl<'database> ReferenceSearch<'_, 'database> {
                 root.definition_source_file_id(database)
                     .original_file(database)
                     .file_id(database)
-                    == *file
-                    || self.file_modules.get(file).is_some_and(|modules| {
+                    == file
+                    || self.file_modules.get(&file).is_some_and(|modules| {
                         modules.iter().any(|module| {
                             module
                                 .path_to_root(database)
@@ -132,11 +132,16 @@ impl<'database> ReferenceSearch<'_, 'database> {
                         })
                     })
             }
-            ReferenceScope::Range {
-                file: searched,
-                range,
-            } => file == searched && range.contains_inclusive(*offset),
+            ReferenceScope::Range { file: searched, .. } => file == *searched,
         }
+    }
+
+    fn is_in_scope(&self, scope: &ReferenceScope, TokenSite { file, offset }: &TokenSite) -> bool {
+        self.is_file_in_scope(scope, *file)
+            && match scope {
+                ReferenceScope::Crates(_) | ReferenceScope::ModuleTree(_) => true,
+                ReferenceScope::Range { range, .. } => range.contains_inclusive(*offset),
+            }
     }
 
     fn local_scope(&self, local: Local<'database>) -> Option<ReferenceScope> {
@@ -227,7 +232,12 @@ impl<'database> ReferenceSearch<'_, 'database> {
         scope: &ReferenceScope,
         FoundReferences { by_file }: &mut FoundReferences,
     ) {
-        for (file, sites) in &self.tokens.strings {
+        for (file, sites) in self
+            .tokens
+            .strings
+            .iter()
+            .filter(|(file, _)| self.is_file_in_scope(scope, **file))
+        {
             for StringSite { offset, text } in sites {
                 if text.contains(written)
                     && self.is_in_scope(
