@@ -5,6 +5,7 @@ use crate::issue_type::IssueType;
 
 #[derive(Serialize)]
 pub struct CatalogueEntry {
+    pub applies_to: String,
     pub definition: &'static str,
     pub evaluation: String,
     pub exceptions: &'static [&'static str],
@@ -36,6 +37,7 @@ impl From<IssueType> for CatalogueEntry {
         } = text;
 
         Self {
+            applies_to: issue_type.applicability().to_string(),
             definition,
             evaluation: evaluation.to_string(),
             exceptions,

@@ -90,6 +90,8 @@ use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::module_findings::ModuleFindings;
 use heisenberg_module_graph::non_production_users::NonProductionUsers;
+use heisenberg_module_graph::placement_violation::PlacementViolation;
+use heisenberg_module_graph::rule_applicability::RuleApplicability;
 use heisenberg_module_graph::shared_module_file::SharedModuleFile;
 use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::test_violation::TestViolation;
@@ -474,7 +476,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                 if self.is_constants_module(node) {
                     self.item_violations(
                         non_constant.iter(),
-                        &ViolationKind::NonConstantInConstantsModule,
+                        &ViolationKind::Placement(PlacementViolation::NonConstantInConstantsModule),
                         origin,
                     )
                     .map(|non_constants| module_findings.violations.extend(non_constants))
@@ -485,7 +487,7 @@ impl<'database> ModuleWalk<'_, 'database> {
 
                             self.item_violations(
                                 non_constant.iter().filter(|item| Some(*item) != accepted),
-                                &ViolationKind::AdditionalPublicItem,
+                                &ViolationKind::Placement(PlacementViolation::AdditionalPublicItem),
                                 origin,
                             )
                             .and_then(|additional| {
@@ -689,7 +691,10 @@ impl<'database> ModuleWalk<'_, 'database> {
         let error_derive = self.error_derive();
 
         match derive.syntax().ancestors().find_map(ast::Enum::cast) {
-            Some(written) if error_derive.generates(expansion) => {
+            Some(written)
+                if error_derive.generates(expansion)
+                    && self.error_rules_apply(written.syntax()) =>
+            {
                 let DerivedSources {
                     outside_chain,
                     sources,
@@ -746,7 +751,8 @@ impl<'database> ModuleWalk<'_, 'database> {
                     && self.semantics.hir_file_for(node).macro_file().is_none()
                     && self
                         .error_types()
-                        .implements_error(&implementation.self_ty(database)) =>
+                        .implements_error(&implementation.self_ty(database))
+                    && self.error_rules_apply(node) =>
             {
                 self.locate_focus(node, origin).map(|location| {
                     Some(Violation {
@@ -786,12 +792,12 @@ impl<'database> ModuleWalk<'_, 'database> {
                         }
                     };
 
-                    violations.extend(origin_violation.map(|violation| Violation {
-                        kind: ViolationKind::Error(violation),
-                        location: location.clone(),
-                    }));
+                    if self.error_rules_apply(node) {
+                        violations.extend(origin_violation.map(|violation| Violation {
+                            kind: ViolationKind::Error(violation),
+                            location: location.clone(),
+                        }));
 
-                    if !self.non_production_code.is_test(node) {
                         error_types
                             .implementations
                             .insert(*implementation, location);
@@ -861,7 +867,6 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.semantics
             .to_def(written)
             .zip(written.name())
-            .filter(|_| !self.in_test_gated_code(written.syntax()))
             .map_or(Ok(None), |(definition, name)| {
                 let module = definition.module(database);
 
@@ -884,6 +889,13 @@ impl<'database> ModuleWalk<'_, 'database> {
                     }
                 })
             })
+    }
+
+    fn error_rules_apply(&self, node: &SyntaxNode) -> bool {
+        self.is_applicable(
+            ViolationKind::Error(ErrorViolation::Handwritten).applicability(),
+            node,
+        )
     }
 
     const fn error_types(&self) -> ErrorTypes<'_, 'database> {
@@ -1334,6 +1346,13 @@ impl<'database> ModuleWalk<'_, 'database> {
                 })
     }
 
+    fn is_applicable(&self, applicability: RuleApplicability, node: &SyntaxNode) -> bool {
+        match applicability {
+            RuleApplicability::AllCode => true,
+            RuleApplicability::ProductionCode => !self.is_test_code(node),
+        }
+    }
+
     fn is_compile_error_call(&self, node: &SyntaxNode) -> bool {
         ast::MacroCall::cast(node.clone())
             .and_then(|call| call.path())
@@ -1469,6 +1488,10 @@ impl<'database> ModuleWalk<'_, 'database> {
             )))
     }
 
+    fn is_test_code(&self, node: &SyntaxNode) -> bool {
+        self.non_production_code.is_test(node) || self.in_test_gated_code(node)
+    }
+
     fn is_test_gated(&self, node: &SyntaxNode) -> bool {
         ConfiguredNode {
             node,
@@ -1479,6 +1502,15 @@ impl<'database> ModuleWalk<'_, 'database> {
 
     fn is_unresolved_method_call(&self, call: &ast::MethodCallExpr) -> bool {
         self.method_calls.resolve(call).is_none()
+    }
+
+    fn is_workspace_adt(&self, adt: Adt) -> bool {
+        let database = self.semantics.db;
+
+        self.file_modules.contains_key(&original_file_id(
+            database,
+            adt.module(database).definition_source_file_id(database),
+        ))
     }
 
     fn is_written_by_the_workspace(&self, node: &SyntaxNode) -> bool {
@@ -1623,6 +1655,7 @@ impl<'database> ModuleWalk<'_, 'database> {
         origin: &SubtreeOrigin,
     ) -> Result<Vec<Violation>, ModuleDependenciesError> {
         items
+            .filter(|item| self.is_applicable(kind.applicability(), item.syntax()))
             .map(|item| {
                 self.locate_focus(item.syntax(), origin)
                     .map(|location| Violation {
@@ -1819,11 +1852,13 @@ impl<'database> ModuleWalk<'_, 'database> {
         {
             Some(AssocItemContainer::Trait(_)) => None,
             Some(AssocItemContainer::Impl(implementation)) => {
-                (implementation.trait_(database).is_none() && reaches_outside)
-                    .then_some(ViolationKind::PublicAssociatedConstant)
+                (implementation.trait_(database).is_none() && reaches_outside).then_some(
+                    ViolationKind::Placement(PlacementViolation::PublicAssociatedConstant),
+                )
             }
-            None => (reaches_outside && !ConstantsModule { database }.matches(module))
-                .then_some(ViolationKind::PublicConstantOutsideConstantsModule),
+            None => (reaches_outside && !ConstantsModule { database }.matches(module)).then_some(
+                ViolationKind::Placement(PlacementViolation::PublicConstantOutsideConstantsModule),
+            ),
         }
     }
 
@@ -1836,29 +1871,29 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         self.locator.file(file).map(|home_file| match home {
             LocalImplHome::Type { .. } | LocalImplHome::TypeArgument { .. } => {
-                ViolationKind::MisplacedImpl(ImplPlacement::Type {
+                ViolationKind::Placement(PlacementViolation::MisplacedImpl(ImplPlacement::Type {
                     type_file: home_file,
-                })
+                }))
             }
-            LocalImplHome::TraitBlanket { .. } => {
-                ViolationKind::MisplacedImpl(ImplPlacement::Blanket {
+            LocalImplHome::TraitBlanket { .. } => ViolationKind::Placement(
+                PlacementViolation::MisplacedImpl(ImplPlacement::Blanket {
                     trait_file: home_file,
-                })
-            }
-            LocalImplHome::TraitObject { .. } => {
-                ViolationKind::MisplacedImpl(ImplPlacement::TraitObject {
+                }),
+            ),
+            LocalImplHome::TraitObject { .. } => ViolationKind::Placement(
+                PlacementViolation::MisplacedImpl(ImplPlacement::TraitObject {
                     trait_file: home_file,
-                })
-            }
-            LocalImplHome::TraitForeignType { owner } => {
-                ViolationKind::MisplacedImpl(ImplPlacement::ForeignType {
+                }),
+            ),
+            LocalImplHome::TraitForeignType { owner } => ViolationKind::Placement(
+                PlacementViolation::MisplacedImpl(ImplPlacement::ForeignType {
                     trait_file: home_file,
                     trait_name: owner
                         .name(database)
                         .display(database, self.krate.edition(database))
                         .to_string(),
-                })
-            }
+                }),
+            ),
         })
     }
 
@@ -1875,27 +1910,35 @@ impl<'database> ModuleWalk<'_, 'database> {
         );
 
         self.locate_focus(implementation.syntax(), origin)
-            .and_then(|location| {
-                match (ImplementedType {
-                    database,
-                    implementation: definition,
-                    krate: self.krate,
+            .map(|location| {
+                self.placement_rules_apply(implementation.syntax())
+                    .then_some(location)
+            })
+            .and_then(|applicable| {
+                applicable.map_or(Ok(None), |location| {
+                    match (ImplementedType {
+                        database,
+                        implementation: definition,
+                        krate: self.krate,
+                    })
+                    .home(&trait_arguments(implementation, self.semantics))
+                    {
+                        ImplHome::Foreign => Ok(Some(Violation {
+                            kind: ViolationKind::Placement(
+                                PlacementViolation::ImplWithoutLocalType,
+                            ),
+                            location,
+                        })),
+                        ImplHome::Local { home } => home
+                            .file(database)
+                            .filter(|file| *file != written_in)
+                            .map(|file| {
+                                self.misplaced_impl_kind(&home, file)
+                                    .map(|kind| Violation { kind, location })
+                            })
+                            .transpose(),
+                    }
                 })
-                .home(&trait_arguments(implementation, self.semantics))
-                {
-                    ImplHome::Foreign => Ok(Some(Violation {
-                        kind: ViolationKind::ImplWithoutLocalType,
-                        location,
-                    })),
-                    ImplHome::Local { home } => home
-                        .file(database)
-                        .filter(|file| *file != written_in)
-                        .map(|file| {
-                            self.misplaced_impl_kind(&home, file)
-                                .map(|kind| Violation { kind, location })
-                        })
-                        .transpose(),
-                }
             })
     }
 
@@ -1967,16 +2010,19 @@ impl<'database> ModuleWalk<'_, 'database> {
     ) -> Result<Option<Violation>, ModuleDependenciesError> {
         match module_item {
             ModuleItem::Misnamed { item, module } => Self::item_name(item)
+                .filter(|_| self.placement_rules_apply(item.syntax()))
                 .map(|name| {
                     let text = name.text();
 
                     self.locate_focus(item.syntax(), origin)
                         .map(|location| Violation {
-                            kind: ViolationKind::ModuleNotNamedAfterItsItem {
-                                expected: NameWords { name: text }.snake_case(),
-                                item: text.to_owned(),
-                                module,
-                            },
+                            kind: ViolationKind::Placement(
+                                PlacementViolation::ModuleNotNamedAfterItsItem {
+                                    expected: NameWords { name: text }.snake_case(),
+                                    item: text.to_owned(),
+                                    module,
+                                },
+                            ),
                             location,
                         })
                 })
@@ -2129,13 +2175,15 @@ impl<'database> ModuleWalk<'_, 'database> {
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
     ) -> Result<Option<Violation>, ModuleDependenciesError> {
-        self.token_origin
-            .is_own_text(self.semantics.hir_file_for(node), node.text_range())
-            .then(|| {
-                self.locate(node, origin)
-                    .map(|location| Violation { kind, location })
-            })
-            .transpose()
+        (self.is_applicable(kind.applicability(), node)
+            && self
+                .token_origin
+                .is_own_text(self.semantics.hir_file_for(node), node.text_range()))
+        .then(|| {
+            self.locate(node, origin)
+                .map(|location| Violation { kind, location })
+        })
+        .transpose()
     }
 
     fn parameter_violations(
@@ -2160,6 +2208,13 @@ impl<'database> ModuleWalk<'_, 'database> {
             .chain(iter::once(self.undestructured_parameter(parameter, origin)))
             .collect::<Result<Vec<Option<Violation>>, ModuleDependenciesError>>()
             .map(|violations| violations.into_iter().flatten().collect())
+    }
+
+    fn placement_rules_apply(&self, node: &SyntaxNode) -> bool {
+        self.is_applicable(
+            ViolationKind::Placement(PlacementViolation::AdditionalPublicItem).applicability(),
+            node,
+        )
     }
 
     fn procedural_function(
@@ -2377,6 +2432,20 @@ impl<'database> ModuleWalk<'_, 'database> {
                 })
             })
             .transpose()
+    }
+
+    fn result_error_violation(
+        &self,
+        error: &Type<'database>,
+        name: UntypedErrorName,
+    ) -> ViolationKind {
+        ViolationKind::Error(
+            if error.as_adt().is_some_and(|adt| self.is_workspace_adt(adt)) {
+                ErrorViolation::NotAnError { error: name }
+            } else {
+                ErrorViolation::UntypedResult { error: name }
+            },
+        )
     }
 
     fn result_errors_of(
@@ -2770,23 +2839,26 @@ impl<'database> ModuleWalk<'_, 'database> {
 
         self.semantics
             .to_def(alias)
-            .map_or(Ok(false), |definition| {
+            .map_or(Ok(None), |definition| {
+                let error = definition.ty(database);
+
                 self.names_a_result_error_of_its_trait(definition)
                     .map(|names| {
-                        names && !self.error_types().is_error_type(&definition.ty(database))
+                        (names && !self.error_types().is_error_type(&error)).then_some(error)
                     })
             })
-            .and_then(|is_untyped| {
+            .and_then(|untyped| {
                 alias
                     .ty()
-                    .filter(|_| is_untyped)
-                    .map_or(Ok(None), |written| {
+                    .zip(untyped)
+                    .map_or(Ok(None), |(written, error)| {
                         self.own_violation(
-                            ViolationKind::Error(ErrorViolation::UntypedResult {
-                                error: UntypedErrorName::Named {
+                            self.result_error_violation(
+                                &error,
+                                UntypedErrorName::Named {
                                     error_type: written.syntax().to_string(),
                                 },
-                            }),
+                            ),
                             written.syntax(),
                             origin,
                         )
@@ -2856,7 +2928,7 @@ impl<'database> ModuleWalk<'_, 'database> {
         .map_or(Ok(None), |error| {
             self.untyped_error_name(written, &error).and_then(|name| {
                 self.own_violation(
-                    ViolationKind::Error(ErrorViolation::UntypedResult { error: name }),
+                    self.result_error_violation(&error, name),
                     written.syntax(),
                     origin,
                 )
@@ -2976,6 +3048,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                 } else if matches!(origin, SubtreeOrigin::SourceFile)
                     && let ItemDefinition::Const(constant) = definition
                     && let Some(kind) = self.misplaced_constant(*constant)
+                    && self.is_applicable(kind.applicability(), node)
                 {
                     self.locate_focus(node, origin).map(|location| {
                         findings.violations.insert(Violation { kind, location });

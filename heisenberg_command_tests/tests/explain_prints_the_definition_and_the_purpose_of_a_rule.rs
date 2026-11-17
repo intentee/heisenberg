@@ -21,7 +21,7 @@ fn explain_prints_the_definition_and_the_purpose_of_a_rule() {
     assert_eq!(
         str::from_utf8(&output),
         Ok("Rule 5.2 GlobImport: A glob import\n\
-        Section 5, Modules and items. Scope: module file. Evaluated in each analysed configuration.\n\
+        Section 5, Modules and items. Scope: module file. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A glob import.\n\
         \n\

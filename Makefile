@@ -124,6 +124,7 @@ fetch:
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/error_messages_and_modules/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/error_types/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/error_types_in_test_code/Cargo.toml
+	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/rules_relaxed_in_test_code/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/every_target_kind/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/function_used_only_by_benchmarks/Cargo.toml
 	cargo fetch --locked --manifest-path $(COVERAGE_FIXTURE_DIRECTORY)/must_use_benchmark_output/Cargo.toml

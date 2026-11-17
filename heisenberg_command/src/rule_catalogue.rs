@@ -80,6 +80,7 @@ impl RuleCatalogue {
                     String::new(),
                     format!("{} {}: {}", text.identifier(), text.name, text.summary),
                     format!("  Scope: {}", text.scope),
+                    format!("  Applies to: {}", issue_type.applicability()),
                     format!("  Evaluated: {}", text.evaluation),
                 ]
             }))

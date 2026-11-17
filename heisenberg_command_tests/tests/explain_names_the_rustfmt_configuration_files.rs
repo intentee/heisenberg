@@ -25,7 +25,7 @@ fn explain_names_the_rustfmt_configuration_files() {
         str::from_utf8(&output),
         Ok(
             "Rule 3.10 RustfmtConfigurationMissing: A workspace without a rustfmt configuration\n\
-        Section 3, Lints and formatting. Scope: workspace. Evaluated in each analysed configuration.\n\
+        Section 3, Lints and formatting. Scope: workspace. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A workspace root that holds neither rustfmt.toml nor .rustfmt.toml. Rustfmt searches the directory of each file and its parents for a configuration and, when it finds none, reads one from the home or user configuration directory.\n\
         \n\

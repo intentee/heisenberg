@@ -110,8 +110,11 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     published (publish = false), and that no member other than a test crate depends on through a normal\n\
     or build dependency. The error type rules count every implementation of std::error::Error in the\n\
     production code of a crate target, those that macros generate included, and accept only those that\n\
-    the Error derive of thiserror, the thiserror-impl package from crates.io, generates for an enum. A\n\
-    standard library without the items that the analysis relies on fails the run.\n\
+    the Error derive of thiserror, the thiserror-impl package from crates.io, generates for an enum. The\n\
+    error type rules and the rules about where items live apply to production code and not to test code,\n\
+    where nobody matches on an error or finds an item by its file; `heisenberg explain` and `heisenberg\n\
+    catalogue` state for each rule whether it applies to all code or to production code. A standard\n\
+    library without the items that the analysis relies on fails the run.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\
@@ -225,7 +228,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     thiserror::Error\n    \
     Rule 7.9 MultipleErrorTypes: A crate with more than one error type\n    \
     Rule 7.10 SourceInErrorMessage: An error message that formats its own source\n    \
-    Rule 7.11 UntypedResultError: A Result whose error type is not an error\n  \
+    Rule 7.11 UntypedResultError: A Result whose error type erases the failure\n    \
+    Rule 7.12 ResultErrorNotAnError: A Result whose error type is a workspace type that is not an\n    \
+    error\n  \
     8 Tests\n    \
     Rule 8.1 IgnoredTest: A test that the test run skips\n    \
     Rule 8.2 ItemUsedOnlyByTests: A production item that only tests use\n    \

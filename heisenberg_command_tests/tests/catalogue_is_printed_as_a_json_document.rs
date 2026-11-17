@@ -27,6 +27,7 @@ fn catalogue_is_printed_as_a_json_document() {
     assert_eq!(
         document.pointer("/rules/0"),
         Some(&json!({
+            "applies_to": "all code",
             "definition": "A cfg_select! call, whose unselected arms escape the analysis.",
             "evaluation": "in each analysed configuration",
             "exceptions": [],

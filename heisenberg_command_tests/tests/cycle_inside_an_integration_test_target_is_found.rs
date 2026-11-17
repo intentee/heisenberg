@@ -18,13 +18,7 @@ fn cycle_inside_an_integration_test_target_is_found() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["AdditionalPublicItem: 1 violation\n\
-            Each module exposes a single public item, so every file has one responsibility. Move each additional public item into its own module.\n\
-            \n\
-            - tests/cycle.rs:16:12: Module already has a public item\n        \
-            pub fn back() {\n\
-            \n\
-            ModuleCycle: 1 violation\n\
+        Ok(["ModuleCycle: 1 violation\n\
             Modules that depend on each other cannot be understood or changed in isolation. Break the cycle so the modules form layers.\n\
             \n\
             - tests/cycle.rs:9:9: Parts of crate depend on each other\n            \
@@ -45,7 +39,7 @@ fn cycle_inside_an_integration_test_target_is_found() {
             pub fn back() {\n\
             \n\
             ------------------------------\n\
-            5 errors found in 3 rules\n\
+            4 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 4).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

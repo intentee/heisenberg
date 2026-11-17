@@ -6,8 +6,8 @@ use clap::builder::PossibleValue;
 use humantime::format_duration;
 
 use heisenberg_module_graph::harness_violation::HarnessViolation;
-use heisenberg_module_graph::impl_placement::ImplPlacement;
 use heisenberg_module_graph::non_production_users::NonProductionUsers;
+use heisenberg_module_graph::rule_applicability::RuleApplicability;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 use heisenberg_project_model::benchmark_target_violation::BenchmarkTargetViolation;
 use heisenberg_project_model::clippy_violation::ClippyViolation;
@@ -34,7 +34,6 @@ use heisenberg_project_model::nextest_presence_violation::NextestPresenceViolati
 use heisenberg_project_model::package_violation::PackageViolation;
 use heisenberg_project_model::required_clippy_setting::RequiredClippySetting;
 
-use crate::constants::ADDITIONAL_PUBLIC_ITEM;
 use crate::constants::ATTRIBUTE_APPLIED_IN_NO_CONFIGURATION;
 use crate::constants::BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS;
 use crate::constants::BENCHMARK_TARGET_RUN_BY_TESTS;
@@ -53,7 +52,6 @@ use crate::constants::CONFINED_PACKAGE_USER_NOT_REACHING_IT;
 use crate::constants::DUPLICATED_FUNCTION_BODY;
 use crate::constants::FAILED_MACRO_EXPANSION;
 use crate::constants::GLOB_IMPORT;
-use crate::constants::IMPL_WITHOUT_LOCAL_TYPE;
 use crate::constants::INCLUDED_SOURCE_FILE;
 use crate::constants::INVALID_MACRO_DEFINITION;
 use crate::constants::ITEM_OUT_OF_ORDER;
@@ -62,27 +60,19 @@ use crate::constants::ITEM_USED_ONLY_BY_TESTS;
 use crate::constants::LINT_ALLOWED_IN_MANIFEST;
 use crate::constants::LINT_SUPPRESSION;
 use crate::constants::METHOD_OUT_OF_ORDER;
-use crate::constants::MISPLACED_BLANKET_IMPL;
-use crate::constants::MISPLACED_FOREIGN_TYPE_IMPL;
-use crate::constants::MISPLACED_IMPL;
-use crate::constants::MISPLACED_TRAIT_OBJECT_IMPL;
 use crate::constants::MODULE_CYCLE;
 use crate::constants::MODULE_FILE_INSIDE_BLOCK;
-use crate::constants::MODULE_NOT_NAMED_AFTER_ITS_ITEM;
 use crate::constants::MUST_USE_BENCHMARK_OUTPUT;
 use crate::constants::NEGATED_CONFIGURATION;
 use crate::constants::NEXTEST_CONFIGURATION_MISSING;
 use crate::constants::NEXTEST_OVERRIDE;
 use crate::constants::NEXTEST_TIMEOUT_NOT_ENFORCED;
 use crate::constants::NON_BENCHMARK_ITEM_IN_BENCHMARK_TARGET;
-use crate::constants::NON_CONSTANT_IN_CONSTANTS_MODULE;
 use crate::constants::NON_DOC_COMMENT;
 use crate::constants::NON_TEST_ITEM_IN_TEST_TARGET;
 use crate::constants::PACKAGE_DEPENDENCY_CYCLE;
 use crate::constants::PACKAGE_DEPENDS_ON_ITSELF;
 use crate::constants::PROCEDURAL_FUNCTION;
-use crate::constants::PUBLIC_ASSOCIATED_CONSTANT;
-use crate::constants::PUBLIC_CONSTANT_OUTSIDE_CONSTANTS_MODULE;
 use crate::constants::PUBLISHABLE_TEST_CRATE;
 use crate::constants::REEXPORT;
 use crate::constants::REFERENCED_TEST;
@@ -122,10 +112,15 @@ use crate::error_issue::ErrorIssue;
 use crate::issue_text::IssueText;
 use crate::layout_issue::LayoutIssue;
 use crate::manifest_issue::ManifestIssue;
+use crate::placement_issue::PlacementIssue;
 use crate::rustfmt_issue::RustfmtIssue;
 use crate::test_issue::TestIssue;
 
-const RULE_FAMILIES: [&[IssueType]; 13] = [
+const RULE_FAMILIES: [&[IssueType]; 14] = [
+    &[
+        IssueType::Error(ErrorIssue::ResultErrorNotAnError),
+        IssueType::Error(ErrorIssue::UntypedResultError),
+    ],
     &[
         IssueType::UnresolvedExternCrate,
         IssueType::UnresolvedMacroCall,
@@ -179,16 +174,16 @@ const RULE_FAMILIES: [&[IssueType]; 13] = [
         IssueType::TestCrateUsedByProduction,
     ],
     &[
-        IssueType::ImplWithoutLocalType,
-        IssueType::MisplacedBlanketImpl,
-        IssueType::MisplacedForeignTypeImpl,
-        IssueType::MisplacedImpl,
-        IssueType::MisplacedTraitObjectImpl,
+        IssueType::Placement(PlacementIssue::ImplWithoutLocalType),
+        IssueType::Placement(PlacementIssue::MisplacedBlanketImpl),
+        IssueType::Placement(PlacementIssue::MisplacedForeignTypeImpl),
+        IssueType::Placement(PlacementIssue::MisplacedImpl),
+        IssueType::Placement(PlacementIssue::MisplacedTraitObjectImpl),
     ],
     &[
-        IssueType::NonConstantInConstantsModule,
-        IssueType::PublicAssociatedConstant,
-        IssueType::PublicConstantOutsideConstantsModule,
+        IssueType::Placement(PlacementIssue::NonConstantInConstantsModule),
+        IssueType::Placement(PlacementIssue::PublicAssociatedConstant),
+        IssueType::Placement(PlacementIssue::PublicConstantOutsideConstantsModule),
     ],
     &[
         IssueType::Layout(LayoutIssue::PositionalFields),
@@ -208,9 +203,9 @@ pub enum IssueType {
     Error(ErrorIssue),
     Layout(LayoutIssue),
     Manifest(ManifestIssue),
+    Placement(PlacementIssue),
     Rustfmt(RustfmtIssue),
     Test(TestIssue),
-    AdditionalPublicItem,
     AttributeAppliedInNoConfiguration,
     BenchmarkTargetExcludedFromBenchmarks,
     BenchmarkTargetRunByTests,
@@ -231,34 +226,25 @@ pub enum IssueType {
     ItemUsedOnlyByBenchmarks,
     ItemUsedOnlyByTests,
     GlobImport,
-    ImplWithoutLocalType,
     IncludedSourceFile,
     InvalidMacroDefinition,
     ItemOutOfOrder,
     LintAllowedInManifest,
     LintSuppression,
     MethodOutOfOrder,
-    MisplacedBlanketImpl,
-    MisplacedForeignTypeImpl,
-    MisplacedImpl,
-    MisplacedTraitObjectImpl,
     ModuleCycle,
     ModuleFileInsideBlock,
-    ModuleNotNamedAfterItsItem,
     MustUseBenchmarkOutput,
     NegatedConfiguration,
     NextestConfigurationMissing,
     NextestOverride,
     NextestTimeoutNotEnforced,
     NonBenchmarkItemInBenchmarkTarget,
-    NonConstantInConstantsModule,
     NonDocComment,
     NonTestItemInTestTarget,
     PackageDependencyCycle,
     PackageDependsOnItself,
     ProceduralFunction,
-    PublicAssociatedConstant,
-    PublicConstantOutsideConstantsModule,
     PublishableTestCrate,
     Reexport,
     ReferencedTest,
@@ -298,6 +284,14 @@ pub enum IssueType {
 
 impl IssueType {
     #[must_use]
+    pub const fn applicability(self) -> RuleApplicability {
+        match self {
+            Self::Error(_) | Self::Placement(_) => RuleApplicability::ProductionCode,
+            _ => RuleApplicability::AllCode,
+        }
+    }
+
+    #[must_use]
     pub fn explanation(self) -> String {
         let text = self.text();
         let IssueText {
@@ -315,10 +309,11 @@ impl IssueType {
         let related = self.related();
 
         iter::once(format!(
-            "{} {name}: {summary}\nSection {}, {}. Scope: {scope}. Evaluated {evaluation}.",
+            "{} {name}: {summary}\nSection {}, {}. Scope: {scope}. Applies to {}. Evaluated {evaluation}.",
             text.identifier(),
             section.number(),
-            section.title()
+            section.title(),
+            self.applicability()
         ))
         .chain([definition.to_owned()])
         .chain(
@@ -371,9 +366,9 @@ impl IssueType {
             Self::Error(issue) => issue.text(),
             Self::Layout(issue) => issue.text(),
             Self::Manifest(issue) => issue.text(),
+            Self::Placement(issue) => issue.text(),
             Self::Rustfmt(issue) => issue.text(),
             Self::Test(issue) => issue.text(),
-            Self::AdditionalPublicItem => ADDITIONAL_PUBLIC_ITEM,
             Self::AttributeAppliedInNoConfiguration => ATTRIBUTE_APPLIED_IN_NO_CONFIGURATION,
             Self::BenchmarkTargetExcludedFromBenchmarks => {
                 BENCHMARK_TARGET_EXCLUDED_FROM_BENCHMARKS
@@ -402,34 +397,25 @@ impl IssueType {
             Self::ItemUsedOnlyByBenchmarks => ITEM_USED_ONLY_BY_BENCHMARKS,
             Self::ItemUsedOnlyByTests => ITEM_USED_ONLY_BY_TESTS,
             Self::GlobImport => GLOB_IMPORT,
-            Self::ImplWithoutLocalType => IMPL_WITHOUT_LOCAL_TYPE,
             Self::IncludedSourceFile => INCLUDED_SOURCE_FILE,
             Self::InvalidMacroDefinition => INVALID_MACRO_DEFINITION,
             Self::ItemOutOfOrder => ITEM_OUT_OF_ORDER,
             Self::LintAllowedInManifest => LINT_ALLOWED_IN_MANIFEST,
             Self::LintSuppression => LINT_SUPPRESSION,
             Self::MethodOutOfOrder => METHOD_OUT_OF_ORDER,
-            Self::MisplacedBlanketImpl => MISPLACED_BLANKET_IMPL,
-            Self::MisplacedForeignTypeImpl => MISPLACED_FOREIGN_TYPE_IMPL,
-            Self::MisplacedImpl => MISPLACED_IMPL,
-            Self::MisplacedTraitObjectImpl => MISPLACED_TRAIT_OBJECT_IMPL,
             Self::ModuleCycle => MODULE_CYCLE,
             Self::ModuleFileInsideBlock => MODULE_FILE_INSIDE_BLOCK,
-            Self::ModuleNotNamedAfterItsItem => MODULE_NOT_NAMED_AFTER_ITS_ITEM,
             Self::MustUseBenchmarkOutput => MUST_USE_BENCHMARK_OUTPUT,
             Self::NegatedConfiguration => NEGATED_CONFIGURATION,
             Self::NextestConfigurationMissing => NEXTEST_CONFIGURATION_MISSING,
             Self::NextestOverride => NEXTEST_OVERRIDE,
             Self::NextestTimeoutNotEnforced => NEXTEST_TIMEOUT_NOT_ENFORCED,
             Self::NonBenchmarkItemInBenchmarkTarget => NON_BENCHMARK_ITEM_IN_BENCHMARK_TARGET,
-            Self::NonConstantInConstantsModule => NON_CONSTANT_IN_CONSTANTS_MODULE,
             Self::NonDocComment => NON_DOC_COMMENT,
             Self::NonTestItemInTestTarget => NON_TEST_ITEM_IN_TEST_TARGET,
             Self::PackageDependencyCycle => PACKAGE_DEPENDENCY_CYCLE,
             Self::PackageDependsOnItself => PACKAGE_DEPENDS_ON_ITSELF,
             Self::ProceduralFunction => PROCEDURAL_FUNCTION,
-            Self::PublicAssociatedConstant => PUBLIC_ASSOCIATED_CONSTANT,
-            Self::PublicConstantOutsideConstantsModule => PUBLIC_CONSTANT_OUTSIDE_CONSTANTS_MODULE,
             Self::PublishableTestCrate => PUBLISHABLE_TEST_CRATE,
             Self::Reexport => REEXPORT,
             Self::ReferencedTest => REFERENCED_TEST,
@@ -468,9 +454,8 @@ impl IssueType {
         }
     }
 
-    const fn ungrouped() -> [Self; 84] {
+    const fn ungrouped() -> [Self; 74] {
         [
-            Self::AdditionalPublicItem,
             Self::AttributeAppliedInNoConfiguration,
             Self::BenchmarkTargetExcludedFromBenchmarks,
             Self::BenchmarkTargetRunByTests,
@@ -491,34 +476,25 @@ impl IssueType {
             Self::ItemUsedOnlyByBenchmarks,
             Self::ItemUsedOnlyByTests,
             Self::GlobImport,
-            Self::ImplWithoutLocalType,
             Self::IncludedSourceFile,
             Self::InvalidMacroDefinition,
             Self::ItemOutOfOrder,
             Self::LintAllowedInManifest,
             Self::LintSuppression,
             Self::MethodOutOfOrder,
-            Self::MisplacedBlanketImpl,
-            Self::MisplacedForeignTypeImpl,
-            Self::MisplacedImpl,
-            Self::MisplacedTraitObjectImpl,
             Self::ModuleCycle,
             Self::ModuleFileInsideBlock,
-            Self::ModuleNotNamedAfterItsItem,
             Self::MustUseBenchmarkOutput,
             Self::NegatedConfiguration,
             Self::NextestConfigurationMissing,
             Self::NextestOverride,
             Self::NextestTimeoutNotEnforced,
             Self::NonBenchmarkItemInBenchmarkTarget,
-            Self::NonConstantInConstantsModule,
             Self::NonDocComment,
             Self::NonTestItemInTestTarget,
             Self::PackageDependencyCycle,
             Self::PackageDependsOnItself,
             Self::ProceduralFunction,
-            Self::PublicAssociatedConstant,
-            Self::PublicConstantOutsideConstantsModule,
             Self::PublishableTestCrate,
             Self::Reexport,
             Self::ReferencedTest,
@@ -624,7 +600,7 @@ impl IssueType {
 impl From<&ViolationKind> for IssueType {
     fn from(kind: &ViolationKind) -> Self {
         match kind {
-            ViolationKind::AdditionalPublicItem => Self::AdditionalPublicItem,
+            ViolationKind::Placement(violation) => Self::Placement(PlacementIssue::from(violation)),
             ViolationKind::BenchmarkHarness(HarnessViolation::MustUseOutput { .. }) => {
                 Self::MustUseBenchmarkOutput
             }
@@ -654,32 +630,15 @@ impl From<&ViolationKind> for IssueType {
                 ..
             } => Self::ItemUsedOnlyByTests,
             ViolationKind::GlobImport => Self::GlobImport,
-            ViolationKind::ImplWithoutLocalType => Self::ImplWithoutLocalType,
             ViolationKind::ItemOutOfOrder { .. } => Self::ItemOutOfOrder,
             ViolationKind::InvalidMacroDefinition => Self::InvalidMacroDefinition,
             ViolationKind::LintSuppression => Self::LintSuppression,
             ViolationKind::MethodOutOfOrder { .. } => Self::MethodOutOfOrder,
-            ViolationKind::MisplacedImpl(ImplPlacement::Blanket { .. }) => {
-                Self::MisplacedBlanketImpl
-            }
-            ViolationKind::MisplacedImpl(ImplPlacement::ForeignType { .. }) => {
-                Self::MisplacedForeignTypeImpl
-            }
-            ViolationKind::MisplacedImpl(ImplPlacement::TraitObject { .. }) => {
-                Self::MisplacedTraitObjectImpl
-            }
-            ViolationKind::MisplacedImpl(ImplPlacement::Type { .. }) => Self::MisplacedImpl,
             ViolationKind::ModuleFileInsideBlock => Self::ModuleFileInsideBlock,
-            ViolationKind::ModuleNotNamedAfterItsItem { .. } => Self::ModuleNotNamedAfterItsItem,
             ViolationKind::NegatedConfiguration => Self::NegatedConfiguration,
-            ViolationKind::NonConstantInConstantsModule => Self::NonConstantInConstantsModule,
             ViolationKind::NonDocComment => Self::NonDocComment,
             ViolationKind::NonTestItemInTestTarget => Self::NonTestItemInTestTarget,
             ViolationKind::ProceduralFunction { .. } => Self::ProceduralFunction,
-            ViolationKind::PublicAssociatedConstant => Self::PublicAssociatedConstant,
-            ViolationKind::PublicConstantOutsideConstantsModule => {
-                Self::PublicConstantOutsideConstantsModule
-            }
             ViolationKind::Reexport => Self::Reexport,
             ViolationKind::SingleLetterName => Self::SingleLetterName,
             ViolationKind::TestOnlyCodeInProduction => Self::TestOnlyCodeInProduction,
@@ -789,6 +748,7 @@ impl ValueEnum for IssueType {
                 .chain(ErrorIssue::variants().map(Self::Error))
                 .chain(LayoutIssue::variants().map(Self::Layout))
                 .chain(ManifestIssue::variants().map(Self::Manifest))
+                .chain(PlacementIssue::variants().map(Self::Placement))
                 .chain(RustfmtIssue::variants().map(Self::Rustfmt))
                 .chain(TestIssue::variants().map(Self::Test))
                 .collect();

@@ -9,6 +9,7 @@ use crate::constants::HANDWRITTEN_ERROR_DISPLAY;
 use crate::constants::HANDWRITTEN_ERROR_TYPE;
 use crate::constants::MACRO_GENERATED_ERROR_TYPE;
 use crate::constants::MULTIPLE_ERROR_TYPES;
+use crate::constants::RESULT_ERROR_NOT_AN_ERROR;
 use crate::constants::SOURCE_IN_ERROR_MESSAGE;
 use crate::constants::UNTYPED_RESULT_ERROR;
 use crate::issue_text::IssueText;
@@ -24,6 +25,7 @@ pub enum ErrorIssue {
     HandwrittenErrorType,
     MacroGeneratedErrorType,
     MultipleErrorTypes,
+    ResultErrorNotAnError,
     SourceInErrorMessage,
     UntypedResultError,
 }
@@ -41,13 +43,14 @@ impl ErrorIssue {
             Self::HandwrittenErrorType => HANDWRITTEN_ERROR_TYPE,
             Self::MacroGeneratedErrorType => MACRO_GENERATED_ERROR_TYPE,
             Self::MultipleErrorTypes => MULTIPLE_ERROR_TYPES,
+            Self::ResultErrorNotAnError => RESULT_ERROR_NOT_AN_ERROR,
             Self::SourceInErrorMessage => SOURCE_IN_ERROR_MESSAGE,
             Self::UntypedResultError => UNTYPED_RESULT_ERROR,
         }
     }
 
     #[must_use]
-    pub const fn variants() -> [Self; 11] {
+    pub const fn variants() -> [Self; 12] {
         [
             Self::ErrorMessageFunction,
             Self::ErrorMessageOnTheEnum,
@@ -58,6 +61,7 @@ impl ErrorIssue {
             Self::HandwrittenErrorType,
             Self::MacroGeneratedErrorType,
             Self::MultipleErrorTypes,
+            Self::ResultErrorNotAnError,
             Self::SourceInErrorMessage,
             Self::UntypedResultError,
         ]
@@ -77,6 +81,7 @@ impl From<&ErrorViolation> for ErrorIssue {
             ErrorViolation::NotAnEnum => Self::ErrorTypeNotAnEnum,
             ErrorViolation::SourceInMessage => Self::SourceInErrorMessage,
             ErrorViolation::SourceOutsideChain => Self::ErrorSourceOutsideChain,
+            ErrorViolation::NotAnError { .. } => Self::ResultErrorNotAnError,
             ErrorViolation::UntypedResult { .. } => Self::UntypedResultError,
         }
     }

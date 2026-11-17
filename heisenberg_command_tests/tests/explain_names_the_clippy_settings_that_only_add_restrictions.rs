@@ -25,7 +25,7 @@ fn explain_names_the_clippy_settings_that_only_add_restrictions() {
         str::from_utf8(&output),
         Ok(
             "Rule 3.13 UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n\
-        Section 3, Lints and formatting. Scope: workspace. Evaluated in each analysed configuration.\n\
+        Section 3, Lints and formatting. Scope: workspace. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A clippy configuration setting other than a required one and those that only add restrictions, which can silence or relax the lints that Heisenberg requires.\n\
         \n\

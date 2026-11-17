@@ -28,6 +28,8 @@ pub mod module_file_analysis;
 pub mod module_findings;
 pub mod module_path;
 pub mod non_production_users;
+pub mod placement_violation;
+pub mod rule_applicability;
 pub mod shared_module_file;
 pub mod source_location;
 pub mod source_position;

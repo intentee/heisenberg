@@ -22,7 +22,7 @@ fn explain_names_the_exceptions_of_a_rule() {
         str::from_utf8(&output),
         Ok(
             "Rule 6.3 PositionalFields: A struct or variant with two or more positional fields\n\
-        Section 6, Names, data and functions. Scope: module file. Evaluated in each analysed configuration.\n\
+        Section 6, Names, data and functions. Scope: module file. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A struct or enum variant written with two or more positional fields.\n\
         \n\

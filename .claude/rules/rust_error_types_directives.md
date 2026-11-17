@@ -13,3 +13,4 @@ No check can decide these requirements, so they are followed by judgement and ve
 - Callers match on variants, never on message text.
 - Heisenberg never panics and adds no fallback that hides a failure: an unexpected condition is a typed error (see `heisenberg_typed_failures.md`).
 - Never use `anyhow` where the failure modes can be enumerated.
+- Test code is exempt from the error type rules: tests propagate failures with `?` and nobody matches on them, so they may use `anyhow`, `Box<dyn Error>` or any error type.

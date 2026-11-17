@@ -27,7 +27,7 @@ fn standard_library_without_the_items_the_analysis_relies_on_fails_the_analysis(
         str::from_utf8(&outcome.errors),
         Ok(format!(
             "error: the module dependencies cannot be extracted for the configuration `{HOST_CONFIGURATION}`\n\
-             error: the standard library of the crate target `standard_library_without_required_items lib` lacks the items that the analysis relies on: core::fmt::Display, core::error::Error, core::option::Option, alloc::boxed::Box, core::result::Result, alloc::string::ToString\n"
+             error: the standard library of the crate target `standard_library_without_required_items lib` lacks the items that the analysis relies on: core::fmt::Display, core::error::Error, core::option::Option, alloc::boxed::Box, core::result::Result, alloc::string::ToString, alloc::vec::Vec\n"
         )
         .as_str())
     );

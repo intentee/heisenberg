@@ -24,6 +24,8 @@ enforced_by:
 
 Every statement is mandatory and is decided by the Heisenberg check named after it; `heisenberg explain <check>` gives its exact definition.
 
+The statements about where items live (one public item per module, module names, impl placement, the constants module) apply to production code and not to test code; the statements about imports, order and cycles apply to all code.
+
 - Each module exposes at most one public item, and the module is named after it. `src/constants.rs` is the exception: it holds every public constant of the crate and no other public item. [AdditionalPublicItem, ModuleNotNamedAfterItsItem, NonConstantInConstantsModule, PublicConstantOutsideConstantsModule, PublicAssociatedConstant]
 - Each file follows this order: module declarations; imports from outside the workspace; imports from other workspace members; imports from this crate; private functions, constants, statics and macros; private types with their impl blocks; the public item with its impl blocks, or the `main` function; tests; inline modules. [ItemOutOfOrder]
 - Within an impl block: constructors first, then `pub`, `pub(crate)` and private functions, each group sorted by name. A trait impl follows the order of its trait. [MethodOutOfOrder]

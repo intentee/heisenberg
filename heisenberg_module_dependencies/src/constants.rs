@@ -16,6 +16,8 @@ pub const LIFETIME_PREFIX: char = '\'';
 
 pub const OWNED_BOX_PATH: [&str; 2] = ["boxed", "Box"];
 
+pub const VECTOR_PATH: [&str; 2] = ["vec", "Vec"];
+
 pub const TEST_MODULE_NAME: &str = "tests";
 
 pub const TRANSPARENT_ERROR_MESSAGE: &str = "transparent";

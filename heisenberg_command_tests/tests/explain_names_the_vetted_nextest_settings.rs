@@ -25,7 +25,7 @@ fn explain_names_the_vetted_nextest_settings() {
         str::from_utf8(&output),
         Ok(
             "Rule 8.19 UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n\
-        Section 8, Tests. Scope: workspace. Evaluated in each analysed configuration.\n\
+        Section 8, Tests. Scope: workspace. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A nextest configuration setting other than the slow-timeout and those that only control concurrency, failure handling and reporting, which can retry, skip or exempt tests, or let a test run past its timeout.\n\
         \n\

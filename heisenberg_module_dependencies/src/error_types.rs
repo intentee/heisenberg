@@ -31,12 +31,24 @@ impl<'database> ErrorTypes<'_, 'database> {
     }
 
     pub fn is_error_type(&self, candidate: &Type<'database>) -> bool {
-        candidate.is_unknown() || self.implements_error(candidate)
+        candidate.is_unknown()
+            || self.implements_error(candidate)
+            || self.accumulates_errors(candidate)
     }
 
     pub fn result_error(&self, candidate: &Type<'database>) -> Option<Type<'database>> {
         (candidate.as_adt() == Some(Adt::Enum(self.standard_items.result)))
             .then(|| candidate.type_arguments().nth(1))
             .flatten()
+    }
+
+    fn accumulates_errors(&self, candidate: &Type<'database>) -> bool {
+        matches!(
+            candidate.as_adt(),
+            Some(Adt::Struct(collection)) if collection == self.standard_items.vector
+        ) && candidate
+            .type_arguments()
+            .next()
+            .is_some_and(|element| self.implements_error(&element))
     }
 }

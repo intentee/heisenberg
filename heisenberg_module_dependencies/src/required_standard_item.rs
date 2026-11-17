@@ -4,6 +4,7 @@ use std::fmt::Formatter;
 
 use crate::constants::ERROR_TRAIT_PATH;
 use crate::constants::OWNED_BOX_PATH;
+use crate::constants::VECTOR_PATH;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RequiredStandardItem {
@@ -13,6 +14,7 @@ pub enum RequiredStandardItem {
     OwnedBox,
     Result,
     ToString,
+    Vector,
 }
 
 impl Display for RequiredStandardItem {
@@ -24,6 +26,7 @@ impl Display for RequiredStandardItem {
             Self::OwnedBox => write!(formatter, "alloc::{}", OWNED_BOX_PATH.join("::")),
             Self::Result => write!(formatter, "core::result::Result"),
             Self::ToString => write!(formatter, "alloc::string::ToString"),
+            Self::Vector => write!(formatter, "alloc::{}", VECTOR_PATH.join("::")),
         }
     }
 }

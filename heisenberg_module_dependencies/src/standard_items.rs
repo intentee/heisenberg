@@ -12,6 +12,7 @@ use heisenberg_module_graph::crate_target::CrateTarget;
 
 use crate::constants::ERROR_TRAIT_PATH;
 use crate::constants::OWNED_BOX_PATH;
+use crate::constants::VECTOR_PATH;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::required_standard_item::RequiredStandardItem;
 use crate::standard_item::standard_item;
@@ -30,6 +31,7 @@ pub struct StandardItems {
     pub owned_box: Struct,
     pub result: Enum,
     pub to_string: Trait,
+    pub vector: Struct,
 }
 
 impl StandardItems {
@@ -58,6 +60,13 @@ impl StandardItems {
         });
         let result = famous.core_result_Result();
         let to_string = famous.alloc_string_ToString();
+        let vector =
+            famous
+                .alloc()
+                .and_then(|alloc| match standard_item(database, alloc, &VECTOR_PATH) {
+                    Some(ModuleDef::Adt(Adt::Struct(vector))) => Some(vector),
+                    _ => None,
+                });
 
         if let Some(display) = display
             && let Some(error_trait) = error_trait
@@ -65,6 +74,7 @@ impl StandardItems {
             && let Some(owned_box) = owned_box
             && let Some(result) = result
             && let Some(to_string) = to_string
+            && let Some(vector) = vector
         {
             Ok(Self {
                 display,
@@ -73,6 +83,7 @@ impl StandardItems {
                 owned_box,
                 result,
                 to_string,
+                vector,
             })
         } else {
             Err(ModuleDependenciesError::StandardItemsMissing {
@@ -84,6 +95,7 @@ impl StandardItems {
                     missing(owned_box.as_ref(), RequiredStandardItem::OwnedBox),
                     missing(result.as_ref(), RequiredStandardItem::Result),
                     missing(to_string.as_ref(), RequiredStandardItem::ToString),
+                    missing(vector.as_ref(), RequiredStandardItem::Vector),
                 ]
                 .into_iter()
                 .flatten()

@@ -19,7 +19,7 @@ fn function_taking_a_workspace_type_it_does_not_belong_to_is_a_violation() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["ProceduralFunction: 5 violations\n\
-            Behavior belongs with the data it works on. Make the function a method of the type it takes, a constructor of its own type, or a private helper used in a single file.\n\
+            Behavior belongs with the data it works on. Restructure the code so that the function no longer needs a value of that type, or move the function into a method of the type. A constructor of its own type and a private helper used in a single file are accepted as they are.\n\
             \n\
             - src/archive.rs:3:8: Function takes Report without belonging to it\n    \
             pub fn archive(report: Box<Report>) -> u8 {\n\

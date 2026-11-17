@@ -37,6 +37,7 @@ pub mod manifest_issue;
 mod module_inclusion;
 mod narrowing;
 pub mod nextest_presence_verdict;
+pub mod placement_issue;
 pub mod project_arguments;
 pub mod rendered_report;
 pub mod rule_catalogue;

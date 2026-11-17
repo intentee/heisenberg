@@ -14,6 +14,7 @@ pub enum ErrorViolation {
     MessageOnTheEnum,
     MultipleTypes { count: usize },
     NotAnEnum,
+    NotAnError { error: UntypedErrorName },
     OutsideItsModule { module: ModulePath },
     SourceInMessage,
     SourceOutsideChain,
@@ -57,6 +58,10 @@ impl Display for ErrorViolation {
             Self::UntypedResult { error } => write!(
                 formatter,
                 "Result error type {error} does not implement std::error::Error"
+            ),
+            Self::NotAnError { error } => write!(
+                formatter,
+                "Result error type {error} is a type of this workspace that is not an error"
             ),
         }
     }

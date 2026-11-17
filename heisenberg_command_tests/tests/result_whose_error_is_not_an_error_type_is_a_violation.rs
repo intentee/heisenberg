@@ -20,7 +20,7 @@ fn result_whose_error_is_not_an_error_type_is_a_violation() {
         str::from_utf8(&outcome.output),
         Ok([
             "UntypedResultError: 8 violations\n\
-            An error that is not an error type erases which failure happened: a caller can print it, or downcast it where it carries a type, but cannot match on it, and the signature names no failure. Declare an error enum whose variants name each failure, and return it.\n\
+            An error type that erases which failure happened names no failure in the signature: a caller can print it, or downcast it where it carries a type, but cannot match on it. Declare an error enum whose variants name each failure, and return it. Return several failures as a Vec of that error type.\n\
             \n\
             - src/boxed_failure.rs:3:41: Result error type Box<dyn Error> does not implement std::error::Error\n    \
             pub fn boxed_failure(succeeds: bool) -> Result<u8, Box<dyn Error>> {\n\

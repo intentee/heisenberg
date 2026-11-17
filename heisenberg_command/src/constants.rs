@@ -258,7 +258,9 @@ pub const ERROR_MESSAGE_ON_THE_ENUM: IssueText = IssueText {
 pub const ERROR_SOURCE_OUTSIDE_CHAIN: IssueText = IssueText {
     definition: "A field of a variant of an enum that derives thiserror::Error whose type implements std::error::Error, that is not the source of its variant, and that its variant does not report beside a source: the variant has no source, or its #[error(...)] message does not format the field. The source is as thiserror decides it: the field marked #[source] or #[from], otherwise the field named source, or the single field of an #[error(transparent)] variant.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
-    exceptions: &[],
+    exceptions: &[
+        "A field that holds a Vec of errors, which accumulates failures: the source chain has room for one cause, and a collection cannot be a source.",
+    ],
     name: "ErrorSourceOutsideChain",
     ordinal: 3,
     rationale: "An error kept outside the source never reaches the error chain, so whoever reports the error loses its cause.",
@@ -774,7 +776,7 @@ pub const PROCEDURAL_FUNCTION: IssueText = IssueText {
     name: "ProceduralFunction",
     ordinal: 4,
     rationale: "Behavior belongs with the data it works on.",
-    remedy: "Make the function a method of the type it takes, a constructor of its own type, or a private helper used in a single file.",
+    remedy: "Restructure the code so that the function no longer needs a value of that type, or move the function into a method of the type. A constructor of its own type and a private helper used in a single file are accepted as they are.",
     scope: RuleScope::ModuleFile,
     section: RuleSection::Code,
     summary: "A function that takes a type of its crate without belonging to it",
@@ -869,6 +871,19 @@ pub const REQUIRED_LINT_NOT_DENIED: IssueText = IssueText {
     scope: RuleScope::Package,
     section: RuleSection::Tools,
     summary: "A workspace member that leaves a required lint or lint group below deny",
+};
+
+pub const RESULT_ERROR_NOT_AN_ERROR: IssueText = IssueText {
+    definition: "A Result written in an item signature or type definition, such as the type of a function parameter, a return type, a field or a type alias, whose error type is a struct, enum or union defined in the workspace that does not implement std::error::Error, and an associated type of a trait impl that the trait names as the error of a Result set to such a type. A type parameter is checked where it is given a type.",
+    evaluation: RuleEvaluation::EachAnalysedConfiguration,
+    exceptions: &["A Result whose type the trait of an impl dictates."],
+    name: "ResultErrorNotAnError",
+    ordinal: 12,
+    rationale: "Err is reserved for failures. A value that is not an error type is either an outcome of the regular flow handed back through Err, which hides an expected result where failures belong, or a failure without the contract of an error, its message and its source chain.",
+    remedy: "When the value is a failure, make it the error type of its crate, or a variant of it, deriving thiserror::Error. When it is an outcome of the regular flow, return it in Ok, as a variant of an enum of outcomes.",
+    scope: RuleScope::ModuleFile,
+    section: RuleSection::Errors,
+    summary: "A Result whose error type is a workspace type that is not an error",
 };
 
 pub const RUSTFMT_CONFIGURATION_AMBIGUOUS: IssueText = IssueText {
@@ -1343,16 +1358,19 @@ pub const UNSAFE_CODE: IssueText = IssueText {
 };
 
 pub const UNTYPED_RESULT_ERROR: IssueText = IssueText {
-    definition: "A Result written in an item signature or type definition, such as the type of a function parameter, a return type, a field or a type alias, whose error type does not implement std::error::Error, such as String, &str, (), an integer, a collection, Box<dyn Error> or anyhow::Error, and an associated type of a trait impl that the trait names as the error of a Result, such as the Err of FromStr, set to such a type. A type parameter is checked where it is given a type.",
+    definition: "A Result written in an item signature or type definition, such as the type of a function parameter, a return type, a field or a type alias, whose error type does not implement std::error::Error and is not a struct, enum or union defined in the workspace, such as String, &str, (), an integer, a collection, Box<dyn Error> or anyhow::Error, and an associated type of a trait impl that the trait names as the error of a Result, such as the Err of FromStr, set to such a type. A type parameter is checked where it is given a type.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
-    exceptions: &["A Result whose type the trait of an impl dictates."],
+    exceptions: &[
+        "A Result whose type the trait of an impl dictates.",
+        "A Vec whose element type implements std::error::Error, which accumulates failures that are each typed.",
+    ],
     name: "UntypedResultError",
     ordinal: 11,
-    rationale: "An error that is not an error type erases which failure happened: a caller can print it, or downcast it where it carries a type, but cannot match on it, and the signature names no failure.",
-    remedy: "Declare an error enum whose variants name each failure, and return it.",
+    rationale: "An error type that erases which failure happened names no failure in the signature: a caller can print it, or downcast it where it carries a type, but cannot match on it.",
+    remedy: "Declare an error enum whose variants name each failure, and return it. Return several failures as a Vec of that error type.",
     scope: RuleScope::ModuleFile,
     section: RuleSection::Errors,
-    summary: "A Result whose error type is not an error",
+    summary: "A Result whose error type erases the failure",
 };
 
 pub const UNVETTED_CLIPPY_SETTING: IssueText = IssueText {

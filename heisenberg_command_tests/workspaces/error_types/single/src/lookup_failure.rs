@@ -64,4 +64,6 @@ pub enum LookupFailure {
     Optional { cause: Option<io::Error> },
     #[error("the erased cause is lost")]
     Erased { cause: Box<dyn Error + Send + Sync> },
+    #[error("several lookups failed")]
+    Several { failures: Vec<io::Error> },
 }

@@ -7,3 +7,9 @@ pub mod boxed {
 pub mod string {
     pub trait ToString {}
 }
+
+pub mod vec {
+    pub struct Vec<TValue> {
+        pub value: TValue,
+    }
+}
