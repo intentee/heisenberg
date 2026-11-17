@@ -1,3 +1,4 @@
+pub mod pair;
 pub mod report;
 
 #[cfg(test)]
@@ -7,6 +8,7 @@ mod tests {
     use std::fmt::Display;
     use std::fmt::Formatter;
 
+    use crate::pair::Pair;
     use crate::report::Report;
 
     macro_rules! unit_failing {
@@ -63,6 +65,8 @@ mod tests {
     #[derive(Debug, thiserror::Error)]
     #[error("the unit marker failed")]
     struct UnitMarker;
+
+    impl Pair<UnitStub, UnitGenerated> for u32 {}
 
     impl Report {
         const fn unit_doubled(&self) -> u8 {

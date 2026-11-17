@@ -3,6 +3,8 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use library::pair::Pair;
+
 use crate::shape::Shape;
 
 macro_rules! crate_failing {
@@ -61,6 +63,8 @@ pub enum CrateFailure {
 pub struct CrateMarker;
 
 pub const LIMIT: u8 = 3;
+
+impl Pair<CrateStub, CrateGenerated> for u32 {}
 
 impl Shape {
     pub const CORNERS: u8 = 4;

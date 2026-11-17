@@ -23,7 +23,7 @@ fn production_architecture_rules_do_not_apply_to_test_code() {
             No errors found!\n\
             ------------------------------\n",
             NextestPresenceEvaluation::Evaluated
-                .host_footer(3, 8)
+                .host_footer(3, 9)
                 .as_str()
         ]
         .concat()
