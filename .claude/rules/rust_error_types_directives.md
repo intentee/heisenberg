@@ -6,7 +6,7 @@ kind: directive
 
 No check can decide these requirements, so they are followed by judgement and verified in review.
 
-- An error enum covers one cohesive concern. A crate that wants a second error enum has a second concern: extract that concern into its own crate, which the original wraps with `#[from]` or `#[source]`.
+- An error enum covers one cohesive concern. A crate that wants a second error enum has a second concern: extract that concern into its own crate, which the original wraps with `#[from]` or `#[source]`; the check `ErrorIssuedOutsideItsCrate` then keeps the original from issuing the extracted error itself.
 - Every distinct failure mode has its own variant with all the context needed to diagnose it: paths, keys, indices, expected and actual values. No `Unknown`, `Other(String)` or `Internal` catch-all.
 - The same underlying cause in a different context is a different variant.
 - Never discard an error: no `|_|` in `map_err`, no catch-and-ignore. Wrap the original as the source of a variant.

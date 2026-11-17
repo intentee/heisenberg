@@ -450,6 +450,11 @@ const CATALOGUE: &str = "Heisenberg 0.1.0 rule catalogue\n\
         Applies to: production code, not to test code\n  \
         Evaluated: in each analysed configuration\n\
         \n\
+        Rule 7.13 ErrorIssuedOutsideItsCrate: An error type returned or constructed by a crate that does not own it\n  \
+        Scope: module file\n  \
+        Applies to: production code, not to test code\n  \
+        Evaluated: in each analysed configuration\n\
+        \n\
         Section 8: Tests\n\
         \n\
         Rule 8.1 IgnoredTest: A test that the test run skips\n  \

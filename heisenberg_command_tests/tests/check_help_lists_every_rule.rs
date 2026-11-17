@@ -254,7 +254,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Rule 7.10 SourceInErrorMessage: An error message that formats its own source\n    \
     Rule 7.11 UntypedResultError: A Result whose error type erases the failure\n    \
     Rule 7.12 ResultErrorNotAnError: A Result whose error type is a workspace type that is not an\n    \
-    error\n  \
+    error\n    \
+    Rule 7.13 ErrorIssuedOutsideItsCrate: An error type returned or constructed by a crate that does\n    \
+    not own it\n  \
     8 Tests\n    \
     Rule 8.1 IgnoredTest: A test that the test run skips\n    \
     Rule 8.2 ItemUsedOnlyByTests: A production item that only tests use\n    \

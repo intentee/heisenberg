@@ -11,6 +11,7 @@ use heisenberg_module_graph::used_item::UsedItem;
 
 use crate::definition_usages::DefinitionUsages;
 use crate::found_reference::FoundReference;
+use crate::path_position::PathPosition;
 
 pub struct ItemReferences<'references, 'database> {
     pub definition: Definition<'database>,
@@ -47,10 +48,7 @@ impl<'database> ItemReferences<'_, 'database> {
     fn construction(name: &SyntaxNode) -> Option<SyntaxNode> {
         name.ancestors()
             .find_map(ast::Path::cast)
-            .and_then(|path| path.syntax().parent())
-            .filter(|parent| {
-                ast::PathExpr::can_cast(parent.kind()) || ast::RecordExpr::can_cast(parent.kind())
-            })
+            .and_then(|path| PathPosition { path: &path }.construction())
     }
 
     fn counts(&self, FoundReference { name, writes }: &FoundReference) -> bool {

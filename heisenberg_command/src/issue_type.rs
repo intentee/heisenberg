@@ -119,6 +119,7 @@ use crate::test_issue::TestIssue;
 
 const RULE_FAMILIES: [&[IssueType]; 14] = [
     &[
+        IssueType::Error(ErrorIssue::ErrorIssuedOutsideItsCrate),
         IssueType::Error(ErrorIssue::ResultErrorNotAnError),
         IssueType::Error(ErrorIssue::UntypedResultError),
     ],

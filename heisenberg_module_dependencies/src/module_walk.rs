@@ -31,7 +31,6 @@ use ra_ap_hir::PathResolution;
 use ra_ap_hir::PathResolutionPerNs;
 use ra_ap_hir::Semantics;
 use ra_ap_hir::Trait;
-use ra_ap_hir::Type;
 use ra_ap_hir::TypeAlias;
 use ra_ap_hir::Variant;
 use ra_ap_hir_def::FunctionId;
@@ -79,6 +78,7 @@ use heisenberg_module_graph::configured_out_negations::ConfiguredOutNegations;
 use heisenberg_module_graph::crate_target::CrateTarget;
 use heisenberg_module_graph::crate_target_kind::CrateTargetKind;
 use heisenberg_module_graph::dependency_reference::DependencyReference;
+use heisenberg_module_graph::error_issuance::ErrorIssuance;
 use heisenberg_module_graph::error_violation::ErrorViolation;
 use heisenberg_module_graph::every_configuration_findings::EveryConfigurationFindings;
 use heisenberg_module_graph::foreign_module::ForeignModule;
@@ -133,6 +133,7 @@ use crate::crate_findings::CrateFindings;
 use crate::defined_items::DefinedItems;
 use crate::definition_usages::DefinitionUsages;
 use crate::derived_sources::DerivedSources;
+use crate::error_boundary::ErrorBoundary;
 use crate::error_derive::ErrorDerive;
 use crate::error_implementation_origin::ErrorImplementationOrigin;
 use crate::error_types::ErrorTypes;
@@ -171,12 +172,12 @@ use crate::ordered_entry::OrderedEntry;
 use crate::output_use::OutputUse;
 use crate::outside_visibility::OutsideVisibility;
 use crate::parameter_name::ParameterName;
+use crate::path_position::PathPosition;
 use crate::path_reference::PathReference;
 use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::public_items::PublicItems;
 use crate::qualified_names::QualifiedNames;
-use crate::signature_scope::SignatureScope;
 use crate::signature_tuple::SignatureTuple;
 use crate::standard_items::StandardItems;
 use crate::substituted_resolution::SubstitutedResolution;
@@ -192,6 +193,7 @@ use crate::unsafe_code_findings::UnsafeCodeFindings;
 use crate::unsafe_code_use::UnsafeCodeUse;
 use crate::used_definition::UsedDefinition;
 use crate::walked_module::WalkedModule;
+use crate::written_result_error::WrittenResultError;
 use crate::written_token::WrittenToken;
 
 pub struct ModuleWalk<'walk, 'database> {
@@ -451,6 +453,36 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
     }
 
+    fn constructed_error(
+        &self,
+        node: &SyntaxNode,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        ast::Path::cast(node.clone())
+            .filter(|path| PathPosition { path }.construction().is_some())
+            .and_then(|path| match self.paths.resolve(&path) {
+                Some(PathResolution::Def(ModuleDef::EnumVariant(variant))) => self
+                    .error_boundary()
+                    .outside_owner_of_variant(variant)
+                    .zip(Some(path)),
+                _ => None,
+            })
+            .map_or(Ok(None), |(owner, path)| {
+                self.qualified_names().crate_name(owner).and_then(|owner| {
+                    self.own_violation(
+                        ViolationKind::Error(ErrorViolation::IssuedOutsideItsCrate {
+                            issuance: ErrorIssuance::Constructed {
+                                written: path.syntax().to_string(),
+                            },
+                            owner,
+                        }),
+                        path.syntax(),
+                        origin,
+                    )
+                })
+            })
+    }
+
     fn container(
         &self,
         node: &SyntaxNode,
@@ -700,6 +732,14 @@ impl<'database> ModuleWalk<'_, 'database> {
                         })
                 }
             })
+    }
+
+    const fn error_boundary(&self) -> ErrorBoundary<'_, 'database> {
+        ErrorBoundary {
+            error_types: self.error_types(),
+            krate: self.krate,
+            token_origin: self.token_origin,
+        }
     }
 
     const fn error_derive(&self) -> ErrorDerive<'_, 'database> {
@@ -1632,15 +1672,6 @@ impl<'database> ModuleWalk<'_, 'database> {
                 }))
     }
 
-    fn is_workspace_adt(&self, adt: Adt) -> bool {
-        let database = self.semantics.db;
-
-        self.file_modules.contains_key(&original_file_id(
-            database,
-            adt.module(database).definition_source_file_id(database),
-        ))
-    }
-
     fn is_written_by_the_workspace(&self, node: &SyntaxNode) -> bool {
         self.token_origin.is_written_by_the_workspace(node)
     }
@@ -2411,6 +2442,13 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
     }
 
+    const fn qualified_names(&self) -> QualifiedNames<'_, 'database> {
+        QualifiedNames {
+            krate: self.krate,
+            semantics: self.semantics,
+        }
+    }
+
     fn reads_its_receiver(&self, function: Function) -> bool {
         let database = self.semantics.db;
 
@@ -2576,20 +2614,6 @@ impl<'database> ModuleWalk<'_, 'database> {
             .transpose()
     }
 
-    fn result_error_violation(
-        &self,
-        error: &Type<'database>,
-        name: UntypedErrorName,
-    ) -> ViolationKind {
-        ViolationKind::Error(
-            if error.as_adt().is_some_and(|adt| self.is_workspace_adt(adt)) {
-                ErrorViolation::NotAnError { error: name }
-            } else {
-                ErrorViolation::UntypedResult { error: name }
-            },
-        )
-    }
-
     fn result_errors_of(
         &self,
         function: Function,
@@ -2682,7 +2706,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                     })
                     .or_else(|| {
                         ast::PathType::cast(node.clone())
-                            .map(|written| self.untyped_result_error(&written, origin))
+                            .map(|written| self.written_result_error(&written, origin))
                     })
                     .or_else(|| {
                         ast::TypeAlias::cast(node.clone())
@@ -3065,87 +3089,17 @@ impl<'database> ModuleWalk<'_, 'database> {
                     .zip(untyped)
                     .map_or(Ok(None), |(written, error)| {
                         self.own_violation(
-                            self.result_error_violation(
+                            ViolationKind::Error(self.error_boundary().untyped_violation(
                                 &error,
                                 UntypedErrorName::Named {
                                     error_type: written.syntax().to_string(),
                                 },
-                            ),
+                            )),
                             written.syntax(),
                             origin,
                         )
                     })
             })
-    }
-
-    fn untyped_error_name(
-        &self,
-        written: &ast::PathType,
-        error: &Type<'database>,
-    ) -> Result<UntypedErrorName, ModuleDependenciesError> {
-        let names = QualifiedNames {
-            krate: self.krate,
-            semantics: self.semantics,
-        };
-        let path = written.path();
-        let result = written.syntax().to_string();
-
-        match path.as_ref().and_then(|path| self.paths.resolve(path)) {
-            Some(PathResolution::Def(ModuleDef::TypeAlias(alias))) => {
-                names.type_alias(alias).and_then(|alias| {
-                    names
-                        .error_type(error)
-                        .map(|error_type| UntypedErrorName::NamedByAlias { alias, error_type })
-                })
-            }
-            _ => path
-                .and_then(|path| path.segment())
-                .and_then(|segment| segment.generic_arg_list())
-                .and_then(|arguments| {
-                    arguments
-                        .generic_args()
-                        .filter_map(|argument| ast::TypeArg::cast(argument.syntax().clone()))
-                        .nth(1)
-                })
-                .and_then(|argument| argument.ty())
-                .ok_or(ModuleDependenciesError::ResultErrorNotWritten { written: result })
-                .map(|written_error| UntypedErrorName::Named {
-                    error_type: written_error.syntax().to_string(),
-                }),
-        }
-    }
-
-    fn untyped_result_error(
-        &self,
-        written: &ast::PathType,
-        origin: &SubtreeOrigin,
-    ) -> Result<Option<Violation>, ModuleDependenciesError> {
-        let database = self.semantics.db;
-
-        SignatureScope {
-            node: written.syntax(),
-        }
-        .is_in_a_signature()
-        .then(|| {
-            self.semantics
-                .resolve_type(&ast::Type::PathType(written.clone()))
-        })
-        .flatten()
-        .and_then(|resolved| self.error_types().result_error(&resolved))
-        .filter(|error| {
-            error.as_type_param(database).is_none()
-                && error.as_associated_type_parent_trait(database).is_none()
-                && !self.error_types().is_error_type(error)
-        })
-        .map_or(Ok(None), |error| {
-            self.untyped_error_name(written, &error).and_then(|name| {
-                self.own_violation(
-                    self.result_error_violation(&error, name),
-                    written.syntax(),
-                    origin,
-                )
-            })
-        })
     }
 
     fn vacuous_negations(
@@ -3229,6 +3183,10 @@ impl<'database> ModuleWalk<'_, 'database> {
                     .map(|handwritten| findings.violations.extend(handwritten))
             })
             .and_then(|()| self.harness_call(node, origin, findings, crate_findings))
+            .and_then(|()| {
+                self.constructed_error(node, origin)
+                    .map(|constructed| findings.violations.extend(constructed))
+            })
             .and_then(|()| {
                 if let Some(path) = ast::Path::cast(node.clone()) {
                     self.record(&path, origin, findings)
@@ -3325,6 +3283,25 @@ impl<'database> ModuleWalk<'_, 'database> {
         }
 
         outcome
+    }
+
+    fn written_result_error(
+        &self,
+        written: &ast::PathType,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        WrittenResultError {
+            boundary: &self.error_boundary(),
+            names: &self.qualified_names(),
+            paths: self.paths,
+            written,
+        }
+        .violation()
+        .and_then(|violation| {
+            violation.map_or(Ok(None), |violation| {
+                self.own_violation(ViolationKind::Error(violation), written.syntax(), origin)
+            })
+        })
     }
 
     fn written_tokens(

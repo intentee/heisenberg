@@ -5,7 +5,7 @@ use ra_ap_paths::AbsPathBuf;
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
-use heisenberg_absolute_path::absolute_path_error::AbsolutePathError;
+use heisenberg_absolute_path::absolute_path::AbsolutePath;
 
 use crate::checked_region::CheckedRegion;
 use crate::coverage_export_error::CoverageExportError;
@@ -16,13 +16,22 @@ use crate::region_span::RegionSpan;
 
 fn resolved_path(
     paths: &mut BTreeMap<String, AbsPathBuf>,
+    export: &AbsPath,
+    function: &str,
     filename: &str,
-) -> Result<AbsPathBuf, AbsolutePathError> {
+) -> Result<AbsPathBuf, CoverageExportError> {
     paths.get(filename).cloned().map_or_else(
         || {
-            exported_path(filename).inspect(|path| {
-                paths.insert(filename.to_owned(), path.clone());
-            })
+            AbsolutePath::parse(filename)
+                .map_err(|source| CoverageExportError::RelativeRegionFile {
+                    export: export.to_path_buf(),
+                    function: function.to_owned(),
+                    source,
+                })
+                .map(exported_path)
+                .inspect(|path| {
+                    paths.insert(filename.to_owned(), path.clone());
+                })
         },
         Ok,
     )
@@ -78,34 +87,28 @@ impl ExportFunction {
                     .iter()
                     .enumerate()
                     .try_for_each(|(index, filename)| {
-                        resolved_path(paths, filename)
-                            .map_err(|source| CoverageExportError::RelativeRegionFile {
-                                export: export.to_path_buf(),
-                                function: name.clone(),
-                                source,
-                            })
-                            .map(|path| {
-                                for CheckedRegion {
-                                    executed,
-                                    exported,
-                                    span,
-                                    ..
-                                } in checked
-                                    .iter()
-                                    .filter(|CheckedRegion { file_id, .. }| *file_id == index)
-                                {
-                                    files
-                                        .entry(path.clone())
-                                        .or_default()
-                                        .entry(*exported)
-                                        .or_insert(ExportedRegion {
-                                            executed: false,
-                                            exported: *exported,
-                                            span: *span,
-                                        })
-                                        .executed |= executed;
-                                }
-                            })
+                        resolved_path(paths, export, name, filename).map(|path| {
+                            for CheckedRegion {
+                                executed,
+                                exported,
+                                span,
+                                ..
+                            } in checked
+                                .iter()
+                                .filter(|CheckedRegion { file_id, .. }| *file_id == index)
+                            {
+                                files
+                                    .entry(path.clone())
+                                    .or_default()
+                                    .entry(*exported)
+                                    .or_insert(ExportedRegion {
+                                        executed: false,
+                                        exported: *exported,
+                                        span: *span,
+                                    })
+                                    .executed |= executed;
+                            }
+                        })
                     })
             })
     }

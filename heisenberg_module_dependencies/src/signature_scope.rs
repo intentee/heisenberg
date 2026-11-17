@@ -18,6 +18,18 @@ pub struct SignatureScope<'scope> {
 }
 
 impl SignatureScope<'_> {
+    pub fn is_in_a_return_type(&self) -> bool {
+        self.node
+            .ancestors()
+            .filter_map(ast::RetType::cast)
+            .any(|returned| {
+                returned
+                    .syntax()
+                    .parent()
+                    .is_some_and(|function| ast::Fn::can_cast(function.kind()))
+            })
+    }
+
     pub fn is_in_a_signature(&self) -> bool {
         self.node
             .ancestors()

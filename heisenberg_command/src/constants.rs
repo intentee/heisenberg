@@ -242,6 +242,23 @@ pub const DUPLICATED_FUNCTION_BODY: IssueText = IssueText {
     summary: "Functions whose signatures and bodies are identical",
 };
 
+pub const ERROR_ISSUED_OUTSIDE_ITS_CRATE: IssueText = IssueText {
+    definition: "A Result written in the return type of a function whose error type is an error type that another crate of the workspace defines, directly, in a Box or in a Vec, and a variant of such an error type written as a value, which constructs the error. An error type is a type that implements std::error::Error. A crate is a crate target, so a binary and the library of its package are two crates. Matching on the error, taking it as a parameter, holding it in a field, wrapping it as the source of a variant, and calling a conversion that its crate declares do not issue it.",
+    evaluation: RuleEvaluation::EachAnalysedConfiguration,
+    exceptions: &[
+        "A Result whose type the trait of an impl dictates.",
+        "A Result whose error type is a type parameter or an associated type, which names no error type.",
+        "The return type of a closure, which the function that calls the closure receives.",
+    ],
+    name: "ErrorIssuedOutsideItsCrate",
+    ordinal: 13,
+    rationale: "The error type of a crate is its boundary: it names the failures of one concern, and only the code of that concern knows when one of them has happened. A crate that returns or constructs the error type of another crate reports failures of a concern it does not own, so the type no longer tells which crate failed.",
+    remedy: "Handle the error where it is received, or wrap it as the #[source] or #[from] of a variant of the error type of this crate and return that.",
+    scope: RuleScope::ModuleFile,
+    section: RuleSection::Errors,
+    summary: "An error type returned or constructed by a crate that does not own it",
+};
+
 pub const ERROR_MESSAGE_FUNCTION: IssueText = IssueText {
     definition: "An error attribute of thiserror, on an error enum or one of its variants, that names a function to format the message, as #[error(fmt = path)] does.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,

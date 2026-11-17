@@ -16,6 +16,13 @@ pub struct QualifiedNames<'names, 'database> {
 }
 
 impl<'database> QualifiedNames<'_, 'database> {
+    pub fn crate_name(&self, krate: Crate) -> Result<String, ModuleDependenciesError> {
+        krate
+            .display_name(self.semantics.db)
+            .ok_or(ModuleDependenciesError::ErrorTypeCrateWithoutName(krate))
+            .map(|crate_name| crate_name.to_string())
+    }
+
     pub fn error_type(&self, error: &Type<'database>) -> Result<String, ModuleDependenciesError> {
         let database = self.semantics.db;
         let rendered = error
@@ -39,20 +46,16 @@ impl<'database> QualifiedNames<'_, 'database> {
 
     fn module_path(&self, module: Module) -> Result<String, ModuleDependenciesError> {
         let database = self.semantics.db;
-        let krate = module.krate(database);
 
-        krate
-            .display_name(database)
-            .ok_or(ModuleDependenciesError::ErrorTypeCrateWithoutName(krate))
-            .map(|crate_name| {
-                iter::once(crate_name.to_string())
-                    .chain(
-                        module
-                            .path_segments(database)
-                            .map(|segment| segment.as_str().to_owned()),
-                    )
-                    .collect::<Vec<String>>()
-                    .join("::")
-            })
+        self.crate_name(module.krate(database)).map(|crate_name| {
+            iter::once(crate_name)
+                .chain(
+                    module
+                        .path_segments(database)
+                        .map(|segment| segment.as_str().to_owned()),
+                )
+                .collect::<Vec<String>>()
+                .join("::")
+        })
     }
 }

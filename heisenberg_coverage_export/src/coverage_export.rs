@@ -5,6 +5,8 @@ use ra_ap_paths::AbsPath;
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
+use heisenberg_absolute_path::absolute_path::AbsolutePath;
+
 use crate::cargo_llvm_cov_record::CargoLlvmCovRecord;
 use crate::coverage_export_error::CoverageExportError;
 use crate::export_data::ExportData;
@@ -49,11 +51,12 @@ impl CoverageExport {
         let mut files = BTreeMap::new();
         let mut paths = BTreeMap::new();
 
-        exported_path(&manifest_path)
+        AbsolutePath::parse(&manifest_path)
             .map_err(|source| CoverageExportError::RelativeManifestPath {
                 export: path.to_path_buf(),
                 source,
             })
+            .map(exported_path)
             .and_then(|exported| {
                 if exported == workspace_manifest {
                     Ok(())

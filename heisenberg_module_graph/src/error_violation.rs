@@ -2,6 +2,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::error_issuance::ErrorIssuance;
 use crate::module_path::ModulePath;
 use crate::untyped_error_name::UntypedErrorName;
 
@@ -9,16 +10,28 @@ use crate::untyped_error_name::UntypedErrorName;
 pub enum ErrorViolation {
     Handwritten,
     HandwrittenDisplay,
+    IssuedOutsideItsCrate {
+        issuance: ErrorIssuance,
+        owner: String,
+    },
     MacroGenerated,
     MessageFunction,
     MessageOnTheEnum,
-    MultipleTypes { count: usize },
+    MultipleTypes {
+        count: usize,
+    },
     NotAnEnum,
-    NotAnError { error: UntypedErrorName },
-    OutsideItsModule { module: ModulePath },
+    NotAnError {
+        error: UntypedErrorName,
+    },
+    OutsideItsModule {
+        module: ModulePath,
+    },
     SourceInMessage,
     SourceOutsideChain,
-    UntypedResult { error: UntypedErrorName },
+    UntypedResult {
+        error: UntypedErrorName,
+    },
 }
 
 impl Display for ErrorViolation {
@@ -28,6 +41,20 @@ impl Display for ErrorViolation {
             Self::HandwrittenDisplay => {
                 formatter.write_str("Error type formats its message by hand")
             }
+            Self::IssuedOutsideItsCrate {
+                issuance: ErrorIssuance::Constructed { written },
+                owner,
+            } => write!(
+                formatter,
+                "Error {written} belongs to the crate {owner}, and only that crate constructs it"
+            ),
+            Self::IssuedOutsideItsCrate {
+                issuance: ErrorIssuance::Returned { error },
+                owner,
+            } => write!(
+                formatter,
+                "Result error type {error} belongs to the crate {owner}, and only that crate returns it"
+            ),
             Self::MessageFunction => {
                 formatter.write_str("Error message is formatted by a function")
             }

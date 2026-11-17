@@ -20,12 +20,6 @@ pub enum ModuleDependenciesError {
     #[error(transparent)]
     MemberCrates(#[from] MemberCratesError),
     #[error(
-        "rust-analyzer gives no source for the Result method {0:?}, whose signature decides whether it drops the error"
-    )]
-    ResultMethodWithoutSource(Function),
-    #[error(transparent)]
-    ResultMethodUnavailable(Arc<Self>),
-    #[error(
         "`{written}` is a Result that is neither a type alias nor written with its error type, so its error type cannot be named"
     )]
     ResultErrorNotWritten { written: String },

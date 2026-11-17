@@ -7,6 +7,7 @@ pub mod crate_target;
 pub mod crate_target_kind;
 pub mod definition_identity;
 pub mod dependency_reference;
+pub mod error_issuance;
 pub mod error_violation;
 pub mod every_configuration_findings;
 pub mod fingerprint_token;

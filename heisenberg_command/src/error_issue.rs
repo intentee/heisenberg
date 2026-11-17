@@ -1,5 +1,6 @@
 use heisenberg_module_graph::error_violation::ErrorViolation;
 
+use crate::constants::ERROR_ISSUED_OUTSIDE_ITS_CRATE;
 use crate::constants::ERROR_MESSAGE_FUNCTION;
 use crate::constants::ERROR_MESSAGE_ON_THE_ENUM;
 use crate::constants::ERROR_SOURCE_OUTSIDE_CHAIN;
@@ -16,6 +17,7 @@ use crate::issue_text::IssueText;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ErrorIssue {
+    ErrorIssuedOutsideItsCrate,
     ErrorMessageFunction,
     ErrorMessageOnTheEnum,
     ErrorSourceOutsideChain,
@@ -34,6 +36,7 @@ impl ErrorIssue {
     #[must_use]
     pub const fn text(self) -> IssueText {
         match self {
+            Self::ErrorIssuedOutsideItsCrate => ERROR_ISSUED_OUTSIDE_ITS_CRATE,
             Self::ErrorMessageFunction => ERROR_MESSAGE_FUNCTION,
             Self::ErrorMessageOnTheEnum => ERROR_MESSAGE_ON_THE_ENUM,
             Self::ErrorSourceOutsideChain => ERROR_SOURCE_OUTSIDE_CHAIN,
@@ -50,8 +53,9 @@ impl ErrorIssue {
     }
 
     #[must_use]
-    pub const fn variants() -> [Self; 12] {
+    pub const fn variants() -> [Self; 13] {
         [
+            Self::ErrorIssuedOutsideItsCrate,
             Self::ErrorMessageFunction,
             Self::ErrorMessageOnTheEnum,
             Self::ErrorSourceOutsideChain,
@@ -73,6 +77,7 @@ impl From<&ErrorViolation> for ErrorIssue {
         match violation {
             ErrorViolation::Handwritten => Self::HandwrittenErrorType,
             ErrorViolation::HandwrittenDisplay => Self::HandwrittenErrorDisplay,
+            ErrorViolation::IssuedOutsideItsCrate { .. } => Self::ErrorIssuedOutsideItsCrate,
             ErrorViolation::MessageFunction => Self::ErrorMessageFunction,
             ErrorViolation::MessageOnTheEnum => Self::ErrorMessageOnTheEnum,
             ErrorViolation::OutsideItsModule { .. } => Self::ErrorTypeOutsideItsModule,

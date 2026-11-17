@@ -54,7 +54,7 @@ pub const FIRST_REGION_KIND_POINTER: &str = "/data/0/functions/0/regions/0/7";
 
 pub const FIRST_REGION_LINE_POINTER: &str = "/data/0/functions/0/regions/0/0";
 
-pub const FULL_RUN_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in every declared configuration\nRules: 114 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
+pub const FULL_RUN_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in every declared configuration\nRules: 115 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
 
 pub const FUNCTION_FIRST_FILE_POINTER: &str = "/filenames/0";
 
