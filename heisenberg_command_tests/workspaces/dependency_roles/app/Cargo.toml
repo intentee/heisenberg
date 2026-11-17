@@ -6,6 +6,8 @@ build = "build.rs"
 autoexamples = false
 
 [dependencies]
+hidden = { path = "../hidden" }
+macros = { path = "../macros" }
 provider = { path = "../provider" }
 spare = { path = "../spare" }
 tested_with = { path = "../tested_with" }

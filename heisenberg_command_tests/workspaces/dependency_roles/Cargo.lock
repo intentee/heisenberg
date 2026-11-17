@@ -8,7 +8,9 @@ version = "0.1.0"
 dependencies = [
  "builder",
  "helper",
+ "hidden",
  "idle",
+ "macros",
  "outside_checker",
  "provider",
  "spare",
@@ -32,7 +34,15 @@ name = "helper"
 version = "0.1.0"
 
 [[package]]
+name = "hidden"
+version = "0.1.0"
+
+[[package]]
 name = "idle"
+version = "0.1.0"
+
+[[package]]
+name = "macros"
 version = "0.1.0"
 
 [[package]]

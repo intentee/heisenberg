@@ -1,8 +1,9 @@
+use macros::revealed;
 use provider::provided::provided;
 
 #[must_use]
 pub const fn total() -> u8 {
-    provided()
+    provided().saturating_add(revealed!())
 }
 
 #[cfg(test)]
@@ -16,7 +17,7 @@ mod tests {
 
     #[test]
     fn total_is_one() {
-        assert_eq!(total().saturating_add(helped()), 6);
+        assert_eq!(total().saturating_add(helped()), 15);
         assert_eq!(checked().saturating_add(tested()), 14);
     }
 }

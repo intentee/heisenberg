@@ -40,7 +40,7 @@ fn dependencies_declared_in_a_role_their_code_does_not_use_are_violations() {
             \n\
             ------------------------------\n\
             5 errors found in 3 rules\n\
-            ------------------------------\n", full_run_footer(11, 21).as_str()]
+            ------------------------------\n", full_run_footer(13, 24).as_str()]
             .concat()
             .as_str())
     );
