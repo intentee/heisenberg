@@ -24,6 +24,11 @@ fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
             - src/lib.rs:12:9: Import is written inside a block\n            \
             use shaped::backend::Generated as Local;\n\
             \n\
+            PathPackageOutsideWorkspace: 1 violation\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package shaped v0.1.0 is built from shaped/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            \n\
             UnresolvedPath: 1 violation\n\
             The code compiles, so a name that rust-analyzer cannot resolve leaves a gap in the analysis. Write the path so that rust-analyzer resolves it, such as by importing the item it names.\n\
             \n\
@@ -34,7 +39,7 @@ fn name_bound_by_an_unresolved_foreign_import_is_reported_only_at_its_paths() {
             also unresolved at src/lib.rs:23:9\n\
             \n\
             ------------------------------\n\
-            2 errors found in 2 rules\n\
+            3 errors found in 3 rules\n\
             ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2).as_str()
         ]

@@ -3,13 +3,13 @@ use ra_ap_hir::Module;
 use ra_ap_hir::Semantics;
 use ra_ap_ide_db::RootDatabase;
 
-use crate::diagnostic_site::DiagnosticSite;
 use crate::diagnostic_violation::DiagnosticViolation;
 use crate::inactive_code_site::InactiveCodeSite;
+use crate::located_violation::LocatedViolation;
 
 pub struct ModuleDiagnostics {
     pub inactive_code: Vec<InactiveCodeSite>,
-    pub sites: Vec<DiagnosticSite>,
+    pub sites: Vec<LocatedViolation>,
 }
 
 impl ModuleDiagnostics {

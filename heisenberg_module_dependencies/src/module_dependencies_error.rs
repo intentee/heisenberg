@@ -35,6 +35,10 @@ pub enum ModuleDependenciesError {
     TraitMethodWithoutSource(Function),
     #[error(transparent)]
     TraitResultErrorsUnavailable(Arc<Self>),
+    #[error(
+        "the name {literal} of an environment variable cannot be read as a string literal: {reason}"
+    )]
+    UnreadableEnvironmentVariableName { literal: String, reason: String },
     #[error("rust-analyzer gives no source for the impl {0:?} that a `Self` resolves to")]
     SelfTypeWithoutSource(Impl),
     #[error(transparent)]

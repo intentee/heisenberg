@@ -19,7 +19,7 @@ fn path_in_an_included_file_closes_a_cycle_at_the_include() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["IncludedSourceFile: 1 violation\n\
-            An included file is trusted as generated text, so code written by hand escapes every rule once it is included. Make the file a module, or have a build script generate it into OUT_DIR.\n\
+            An included file is trusted as generated text, so code written by hand escapes the rules about how code is written once it is included. Make the file a module, or have a build script generate it into OUT_DIR.\n\
             \n\
             - src/first.rs:1:1: Included file snippets/second.rs is not a build script output\n    \
             include!(\"../snippets/second.rs\");\n\

@@ -8,3 +8,4 @@ kind: directive
 - Heisenberg must never silently skip unsupported constructs or treat incomplete analysis as success. Given the same declared inputs, it must produce the same results.
 - Heisenberg never detects the operating system or the host, and contains no OS-specific workaround. Every run is fully described by its declared inputs and explicit arguments; platform differences live only in its dependencies.
 - Declared equals used. A compliant project declares no code, item, dependency or visibility that its analysed code does not account for: everything cargo compiles is analysed, and nothing is declared that nothing uses.
+- What Heisenberg trusts is stated, not implied: the help text names every input it does not analyse (what macros of other crates generate beyond names that must resolve, what build scripts and procedural macros do when they run, dependency code, the linker), and nothing outside that list is accepted without analysis.

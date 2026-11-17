@@ -18,6 +18,11 @@ pub enum ManifestViolation {
         manifest: String,
         target: String,
     },
+    PathPackageOutsideWorkspace {
+        manifest: String,
+        package: String,
+        package_manifest: String,
+    },
     RustVersionBelowSupported {
         rust_version: String,
         table: LintTable,
@@ -44,6 +49,7 @@ impl ManifestViolation {
             Self::RustVersionBelowSupported { table, .. } => table.manifest(),
             Self::DependencyUnused { manifest, .. }
             | Self::DocTestsEnabled { manifest, .. }
+            | Self::PathPackageOutsideWorkspace { manifest, .. }
             | Self::TestDependencyInProduction { manifest, .. }
             | Self::TestLibraryInProductionPackage { manifest, .. }
             | Self::UnpinnedDependency { manifest, .. } => manifest,
@@ -71,6 +77,14 @@ impl Display for ManifestViolation {
             Self::DocTestsEnabled { target, .. } => write!(
                 formatter,
                 "Target {target} has doc tests enabled, which cargo test runs and no analysis reads"
+            ),
+            Self::PathPackageOutsideWorkspace {
+                package,
+                package_manifest,
+                ..
+            } => write!(
+                formatter,
+                "Package {package} is built from {package_manifest}, which is not a workspace member, so its code is not analysed"
             ),
             Self::RustVersionBelowSupported {
                 rust_version,

@@ -56,13 +56,25 @@ fn confined_package_user_reaching_it_is_not_checked_in_a_partial_run() {
             \n\
             - cyclic/Cargo.toml: Packages cyclic v0.1.0, harness v0.1.0 depend on each other through dev-dependencies\n\
             \n\
+            PathPackageOutsideWorkspace: 8 violations\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package confined v0.1.0 is built from vendor/confined/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package d v0.1.0 is built from vendor/d/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package p v0.1.0 is built from vendor/p/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package q v0.1.0 is built from vendor/q/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package scripted v0.1.0 is built from vendor/scripted/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package x v0.1.0 is built from vendor/x/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package y v0.1.0 is built from vendor/y/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package z v0.1.0 is built from vendor/z/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            \n\
             UnknownConfinedPackage: 1 violation\n\
             A confinement holds only for a package that the workspace resolves. Remove the entry from confined_packages, or correct the package name.\n\
             \n\
             - Cargo.toml: Confined package absent names no package that the workspace resolves\n\
             \n\
             ------------------------------\n\
-            11 errors found in 5 rules\n\
+            19 errors found in 6 rules\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Not analysed: {HOST_CONFIGURATION}-without-features\n\

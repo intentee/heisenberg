@@ -33,8 +33,13 @@ fn heisenberg_binary_builds_a_dependency_that_pins_a_toolchain_with_the_rustc_of
     assert_eq!(
         str::from_utf8(&output.stdout),
         Ok([
-            "------------------------------\n\
-             No errors found!\n\
+            "PathPackageOutsideWorkspace: 1 violation\n\
+             Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+             \n\
+             - Cargo.toml: Package toolchain_pinned_dependency v0.1.0 is built from ../toolchain_pinned_dependency/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+             \n\
+             ------------------------------\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n",
             NextestPresenceEvaluation::NotEvaluated
                 .host_footer(1, 1)
@@ -43,5 +48,5 @@ fn heisenberg_binary_builds_a_dependency_that_pins_a_toolchain_with_the_rustc_of
         .concat()
         .as_str())
     );
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.status.code(), Some(1));
 }

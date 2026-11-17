@@ -401,12 +401,12 @@ pub const IMPORT_INSIDE_BLOCK: IssueText = IssueText {
 };
 
 pub const INCLUDED_SOURCE_FILE: IssueText = IssueText {
-    definition: "An include! of a file that no build script provides: one outside the OUT_DIR of its crate, which a build script writes or an out_dirs declaration stands in for. Included files are trusted as generated text and not analysed.",
+    definition: "An include! of a file that no build script provides: one outside the OUT_DIR of its crate, which a build script writes or an out_dirs declaration stands in for. Build script output is checked for unsafe code and for names that do not resolve, and is otherwise trusted as generated text.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
     exceptions: &[],
     name: "IncludedSourceFile",
     ordinal: 3,
-    rationale: "An included file is trusted as generated text, so code written by hand escapes every rule once it is included.",
+    rationale: "An included file is trusted as generated text, so code written by hand escapes the rules about how code is written once it is included.",
     remedy: "Make the file a module, or have a build script generate it into OUT_DIR.",
     scope: RuleScope::ModuleFile,
     section: RuleSection::Analysis,
@@ -784,6 +784,19 @@ pub const PACKAGE_DEPENDS_ON_ITSELF: IssueText = IssueText {
     scope: RuleScope::Package,
     section: RuleSection::Packages,
     summary: "A package that depends on itself through dev-dependencies",
+};
+
+pub const PATH_PACKAGE_OUTSIDE_WORKSPACE: IssueText = IssueText {
+    definition: "A package that cargo resolves from a local path and that is not a member of the workspace, such as a path dependency outside the workspace directory or one the workspace excludes.",
+    evaluation: RuleEvaluation::EachAnalysedConfiguration,
+    exceptions: &[],
+    name: "PathPackageOutsideWorkspace",
+    ordinal: 12,
+    rationale: "Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it.",
+    remedy: "Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.",
+    scope: RuleScope::Workspace,
+    section: RuleSection::Packages,
+    summary: "A package built from a local path that is not a workspace member",
 };
 
 pub const POSITIONAL_FIELDS: IssueText = IssueText {
@@ -1205,6 +1218,19 @@ pub const UNCOVERED_CODE: IssueText = IssueText {
     summary: "Production code that no test executes",
 };
 
+pub const UNDECLARED_ENVIRONMENT_VARIABLE: IssueText = IssueText {
+    definition: "An env! or option_env! written by the workspace that names a variable the analysed environment of its crate target does not hold. The environment holds the variables cargo sets for the package and the target, the [env] table of the cargo configuration, and what the build script of the package emits with rustc-env.",
+    evaluation: RuleEvaluation::EachAnalysedConfiguration,
+    exceptions: &[],
+    name: "UndeclaredEnvironmentVariable",
+    ordinal: 18,
+    rationale: "The compiler reads such a variable from the shell that starts the build, so the code that is compiled depends on an input that no file declares, and the analysis sees a placeholder in its place.",
+    remedy: "Declare the variable in the [env] table of the cargo configuration, or have the build script emit it with cargo::rustc-env.",
+    scope: RuleScope::ModuleFile,
+    section: RuleSection::Analysis,
+    summary: "An env! or option_env! of a variable that nothing declares",
+};
+
 pub const UNDESTRUCTURED_PARAMETER: IssueText = IssueText {
     definition: "A function or closure parameter bound by an identifier, other than self, whose every use, at least one, accesses a field of the struct or tuple the parameter holds, directly or behind references, with the field name written in a module file.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
@@ -1352,7 +1378,7 @@ pub const UNRESOLVED_EXTERN_CRATE: IssueText = IssueText {
 };
 
 pub const UNRESOLVED_MACRO_CALL: IssueText = IssueText {
-    definition: "A macro call, attribute or derive whose macro rust-analyzer cannot resolve. A macro call whose name an unresolved import binds belongs to that import's issue.",
+    definition: "A macro call, attribute or derive whose macro rust-analyzer cannot resolve, in any code of the crate target, the expansion of a macro of another crate included. A macro call whose name an unresolved import binds belongs to that import's issue.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
     exceptions: &[],
     name: "UnresolvedMacroCall",
@@ -1365,7 +1391,7 @@ pub const UNRESOLVED_MACRO_CALL: IssueText = IssueText {
 };
 
 pub const UNRESOLVED_METHOD_CALL: IssueText = IssueText {
-    definition: "A method call whose method rust-analyzer cannot resolve, unless its receiver holds a name that rust-analyzer cannot resolve, which is that name's issue.",
+    definition: "A method call whose method rust-analyzer cannot resolve, unless its receiver holds a name that rust-analyzer cannot resolve, which is that name's issue. A call in the expansion of a macro is reported at the macro call the workspace wrote, whoever wrote the macro.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
     exceptions: &[],
     name: "UnresolvedMethodCall",
@@ -1391,7 +1417,7 @@ pub const UNRESOLVED_MODULE: IssueText = IssueText {
 };
 
 pub const UNRESOLVED_PATH: IssueText = IssueText {
-    definition: "A path that rust-analyzer cannot resolve, imports included. A name bound by an unresolved import, whether a path or a macro call, belongs to that import's issue, and paths into a module of another crate that do not resolve are one issue per module, listed under a failed macro expansion that a workspace member reports in that module's file when there is one.",
+    definition: "A path that rust-analyzer cannot resolve, imports included, in any code of the crate target: a path in the expansion of a macro is reported at the macro call the workspace wrote, whoever wrote the macro. A name bound by an unresolved import, whether a path or a macro call, belongs to that import's issue, and paths into a module of another crate that do not resolve are one issue per module, listed under a failed macro expansion that a workspace member reports in that module's file when there is one.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
     exceptions: &[],
     name: "UnresolvedPath",
@@ -1404,9 +1430,11 @@ pub const UNRESOLVED_PATH: IssueText = IssueText {
 };
 
 pub const UNSAFE_CODE: IssueText = IssueText {
-    definition: "An unsafe block, function, trait, impl, extern block or attribute, written in the module files of a crate whose own code neither declares foreign functions or statics in an extern block, nor uses one, nor defines a function with a foreign ABI.",
+    definition: "An unsafe block, function, trait, impl, extern block or attribute, a global_asm! call, or a no_mangle, export_name or link_section attribute written without unsafe, in the text the workspace wrote for a crate target: in its module files, in the expansion of a macro that the workspace defines, or in the build script output that include! brings in. It is a violation when the production code of the crate target neither declares a foreign function or static in an extern block, nor uses one, nor defines a function with a foreign ABI.",
     evaluation: RuleEvaluation::EachAnalysedConfiguration,
-    exceptions: &[],
+    exceptions: &[
+        "Unsafe code in the test code of a crate target whose test code integrates foreign code, when its production code does not.",
+    ],
     name: "UnsafeCode",
     ordinal: 16,
     rationale: "Unsafe code escapes the guarantees that make a project statically analyzable, and only code that meets a foreign library cannot avoid it.",

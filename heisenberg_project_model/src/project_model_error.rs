@@ -182,8 +182,16 @@ pub enum ProjectModelError {
         variable = CLIPPY_ARGUMENTS_VARIABLE
     )]
     ConfiguredClippyArguments { definition: Definition },
+    #[error(
+        "`{key}` replaces the build script of a package in the cargo configuration, and Heisenberg analyses what the build script emits"
+    )]
+    ConfiguredBuildScriptOverride { key: String },
     #[error("`{key}` is set in {definition}, and Heisenberg builds with the rustc of the sysroot")]
     ConfiguredCompiler { definition: Definition, key: String },
+    #[error(
+        "`{key}` is set in {definition}, and Heisenberg checks the patches that the workspace manifest declares"
+    )]
+    ConfiguredPatch { definition: Definition, key: String },
     #[error(
         "`{CARGO_BUILD_TABLE}.{CARGO_RUSTDOC}` is set in {definition}, and Heisenberg cannot account for the rustdoc that cargo names to build scripts"
     )]

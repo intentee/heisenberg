@@ -8,6 +8,32 @@ use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::heisenberg_check::HeisenbergCheck;
 use heisenberg_command_tests::host_only_fixture::HostOnlyFixture;
 
+const EXPORTED_ITEMS: &str = "ItemMoreVisibleThanItsUses: 10 violations\n\
+            An unpublishable package has every user inside the workspace, so an item exported to crates that never use it declares an interface that does not exist: it hides which items are the crate's surface, and keeps the compiler from reporting the item once nothing in its crate uses it either. Narrow the visibility to pub(crate), or remove the item when its own crate does not use it.\n\
+            \n\
+            - builder/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn builder() -> u8 {\n\
+            - consumer/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn consumer() -> u8 {\n\
+            - dependent/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn dependent() -> u8 {\n\
+            - enabler/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn enabler() -> u8 {\n\
+            - forked/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn forked() -> u8 {\n\
+            - harness/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn harness() -> u8 {\n\
+            - idle/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn idle() -> u8 {\n\
+            - scriptor/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn scriptor() -> u8 {\n\
+            - stranger/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn stranger() -> u8 {\n\
+            - unlisted/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
+            pub const fn unlisted() -> u8 {\n\
+            \n\
+            ";
+
 fn expected_report() -> String {
     format!(
         "ConfinedPackageReachedOutsideItsUsers: 7 violations\n\
@@ -43,34 +69,23 @@ fn expected_report() -> String {
             \n\
             - Cargo.toml: Package idle is listed as a user of confined package confined but depends on it in no declared configuration\n\
             \n\
-            ItemMoreVisibleThanItsUses: 10 violations\n\
-            An unpublishable package has every user inside the workspace, so an item exported to crates that never use it declares an interface that does not exist: it hides which items are the crate's surface, and keeps the compiler from reporting the item once nothing in its crate uses it either. Narrow the visibility to pub(crate), or remove the item when its own crate does not use it.\n\
-            \n\
-            - builder/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn builder() -> u8 {{\n\
-            - consumer/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn consumer() -> u8 {{\n\
-            - dependent/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn dependent() -> u8 {{\n\
-            - enabler/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn enabler() -> u8 {{\n\
-            - forked/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn forked() -> u8 {{\n\
-            - harness/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn harness() -> u8 {{\n\
-            - idle/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn idle() -> u8 {{\n\
-            - scriptor/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn scriptor() -> u8 {{\n\
-            - stranger/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn stranger() -> u8 {{\n\
-            - unlisted/src/lib.rs:1:14: Function is used by no other crate target, so its visibility reaches further than its uses\n    \
-            pub const fn unlisted() -> u8 {{\n\
-            \n\
+            {EXPORTED_ITEMS}\
             PackageDependencyCycle: 1 violation\n\
             Package dependencies never form a cycle, dev-dependencies included. When a test library depends on the package whose tests use it, move those tests and the helpers that need the package into a separate tests package that holds them in its library.\n\
             \n\
             - cyclic/Cargo.toml: Packages cyclic v0.1.0, harness v0.1.0 depend on each other through dev-dependencies\n\
+            \n\
+            PathPackageOutsideWorkspace: 8 violations\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package confined v0.1.0 is built from vendor/confined/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package d v0.1.0 is built from vendor/d/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package p v0.1.0 is built from vendor/p/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package q v0.1.0 is built from vendor/q/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package scripted v0.1.0 is built from vendor/scripted/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package x v0.1.0 is built from vendor/x/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package y v0.1.0 is built from vendor/y/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            - Cargo.toml: Package z v0.1.0 is built from vendor/z/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
             \n\
             TestLibraryInProductionPackage: 3 violations\n\
             A library that only tests need belongs with the tests, in a test crate: a production package that declares it mixes the inputs of its tests into its own manifest, and every package that tests the same way repeats it. Move the tests that need the library, with the dev-dependency, into a declared test crate.\n\
@@ -96,7 +111,7 @@ fn expected_report() -> String {
             - tested/Cargo.toml: Dependency x is referred to by no code that the role serves\n\
             \n\
             ------------------------------\n\
-            32 errors found in 9 rules\n\
+            40 errors found in 10 rules\n\
             ------------------------------\n\
             Analysed on {HOST_CONFIGURATION}: 19 crate targets, 22 modules\n\
             Analysed on {HOST_CONFIGURATION}-without-features: 19 crate targets, 22 modules\n\

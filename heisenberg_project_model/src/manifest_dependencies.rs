@@ -65,6 +65,84 @@ impl ManifestDependencies<'_> {
                 .flatten()
                 .filter_map(|(name, dependency)| unpinned(name, dependency)),
         )
+        .chain(
+            manifest
+                .patch
+                .iter()
+                .flat_map(BTreeMap::values)
+                .flatten()
+                .filter_map(|(name, dependency)| unpinned(name, dependency)),
+        )
+        .chain(
+            manifest
+                .replace
+                .iter()
+                .flatten()
+                .filter_map(|(package, dependency)| {
+                    DependencyRequirement { dependency }
+                        .unpinned()
+                        .map(|requirement| UnpinnedDependency {
+                            dependency: package.clone(),
+                            requirement,
+                        })
+                }),
+        )
         .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cargo_util_schemas::manifest::TomlManifest;
+    use toml::from_str;
+
+    use super::ManifestDependencies;
+    use crate::unpinned_dependency::UnpinnedDependency;
+    use crate::unpinned_requirement::UnpinnedRequirement;
+
+    fn unpinned(written: &str) -> Vec<UnpinnedDependency> {
+        let manifest = from_str::<TomlManifest>(written)
+            .expect("the manifest of a test is a valid cargo manifest");
+
+        ManifestDependencies {
+            manifest: &manifest,
+        }
+        .unpinned()
+    }
+
+    #[test]
+    fn patch_that_follows_a_branch_is_not_pinned() {
+        assert_eq!(
+            unpinned(
+                "[patch.crates-io]\npatched = { git = \"https://example.invalid/patched\", branch = \"main\" }"
+            ),
+            vec![UnpinnedDependency {
+                dependency: "patched".to_owned(),
+                requirement: UnpinnedRequirement::GitWithoutRevision,
+            }]
+        );
+    }
+
+    #[test]
+    fn replacement_that_follows_a_branch_is_not_pinned() {
+        assert_eq!(
+            unpinned(
+                "[replace]\n\"replaced:1.0.0\" = { git = \"https://example.invalid/replaced\", branch = \"main\" }"
+            ),
+            vec![UnpinnedDependency {
+                dependency: "replaced:1.0.0".to_owned(),
+                requirement: UnpinnedRequirement::GitWithoutRevision,
+            }]
+        );
+    }
+
+    #[test]
+    fn patch_at_a_revision_is_pinned() {
+        assert_eq!(
+            unpinned(
+                "[patch.crates-io]\npatched = { git = \"https://example.invalid/patched\", rev = \"0123abc\" }"
+            ),
+            Vec::new()
+        );
     }
 }

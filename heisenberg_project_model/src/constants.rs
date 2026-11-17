@@ -72,6 +72,8 @@ pub const CARGO_MANIFEST_FILE: &str = "Cargo.toml";
 
 pub const CARGO_OUT_DIR_VARIABLE: &str = "OUT_DIR";
 
+pub const CARGO_PATCH_TABLE: &str = "patch";
+
 pub const CARGO_RUSTC: &str = "rustc";
 
 pub const CARGO_RUSTDOC: &str = "rustdoc";

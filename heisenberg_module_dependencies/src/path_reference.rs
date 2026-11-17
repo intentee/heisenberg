@@ -13,7 +13,6 @@ use crate::module_paths::ModulePaths;
 use crate::path_reference_outcome::PathReferenceOutcome;
 use crate::path_resolutions::PathResolutions;
 use crate::referenced_modules::ReferencedModules;
-use crate::token_origin::TokenOrigin;
 use crate::unresolved_import_binding::UnresolvedImportBinding;
 
 pub struct PathReference<'reference, 'database> {
@@ -23,7 +22,6 @@ pub struct PathReference<'reference, 'database> {
     pub paths: &'reference PathResolutions<'reference, 'database>,
     pub scope: &'reference SyntaxNode,
     pub semantics: &'reference Semantics<'database, RootDatabase>,
-    pub token_origin: &'reference TokenOrigin<'reference, 'database>,
 }
 
 impl PathReference<'_, '_> {
@@ -36,10 +34,7 @@ impl PathReference<'_, '_> {
                     self.dependency(scope.module(), definition)
                 }),
             Some(_) => PathReferenceOutcome::Irrelevant,
-            None if self.names_an_attribute_or_a_macro_call()
-                || self.is_type_anchor()
-                || self.token_origin.is_foreign_text(self.path.syntax()) =>
-            {
+            None if self.names_an_attribute_or_a_macro_call() || self.is_type_anchor() => {
                 PathReferenceOutcome::Irrelevant
             }
             None => self.path.qualifier().map_or_else(

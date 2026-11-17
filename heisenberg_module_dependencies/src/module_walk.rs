@@ -46,6 +46,7 @@ use ra_ap_hir_expand::builtin::EagerExpander;
 use ra_ap_hir_expand::name::AsName as _;
 use ra_ap_hir_expand::name::Name;
 use ra_ap_ide_db::RootDatabase;
+use ra_ap_ide_db::base_db::Crate as DatabaseCrate;
 use ra_ap_ide_db::defs::Definition;
 use ra_ap_paths::AbsPath;
 use ra_ap_syntax::AstNode;
@@ -120,8 +121,11 @@ use crate::attribute_directives::AttributeDirectives;
 use crate::attributed_item::AttributedItem;
 use crate::benchmark_harness::BenchmarkHarness;
 use crate::benchmark_output::BenchmarkOutput;
+use crate::builtin_attribute::BuiltinAttribute;
+use crate::cargo_target_variables::CargoTargetVariables;
 use crate::constants::LIFETIME_PREFIX;
 use crate::constants::TEST_MODULE_NAME;
+use crate::constants::UNSAFE_ATTRIBUTES;
 use crate::constants_module::ConstantsModule;
 use crate::constructor::Constructor;
 use crate::covered_code::CoveredCode;
@@ -185,6 +189,7 @@ use crate::token_origin::TokenOrigin;
 use crate::tool_directive::ToolDirective;
 use crate::trait_arguments::trait_arguments;
 use crate::unsafe_code_findings::UnsafeCodeFindings;
+use crate::unsafe_code_use::UnsafeCodeUse;
 use crate::used_definition::UsedDefinition;
 use crate::walked_module::WalkedModule;
 use crate::written_token::WrittenToken;
@@ -192,6 +197,7 @@ use crate::written_token::WrittenToken;
 pub struct ModuleWalk<'walk, 'database> {
     pub benchmark_harness: &'walk BenchmarkHarness<'walk, 'database>,
     pub build_script_output_files: &'walk BTreeSet<FileId>,
+    pub cargo_target_variables: &'walk CargoTargetVariables,
     pub crate_target: &'walk CrateTarget,
     pub dependency_names: &'walk HashMap<Crate, String>,
     pub error_derive_crates: &'walk HashSet<Crate>,
@@ -976,7 +982,9 @@ impl<'database> ModuleWalk<'_, 'database> {
                         Ok(())
                     }
                 })
-                .and_then(|()| {
+                .and_then(|()| self.undeclared_environment_variable(call, origin))
+                .and_then(|undeclared| {
+                    module_findings.violations.extend(undeclared);
                     pending.extend(expansion.eager_arg(database).map(|argument| Subtree {
                         origin: origin.expansion_of(call.syntax()),
                         root: self.semantics.parse_or_expand(HirFileId::from(argument)),
@@ -1402,8 +1410,10 @@ impl<'database> ModuleWalk<'_, 'database> {
     fn integrates_foreign_code(&self, node: &SyntaxNode, file: HirFileId) -> bool {
         let database = self.semantics.db;
 
-        (ast::ExternBlock::can_cast(node.kind())
-            && self.token_origin.is_own_text(
+        (ast::ExternBlock::cast(node.clone())
+            .and_then(|block| block.extern_item_list())
+            .is_some_and(|items| items.extern_items().next().is_some())
+            && self.token_origin.is_workspace_code_at(
                 file,
                 ItemFocus {
                     node,
@@ -1415,7 +1425,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                 .filter(|function| {
                     function.abi().is_some_and(|abi| {
                         self.token_origin
-                            .is_own_text(file, abi.syntax().text_range())
+                            .is_workspace_code_at(file, abi.syntax().text_range())
                     })
                 })
                 .and_then(|function| self.semantics.to_def(&function))
@@ -1427,7 +1437,7 @@ impl<'database> ModuleWalk<'_, 'database> {
             || ast::Path::cast(node.clone())
                 .filter(|path| {
                     self.token_origin
-                        .is_own_text(file, path.syntax().text_range())
+                        .is_workspace_code_at(file, path.syntax().text_range())
                 })
                 .and_then(|path| self.paths.resolve(&path))
                 .is_some_and(|resolution| match resolution {
@@ -1599,6 +1609,29 @@ impl<'database> ModuleWalk<'_, 'database> {
         self.method_calls.resolve(call).is_none()
     }
 
+    fn is_unsafe_without_the_keyword(&self, node: &SyntaxNode) -> bool {
+        let database = self.semantics.db;
+
+        self.token_origin.is_workspace_code(node)
+            && (ast::Meta::cast(node.clone()).is_some_and(|meta| {
+                !node
+                    .parent()
+                    .is_some_and(|parent| ast::UnsafeMeta::can_cast(parent.kind()))
+                    && BuiltinAttribute {
+                        meta: &meta,
+                        paths: self.paths,
+                    }
+                    .is_named(&UNSAFE_ATTRIBUTES)
+            }) || ast::MacroCall::cast(node.clone())
+                .and_then(|call| self.semantics.to_def(&call))
+                .is_some_and(|expansion| {
+                    matches!(
+                        expansion.lookup(database).def.kind,
+                        MacroDefKind::BuiltIn(_, BuiltinFnLikeExpander::GlobalAsm)
+                    )
+                }))
+    }
+
     fn is_workspace_adt(&self, adt: Adt) -> bool {
         let database = self.semantics.db;
 
@@ -1609,8 +1642,7 @@ impl<'database> ModuleWalk<'_, 'database> {
     }
 
     fn is_written_by_the_workspace(&self, node: &SyntaxNode) -> bool {
-        self.token_origin.is_workspace_text(node)
-            || self.token_origin.is_generated_by_a_workspace_macro(node)
+        self.token_origin.is_written_by_the_workspace(node)
     }
 
     fn item(
@@ -2434,7 +2466,6 @@ impl<'database> ModuleWalk<'_, 'database> {
                 SubtreeOrigin::SourceFile => path.syntax(),
             },
             semantics: self.semantics,
-            token_origin: self.token_origin,
         })
         .outcome()
         {
@@ -2788,6 +2819,62 @@ impl<'database> ModuleWalk<'_, 'database> {
         })
     }
 
+    fn undeclared_environment_variable(
+        &self,
+        call: &ast::MacroCall,
+        origin: &SubtreeOrigin,
+    ) -> Result<Option<Violation>, ModuleDependenciesError> {
+        let database = self.semantics.db;
+
+        self.semantics
+            .to_def(call)
+            .filter(|expansion| {
+                matches!(
+                    expansion.lookup(database).def.kind,
+                    MacroDefKind::BuiltInEager(_, expander) if expander.is_env_or_option_env()
+                ) && self.token_origin.is_workspace_code(call.syntax())
+            })
+            .and_then(|expansion| expansion.eager_arg(database))
+            .and_then(|argument| {
+                code_tokens(
+                    self.semantics
+                        .parse_or_expand(HirFileId::from(argument))
+                        .descendants_with_tokens(),
+                )
+                .find_map(ast::String::cast)
+            })
+            .map_or(Ok(None), |name| {
+                name.value()
+                    .map_err(
+                        |error| ModuleDependenciesError::UnreadableEnvironmentVariableName {
+                            literal: name.text().to_owned(),
+                            reason: format!("{error:?}"),
+                        },
+                    )
+                    .and_then(|variable| {
+                        if DatabaseCrate::from(self.krate)
+                            .env(database)
+                            .get(&variable)
+                            .is_some()
+                            || self
+                                .cargo_target_variables
+                                .declares(self.crate_target, &variable)
+                        {
+                            Ok(None)
+                        } else {
+                            self.locate_focus(call.syntax(), origin)
+                                .map(|location| Violation {
+                                    kind: ViolationKind::UndeclaredEnvironmentVariable {
+                                        variable: variable.into_owned(),
+                                    },
+                                    location,
+                                })
+                                .map(Some)
+                        }
+                    })
+            })
+    }
+
     fn undestructured_parameter(
         &self,
         parameter: &ast::Param,
@@ -2894,7 +2981,6 @@ impl<'database> ModuleWalk<'_, 'database> {
                     })
             })
             .and_then(|call| call.name_ref())
-            .filter(|name| !self.token_origin.is_foreign_text(name.syntax()))
             .map(|name| {
                 self.locate(name.syntax(), origin)
                     .map(|location| Violation {
@@ -2910,17 +2996,16 @@ impl<'database> ModuleWalk<'_, 'database> {
         node: &SyntaxNode,
         file: HirFileId,
         origin: &SubtreeOrigin,
-        UnsafeCodeFindings {
-            integrates_foreign_code,
-            sites,
-        }: &mut UnsafeCodeFindings,
+        UnsafeCodeFindings { production, test }: &mut UnsafeCodeFindings,
     ) -> Result<(), ModuleDependenciesError> {
         code_tokens(node.children_with_tokens())
             .filter(|token| {
                 token.kind() == T![unsafe]
                     && !ast::FnPtrType::can_cast(node.kind())
                     && !ast::TokenTree::can_cast(node.kind())
-                    && self.token_origin.is_own_text(file, token.text_range())
+                    && self
+                        .token_origin
+                        .is_workspace_code_at(file, token.text_range())
             })
             .map(|token| {
                 self.locate_original(
@@ -2933,11 +3018,27 @@ impl<'database> ModuleWalk<'_, 'database> {
                     location,
                 })
             })
+            .chain(self.is_unsafe_without_the_keyword(node).then(|| {
+                self.locate(node, origin).map(|location| Violation {
+                    kind: ViolationKind::UnsafeCode,
+                    location,
+                })
+            }))
             .collect::<Result<Vec<Violation>, ModuleDependenciesError>>()
-            .map(|unsafe_sites| {
-                sites.extend(unsafe_sites);
-                *integrates_foreign_code =
-                    *integrates_foreign_code || self.integrates_foreign_code(node, file);
+            .map(|sites| {
+                let integrates_foreign_code = self.integrates_foreign_code(node, file);
+
+                if integrates_foreign_code || !sites.is_empty() {
+                    if self.is_test_code(node) {
+                        test
+                    } else {
+                        production
+                    }
+                    .merge(UnsafeCodeUse {
+                        integrates_foreign_code,
+                        sites,
+                    });
+                }
             })
     }
 

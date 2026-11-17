@@ -15,6 +15,7 @@ use heisenberg_expanded_code::generated_tokens::GeneratedTokens;
 use heisenberg_source_locator::written_range::written_range;
 
 pub struct TokenOrigin<'origin, 'database> {
+    pub build_script_output_files: &'origin BTreeSet<FileId>,
     pub own_files: &'origin BTreeSet<FileId>,
     pub semantics: &'origin Semantics<'database, RootDatabase>,
     pub workspace_files: &'origin BTreeSet<FileId>,
@@ -33,18 +34,10 @@ impl TokenOrigin<'_, '_> {
     }
 
     pub fn is_generated_by_a_workspace_macro(&self, node: &SyntaxNode) -> bool {
-        let database = self.semantics.db;
         let file_id = self.semantics.hir_file_for(node);
 
-        code_tokens(node.descendants_with_tokens()).any(|token| {
-            GeneratedTokens {
-                semantics: self.semantics,
-            }
-            .generating_proc_macro(file_id, token.text_range())
-            .is_some_and(|call| {
-                self.is_workspace_crate(Crate::from(call.lookup(database).def.krate))
-            })
-        })
+        code_tokens(node.descendants_with_tokens())
+            .any(|token| self.is_generated_by_a_workspace_macro_at(file_id, token.text_range()))
     }
 
     pub fn is_own_file(&self, file_id: FileId) -> bool {
@@ -67,6 +60,18 @@ impl TokenOrigin<'_, '_> {
         .is_written_in(file_id, range, written, self.own_files)
     }
 
+    pub fn is_workspace_code(&self, node: &SyntaxNode) -> bool {
+        let file_id = self.semantics.hir_file_for(node);
+
+        code_tokens(node.descendants_with_tokens())
+            .any(|token| self.is_workspace_code_at(file_id, token.text_range()))
+    }
+
+    pub fn is_workspace_code_at(&self, file_id: HirFileId, range: TextRange) -> bool {
+        self.is_written_by_the_workspace_at(file_id, range)
+            || self.is_text_of(file_id, range, self.build_script_output_files)
+    }
+
     pub fn is_workspace_crate(&self, krate: Crate) -> bool {
         self.workspace_files
             .contains(&krate.root_file(self.semantics.db))
@@ -78,6 +83,25 @@ impl TokenOrigin<'_, '_> {
 
     pub fn is_workspace_text(&self, node: &SyntaxNode) -> bool {
         self.is_written_in(node, self.workspace_files)
+    }
+
+    pub fn is_written_by_the_workspace(&self, node: &SyntaxNode) -> bool {
+        self.is_workspace_text(node) || self.is_generated_by_a_workspace_macro(node)
+    }
+
+    pub fn is_written_by_the_workspace_at(&self, file_id: HirFileId, range: TextRange) -> bool {
+        self.is_workspace_range(file_id, range)
+            || self.is_generated_by_a_workspace_macro_at(file_id, range)
+    }
+
+    fn is_generated_by_a_workspace_macro_at(&self, file_id: HirFileId, range: TextRange) -> bool {
+        let database = self.semantics.db;
+
+        GeneratedTokens {
+            semantics: self.semantics,
+        }
+        .generating_proc_macro(file_id, range)
+        .is_some_and(|call| self.is_workspace_crate(Crate::from(call.lookup(database).def.krate)))
     }
 
     fn is_text_of(&self, file_id: HirFileId, range: TextRange, files: &BTreeSet<FileId>) -> bool {

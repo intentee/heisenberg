@@ -1,5 +1,13 @@
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
+pub const CARGO_BINARY_NAME_VARIABLE: &str = "CARGO_BIN_NAME";
+
+pub const CARGO_BINARY_PATH_VARIABLE_PREFIX: &str = "CARGO_BIN_EXE_";
+
+pub const CARGO_PRIMARY_PACKAGE_VARIABLE: &str = "CARGO_PRIMARY_PACKAGE";
+
+pub const CARGO_TARGET_TEMPORARY_DIRECTORY_VARIABLE: &str = "CARGO_TARGET_TMPDIR";
+
 pub const ERROR_DISPLAY_METHOD: &str = "as_display";
 
 pub const ERROR_MESSAGE_FUNCTION: &str = "fmt";
@@ -34,5 +42,7 @@ pub const UNRESOLVED_CODE_KINDS: [ViolationKind; 8] = [
     ViolationKind::UnresolvedModule,
     ViolationKind::UnresolvedPath,
 ];
+
+pub const UNSAFE_ATTRIBUTES: [&str; 3] = ["export_name", "link_section", "no_mangle"];
 
 pub const WORD_SEPARATOR: char = '_';

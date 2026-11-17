@@ -98,6 +98,11 @@ const CATALOGUE: &str = "Heisenberg 0.1.0 rule catalogue\n\
         Applies to: all code\n  \
         Evaluated: in each analysed configuration\n\
         \n\
+        Rule 1.18 UndeclaredEnvironmentVariable: An env! or option_env! of a variable that nothing declares\n  \
+        Scope: module file\n  \
+        Applies to: all code\n  \
+        Evaluated: in each analysed configuration\n\
+        \n\
         Section 2: Declared configurations\n\
         \n\
         Rule 2.1 AttributeAppliedInNoConfiguration: A cfg_attr that applies in no declared configuration\n  \
@@ -248,6 +253,11 @@ const CATALOGUE: &str = "Heisenberg 0.1.0 rule catalogue\n\
         Scope: package\n  \
         Applies to: all code\n  \
         Evaluated: only when every declared configuration is analysed\n\
+        \n\
+        Rule 4.12 PathPackageOutsideWorkspace: A package built from a local path that is not a workspace member\n  \
+        Scope: workspace\n  \
+        Applies to: all code\n  \
+        Evaluated: in each analysed configuration\n\
         \n\
         Section 5: Modules and items\n\
         \n\

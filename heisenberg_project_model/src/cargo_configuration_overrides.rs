@@ -10,10 +10,13 @@ use cargo::context::EnvConfigValue;
 use cargo::context::OptValue;
 use cargo::context::StringList;
 use cargo::context::TargetCfgConfig;
+use cargo::context::TargetConfig;
 use cargo::context::Value;
+use cargo_util_schemas::manifest::TomlDependency;
 
 use crate::constants::CARGO_BUILD_TABLE;
 use crate::constants::CARGO_ENVIRONMENT_TABLE;
+use crate::constants::CARGO_PATCH_TABLE;
 use crate::constants::CARGO_RUSTC;
 use crate::constants::CARGO_RUSTC_WORKSPACE_WRAPPER;
 use crate::constants::CARGO_RUSTC_WRAPPER;
@@ -113,6 +116,8 @@ impl CargoConfigurationOverrides<'_> {
                     .and_then(|()| reject_compiler(CARGO_RUSTC_WRAPPER, rustc_wrapper.as_ref()))
                 },
             )
+            .and_then(|()| self.reject_build_script_overrides())
+            .and_then(|()| self.reject_patches())
             .and_then(|()| {
                 self.reject_configured_environment(CLIPPY_ARGUMENTS_VARIABLE, |definition| {
                     ProjectModelError::ConfiguredClippyArguments { definition }
@@ -131,6 +136,27 @@ impl CargoConfigurationOverrides<'_> {
                     ProjectModelError::ConfiguredNightlyBootstrap { definition }
                 })
             })
+    }
+
+    fn reject_build_script_overrides(&self) -> Result<(), ProjectModelError> {
+        SUPPORTED_TARGETS.into_iter().try_for_each(|target| {
+            let triple = target.triple();
+
+            self.context
+                .target_cfg_triple(triple)
+                .map_err(self.unreadable_value(&format!("{CARGO_TARGET_TABLE}.{triple}")))
+                .and_then(
+                    |TargetConfig {
+                         links_overrides, ..
+                     }| {
+                        links_overrides.keys().next().map_or(Ok(()), |library| {
+                            Err(ProjectModelError::ConfiguredBuildScriptOverride {
+                                key: format!("{CARGO_TARGET_TABLE}.{triple}.{library}"),
+                            })
+                        })
+                    },
+                )
+        })
     }
 
     fn reject_configured_environment(
@@ -225,6 +251,31 @@ impl CargoConfigurationOverrides<'_> {
         self.context
             .get_env_os(variable)
             .map_or(Ok(()), |_| Err(error))
+    }
+
+    fn reject_patches(&self) -> Result<(), ProjectModelError> {
+        self.context
+            .get::<Option<
+                BTreeMap<String, BTreeMap<String, Value<TomlDependency<ConfigRelativePath>>>>,
+            >>(CARGO_PATCH_TABLE)
+            .map_err(self.unreadable_value(CARGO_PATCH_TABLE))
+            .and_then(|patches| {
+                patches
+                    .into_iter()
+                    .flatten()
+                    .find_map(|(registry, packages)| {
+                        packages
+                            .into_iter()
+                            .next()
+                            .map(|(package, Value { definition, .. })| {
+                                ProjectModelError::ConfiguredPatch {
+                                    definition,
+                                    key: format!("{CARGO_PATCH_TABLE}.{registry}.{package}"),
+                                }
+                            })
+                    })
+                    .map_or(Ok(()), Err)
+            })
     }
 
     fn unreadable_value<TSource: Into<Box<dyn Error + Send + Sync>>>(

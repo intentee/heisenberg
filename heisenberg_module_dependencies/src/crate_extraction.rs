@@ -28,13 +28,11 @@ use heisenberg_source_locator::source_locator::SourceLocator;
 
 use crate::constants::UNRESOLVED_CODE_KINDS;
 use crate::crate_findings::CrateFindings;
-use crate::diagnostic_site::DiagnosticSite;
 use crate::file_start::file_start;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
-use crate::token_origin::TokenOrigin;
 use crate::walked_module::WalkedModule;
 
 pub struct CrateExtraction<'extraction, 'database> {
@@ -45,7 +43,6 @@ pub struct CrateExtraction<'extraction, 'database> {
     pub locator: &'extraction SourceLocator<'extraction>,
     pub modules: &'extraction [Module],
     pub semantics: &'extraction Semantics<'database, RootDatabase>,
-    pub workspace_files: &'extraction BTreeSet<FileId>,
 }
 
 impl CrateExtraction<'_, '_> {
@@ -54,11 +51,6 @@ impl CrateExtraction<'_, '_> {
         walked: Vec<Result<WalkedModule, ModuleDependenciesError>>,
     ) -> Result<CrateModuleGraph, ModuleDependenciesError> {
         let database = self.semantics.db;
-        let token_origin = TokenOrigin {
-            own_files: self.files,
-            semantics: self.semantics,
-            workspace_files: self.workspace_files,
-        };
         let root = self.krate.root_module(database);
 
         let mut crate_findings = CrateFindings::default();
@@ -91,45 +83,37 @@ impl CrateExtraction<'_, '_> {
                 self.diagnostics
                     .iter()
                     .flat_map(|ModuleDiagnostics { sites, .. }| sites)
-                    .filter(|DiagnosticSite { origin, .. }| {
-                        token_origin.is_own_text(origin.file_id, origin.value)
+                    .try_for_each(|LocatedViolation { display, kind }| {
+                        self.locator.locate(*display).and_then(|location| {
+                            if *kind == ViolationKind::FailedMacroExpansion {
+                                self.written_call(*display).map(|written| {
+                                    let violation = Violation {
+                                        kind: ViolationKind::FailedMacroExpansion,
+                                        location: written,
+                                    };
+
+                                    if violation.location == location {
+                                        findings.violations.insert(violation);
+                                    } else {
+                                        findings.violations.fold(
+                                            violation,
+                                            FoldedFinding {
+                                                kind: FoldedFindingKind::FailingExpansion,
+                                                location,
+                                            },
+                                        );
+                                    }
+                                })
+                            } else {
+                                findings.violations.insert(Violation {
+                                    kind: kind.clone(),
+                                    location,
+                                });
+
+                                Ok(())
+                            }
+                        })
                     })
-                    .try_for_each(
-                        |DiagnosticSite {
-                             violation: LocatedViolation { display, kind },
-                             ..
-                         }| {
-                            self.locator.locate(*display).and_then(|location| {
-                                if *kind == ViolationKind::FailedMacroExpansion {
-                                    self.written_call(*display).map(|written| {
-                                        let violation = Violation {
-                                            kind: ViolationKind::FailedMacroExpansion,
-                                            location: written,
-                                        };
-
-                                        if violation.location == location {
-                                            findings.violations.insert(violation);
-                                        } else {
-                                            findings.violations.fold(
-                                                violation,
-                                                FoldedFinding {
-                                                    kind: FoldedFindingKind::FailingExpansion,
-                                                    location,
-                                                },
-                                            );
-                                        }
-                                    })
-                                } else {
-                                    findings.violations.insert(Violation {
-                                        kind: kind.clone(),
-                                        location,
-                                    });
-
-                                    Ok(())
-                                }
-                            })
-                        },
-                    )
                     .map(|()| registers_benchmark)
             })
             .and_then(|registers_benchmark| {

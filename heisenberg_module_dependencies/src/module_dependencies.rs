@@ -32,6 +32,7 @@ use heisenberg_project_model::source_file::SourceFile;
 use heisenberg_source_locator::source_locator::SourceLocator;
 use heisenberg_task_graph::once_map::OnceMap;
 
+use crate::cargo_target_variables::CargoTargetVariables;
 use crate::crate_extraction::CrateExtraction;
 use crate::crate_walk::CrateWalk;
 use crate::inactive_code_site::InactiveCodeSite;
@@ -100,6 +101,7 @@ impl ModuleDependencies<'_, '_> {
         &self,
         vetted_crates: &VettedCrates,
         members: &[ResolvedMemberCrate],
+        cargo_target_variables: &CargoTargetVariables,
         workspace_files: &BTreeSet<FileId>,
         non_production_files: &NonProductionFiles,
         file_modules: &HashMap<FileId, Vec<Module>>,
@@ -158,6 +160,7 @@ impl ModuleDependencies<'_, '_> {
                         });
                         let crate_walk = CrateWalk {
                             build_script_output_files,
+                            cargo_target_variables,
                             crate_target,
                             dependency_names: &dependency_names,
                             file_modules,
@@ -191,7 +194,6 @@ impl ModuleDependencies<'_, '_> {
                                 locator: &SourceLocator { database, files },
                                 modules: &modules,
                                 semantics: &Semantics::new(database),
-                                workspace_files,
                             }
                             .graph(walked)
                         })
@@ -209,6 +211,11 @@ impl ModuleDependencies<'_, '_> {
         members: &[ResolvedMemberCrate],
     ) -> Result<Vec<CrateModuleGraph>, ModuleDependenciesError> {
         let workspace_files = module_files(members.iter());
+        let cargo_target_variables = CargoTargetVariables::new(
+            members
+                .iter()
+                .map(|ResolvedMemberCrate { crate_target, .. }| crate_target),
+        );
         let non_production_files = NonProductionFiles {
             benchmark: self.category_files(members, CodeCategory::Benchmark),
             test: self.category_files(members, CodeCategory::Test),
@@ -245,6 +252,7 @@ impl ModuleDependencies<'_, '_> {
                 )
                 .cloned()
                 .collect::<Vec<ResolvedMemberCrate>>(),
+            &cargo_target_variables,
             &workspace_files,
             &non_production_files,
             &file_modules,
@@ -267,6 +275,7 @@ impl ModuleDependencies<'_, '_> {
                     self.graphs(
                         vetted_crates,
                         &[member],
+                        &cargo_target_variables,
                         &workspace_files,
                         &non_production_files,
                         &member_file_modules,

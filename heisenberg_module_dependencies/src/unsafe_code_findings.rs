@@ -1,32 +1,28 @@
 use heisenberg_module_graph::module_findings::ModuleFindings;
-use heisenberg_module_graph::violation::Violation;
+
+use crate::unsafe_code_use::UnsafeCodeUse;
 
 #[derive(Default)]
 pub struct UnsafeCodeFindings {
-    pub integrates_foreign_code: bool,
-    pub sites: Vec<Violation>,
+    pub production: UnsafeCodeUse,
+    pub test: UnsafeCodeUse,
 }
 
 impl UnsafeCodeFindings {
     pub fn fold(self, ModuleFindings { violations, .. }: &mut ModuleFindings) {
-        let Self {
-            integrates_foreign_code,
-            sites,
-        } = self;
+        let Self { production, test } = self;
 
-        if !integrates_foreign_code {
-            violations.extend(sites);
+        if !production.integrates_foreign_code {
+            violations.extend(production.sites);
+
+            if !test.integrates_foreign_code {
+                violations.extend(test.sites);
+            }
         }
     }
 
-    pub fn merge(
-        &mut self,
-        Self {
-            integrates_foreign_code,
-            sites,
-        }: Self,
-    ) {
-        self.integrates_foreign_code |= integrates_foreign_code;
-        self.sites.extend(sites);
+    pub fn merge(&mut self, Self { production, test }: Self) {
+        self.production.merge(production);
+        self.test.merge(test);
     }
 }

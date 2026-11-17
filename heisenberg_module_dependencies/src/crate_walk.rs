@@ -26,6 +26,7 @@ use heisenberg_source_locator::source_locator::SourceLocator;
 use heisenberg_task_graph::once_map::OnceMap;
 
 use crate::benchmark_harness::BenchmarkHarness;
+use crate::cargo_target_variables::CargoTargetVariables;
 use crate::definition_usages::DefinitionUsages;
 use crate::method_call_resolutions::MethodCallResolutions;
 use crate::module_dependencies_error::ModuleDependenciesError;
@@ -42,6 +43,7 @@ use crate::walked_module::WalkedModule;
 
 pub struct CrateWalk<'walk> {
     pub build_script_output_files: &'walk BTreeSet<FileId>,
+    pub cargo_target_variables: &'walk CargoTargetVariables,
     pub crate_target: &'walk CrateTarget,
     pub dependency_names: &'walk HashMap<Crate, String>,
     pub file_modules: &'walk HashMap<FileId, Vec<Module>>,
@@ -90,6 +92,7 @@ impl CrateWalk<'_> {
                 semantics: &semantics,
             },
             build_script_output_files: self.build_script_output_files,
+            cargo_target_variables: self.cargo_target_variables,
             crate_target: self.crate_target,
             dependency_names: self.dependency_names,
             file_modules: self.file_modules,
@@ -116,6 +119,7 @@ impl CrateWalk<'_> {
             test_gated_code: self.test_gated_code,
             trait_result_errors: self.trait_result_errors,
             token_origin: &TokenOrigin {
+                build_script_output_files: self.build_script_output_files,
                 own_files: self.files,
                 semantics: &semantics,
                 workspace_files: self.workspace_files,

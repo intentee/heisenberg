@@ -89,6 +89,7 @@ use crate::constants::TESTS_ONLY_PACKAGE_WITHOUT_TEST_LIBRARIES;
 use crate::constants::TOOL_ATTRIBUTE;
 use crate::constants::TUPLE_IN_SIGNATURE;
 use crate::constants::UNCOVERED_CODE;
+use crate::constants::UNDECLARED_ENVIRONMENT_VARIABLE;
 use crate::constants::UNDESTRUCTURED_PARAMETER;
 use crate::constants::UNDETERMINED_BENCHMARK_OUTPUT;
 use crate::constants::UNIMPLEMENTED_BUILTIN_MACRO;
@@ -261,6 +262,7 @@ pub enum IssueType {
     ToolAttribute,
     TupleInSignature,
     UncoveredCode,
+    UndeclaredEnvironmentVariable,
     UndestructuredParameter,
     UndeterminedBenchmarkOutput,
     UnimplementedBuiltinMacro,
@@ -432,6 +434,7 @@ impl IssueType {
             Self::ToolAttribute => TOOL_ATTRIBUTE,
             Self::TupleInSignature => TUPLE_IN_SIGNATURE,
             Self::UncoveredCode => UNCOVERED_CODE,
+            Self::UndeclaredEnvironmentVariable => UNDECLARED_ENVIRONMENT_VARIABLE,
             Self::UndestructuredParameter => UNDESTRUCTURED_PARAMETER,
             Self::UndeterminedBenchmarkOutput => UNDETERMINED_BENCHMARK_OUTPUT,
             Self::UnimplementedBuiltinMacro => UNIMPLEMENTED_BUILTIN_MACRO,
@@ -454,7 +457,7 @@ impl IssueType {
         }
     }
 
-    const fn ungrouped() -> [Self; 74] {
+    const fn ungrouped() -> [Self; 75] {
         [
             Self::AttributeAppliedInNoConfiguration,
             Self::BenchmarkTargetExcludedFromBenchmarks,
@@ -511,6 +514,7 @@ impl IssueType {
             Self::ToolAttribute,
             Self::TupleInSignature,
             Self::UncoveredCode,
+            Self::UndeclaredEnvironmentVariable,
             Self::UndestructuredParameter,
             Self::UndeterminedBenchmarkOutput,
             Self::UnimplementedBuiltinMacro,
@@ -643,6 +647,9 @@ impl From<&ViolationKind> for IssueType {
             ViolationKind::SingleLetterName => Self::SingleLetterName,
             ViolationKind::TestOnlyCodeInProduction => Self::TestOnlyCodeInProduction,
             ViolationKind::TupleInSignature => Self::TupleInSignature,
+            ViolationKind::UndeclaredEnvironmentVariable { .. } => {
+                Self::UndeclaredEnvironmentVariable
+            }
             ViolationKind::UndestructuredParameter { .. } => Self::UndestructuredParameter,
             ViolationKind::UnimplementedBuiltinMacro => Self::UnimplementedBuiltinMacro,
             ViolationKind::UnmappedItem => Self::UnmappedItem,

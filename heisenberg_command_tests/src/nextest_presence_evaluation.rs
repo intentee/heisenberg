@@ -34,8 +34,8 @@ impl NextestPresenceEvaluation {
                 Self::NotEvaluated => "UnneededNextestConfiguration, ",
             },
             match self {
-                Self::Evaluated => 101,
-                Self::NotEvaluated => 99,
+                Self::Evaluated => 103,
+                Self::NotEvaluated => 101,
             },
             match self {
                 Self::Evaluated => 9,

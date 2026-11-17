@@ -23,8 +23,13 @@ fn package_cycle_between_two_packages_of_one_name_is_a_cycle() {
             \n\
             - Cargo.toml: Packages twin v0.1.0, twin v0.2.0 depend on each other through dev-dependencies\n\
             \n\
+            PathPackageOutsideWorkspace: 1 violation\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package twin v0.2.0 is built from next/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            \n\
             ------------------------------\n\
-            1 errors found in 1 rule\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(1, 1).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

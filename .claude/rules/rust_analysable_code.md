@@ -9,6 +9,7 @@ enforced_by:
   - InvalidMacroDefinition
   - ModuleFileInsideBlock
   - SharedModuleFile
+  - UndeclaredEnvironmentVariable
   - UnimplementedBuiltinMacro
   - UnmappedItem
   - UnparsableMacroExpansion
@@ -25,12 +26,13 @@ enforced_by:
 
 Every statement is mandatory and is decided by the Heisenberg check named after it; `heisenberg explain <check>` gives its exact definition.
 
-- Every name resolves: extern crates, modules, paths, method calls, macro calls, attributes and derives. [UnresolvedExternCrate, UnresolvedModule, UnresolvedPath, UnresolvedMethodCall, UnresolvedMacroCall]
+- Every name resolves: extern crates, modules, paths, method calls, macro calls, attributes and derives, in all the code of a crate target, the code that any macro generates included. [UnresolvedExternCrate, UnresolvedModule, UnresolvedPath, UnresolvedMethodCall, UnresolvedMacroCall]
 - Every macro definition is valid, and every macro call expands to code that parses. [InvalidMacroDefinition, FailedMacroExpansion, UnparsableMacroExpansion, UnimplementedBuiltinMacro]
 - Every item maps to its definition. [UnmappedItem]
 - Never use `cfg_select!`; write each arm as an item under its own `#[cfg]` attribute. [ConfigurationSelectionMacro]
 - `include!` brings in only build script output from `OUT_DIR`; code written by hand is a module. [IncludedSourceFile]
 - A module file is declared at module level, never inside a block, and belongs to exactly one module. [ModuleFileInsideBlock, SharedModuleFile]
 - Every `.rs` file of a workspace member is a module file of a crate target. [UnreachableSourceFile]
-- No unsafe code, except in a crate that integrates foreign code. [UnsafeCode]
+- No unsafe code, except in a crate target whose production code integrates foreign code. Unsafe code is counted wherever the workspace wrote it: in module files, in the expansion of its macros and in its build script output; `global_asm!` and an unmarked `no_mangle`, `export_name` or `link_section` are unsafe code. [UnsafeCode]
+- `env!` and `option_env!` name only variables that cargo, the `[env]` table of the cargo configuration or the build script of the package declares. [UndeclaredEnvironmentVariable]
 - No target has doc tests enabled: a doc test is code inside a comment that no analysis reads. Code that must compile lives in an example or a test. [DocTestsEnabled]

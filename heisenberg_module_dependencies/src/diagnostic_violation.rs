@@ -11,7 +11,6 @@ use ra_ap_vfs::FileId;
 use heisenberg_expanded_code::covering_ancestors::CoveringAncestors;
 use heisenberg_module_graph::violation_kind::ViolationKind;
 
-use crate::diagnostic_site::DiagnosticSite;
 use crate::item_focus::ItemFocus;
 use crate::located_violation::LocatedViolation;
 use crate::unresolved_import_binding::UnresolvedImportBinding;
@@ -22,55 +21,37 @@ pub struct DiagnosticViolation<'violation, 'database> {
 }
 
 impl DiagnosticViolation<'_, '_> {
-    pub fn site(&self) -> Option<DiagnosticSite> {
+    pub fn site(&self) -> Option<LocatedViolation> {
         let semantics = self.semantics;
 
         match self.diagnostic {
-            AnyDiagnostic::MacroDefError(diagnostic) => Some(DiagnosticSite {
-                origin: diagnostic.node.map(AstPtr::text_range),
-                violation: LocatedViolation {
-                    display: self.focus(diagnostic.node),
-                    kind: ViolationKind::InvalidMacroDefinition,
-                },
+            AnyDiagnostic::MacroDefError(diagnostic) => Some(LocatedViolation {
+                display: self.focus(diagnostic.node),
+                kind: ViolationKind::InvalidMacroDefinition,
             }),
-            AnyDiagnostic::MacroError(diagnostic) if diagnostic.error => Some(DiagnosticSite {
-                origin: diagnostic.range,
-                violation: LocatedViolation {
-                    display: semantics.diagnostics_display_range_for_range(diagnostic.range),
-                    kind: ViolationKind::FailedMacroExpansion,
-                },
+            AnyDiagnostic::MacroError(diagnostic) if diagnostic.error => Some(LocatedViolation {
+                display: semantics.diagnostics_display_range_for_range(diagnostic.range),
+                kind: ViolationKind::FailedMacroExpansion,
             }),
-            AnyDiagnostic::UnimplementedBuiltinMacro(diagnostic) => Some(DiagnosticSite {
-                origin: diagnostic.node.map(|node| node.text_range()),
-                violation: LocatedViolation {
-                    display: semantics.diagnostics_display_range(diagnostic.node),
-                    kind: ViolationKind::UnimplementedBuiltinMacro,
-                },
+            AnyDiagnostic::UnimplementedBuiltinMacro(diagnostic) => Some(LocatedViolation {
+                display: semantics.diagnostics_display_range(diagnostic.node),
+                kind: ViolationKind::UnimplementedBuiltinMacro,
             }),
-            AnyDiagnostic::UnresolvedExternCrate(diagnostic) => Some(DiagnosticSite {
-                origin: diagnostic.decl.map(AstPtr::text_range),
-                violation: LocatedViolation {
-                    display: self.focus(diagnostic.decl),
-                    kind: ViolationKind::UnresolvedExternCrate,
-                },
+            AnyDiagnostic::UnresolvedExternCrate(diagnostic) => Some(LocatedViolation {
+                display: self.focus(diagnostic.decl),
+                kind: ViolationKind::UnresolvedExternCrate,
             }),
             AnyDiagnostic::UnresolvedMacroCall(diagnostic)
                 if !self.is_bound_by_unresolved_import(diagnostic) =>
             {
-                Some(DiagnosticSite {
-                    origin: diagnostic.range,
-                    violation: LocatedViolation {
-                        display: semantics.diagnostics_display_range_for_range(diagnostic.range),
-                        kind: ViolationKind::UnresolvedMacroCall,
-                    },
+                Some(LocatedViolation {
+                    display: semantics.diagnostics_display_range_for_range(diagnostic.range),
+                    kind: ViolationKind::UnresolvedMacroCall,
                 })
             }
-            AnyDiagnostic::UnresolvedModule(diagnostic) => Some(DiagnosticSite {
-                origin: diagnostic.decl.map(AstPtr::text_range),
-                violation: LocatedViolation {
-                    display: self.focus(diagnostic.decl),
-                    kind: ViolationKind::UnresolvedModule,
-                },
+            AnyDiagnostic::UnresolvedModule(diagnostic) => Some(LocatedViolation {
+                display: self.focus(diagnostic.decl),
+                kind: ViolationKind::UnresolvedModule,
             }),
             _ => None,
         }

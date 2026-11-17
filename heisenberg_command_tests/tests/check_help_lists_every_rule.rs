@@ -66,33 +66,38 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     [build] or [target] tables of the cargo configuration or in the CARGO_BUILD_RUSTFLAGS and\n\
     CARGO_TARGET_<TRIPLE>_RUSTFLAGS variables of a supported target, rustc, rustc-workspace-wrapper,\n\
     rustc-wrapper or rustdoc in the [build] table of the cargo configuration, including through the\n\
-    environment variables that set them, and CLIPPY_ARGS, CLIPPY_CONF_DIR or RUSTC_BOOTSTRAP in the\n\
-    [env] table of the cargo configuration, under any letter case, fail the run. A failing run reports\n\
-    the first failure among loading the project, building it, resolving the standard library of its\n\
-    targets and reading its clippy and nextest configurations, in that order, and otherwise the analysis\n\
-    failures of every configuration.\n\
+    environment variables that set them, a [patch] table in the cargo configuration, whose patches\n\
+    belong in the workspace manifest, a build script override of a supported target in the cargo\n\
+    configuration ([target.<triple>.<links>]), and CLIPPY_ARGS, CLIPPY_CONF_DIR or RUSTC_BOOTSTRAP in\n\
+    the [env] table of the cargo configuration, under any letter case, fail the run. A failing run\n\
+    reports the first failure among loading the project, building it, resolving the standard library of\n\
+    its targets and reading its clippy and nextest configurations, in that order, and otherwise the\n\
+    analysis failures of every configuration.\n\
     \n\
     Analysis: Values that the [env] table of the cargo configuration declares reach the analysis as\n\
     cargo resolves them, OUT_DIR and the cfgs and env a build script emits come from running it, or from\n\
-    its out_dirs declaration, and an env! or option_env! of a variable that none of them sets expands as\n\
-    rust-analyzer expands it. The analysis enables debug assertions, the features of the analysed\n\
-    configuration, each on every workspace member that defines it, as cargo does, and test only for the\n\
-    targets cargo builds with libtest's harness, as rustc's --test does: a target with harness = false,\n\
-    or one that cargo neither tests nor benchmarks, such as a build script or an example, is analysed\n\
-    without it. Every run analyses the declared configurations that --configuration selects, which it\n\
-    requires, and a --configuration the workspace does not declare or selects twice fails the run. Build\n\
-    scripts and procedural macros run: for each analysed configuration, cargo builds the procedural\n\
-    macros offline with the rustc of the sysroot and --jobs parallel jobs, which build scripts see in\n\
-    NUM_JOBS, and runs the build scripts, apart from those out_dirs declares, and --jobs processes of\n\
-    the sysroot's rust-analyzer-proc-macro-srv expand the procedural macros, whose output is analysed\n\
-    like any macro expansion, its input where it is written and the tokens it generates trusted, and a\n\
-    build script that fails or emits a cfg that does not parse, one that needs a build script out_dirs\n\
-    declares, a build script output that cannot be read, a procedural macro that fails to build or that\n\
-    the server cannot load, a declared target without its standard library, a sysroot without rustc and\n\
-    a sysroot without the server, or whose server cannot start, fail the run. Every decision is\n\
-    semantic, as rust-analyzer resolves the code. The analysis runs on --jobs worker threads and reports\n\
-    the same issues for every count. Shared module files are analysed in every crate that includes them.\n\
-    The public item, constant, method order, integration test target and benchmark target rules apply to\n\
+    its out_dirs declaration, and an env! or option_env! of a variable that neither they nor cargo set\n\
+    for the target is a violation. The values of the variables that cargo sets only while it builds a\n\
+    target (CARGO_BIN_NAME, CARGO_BIN_EXE_<name>, CARGO_TARGET_TMPDIR and CARGO_PRIMARY_PACKAGE) are not\n\
+    known to the analysis, and the files that include_str! and include_bytes! name are not read. The\n\
+    analysis enables debug assertions, the features of the analysed configuration, each on every\n\
+    workspace member that defines it, as cargo does, and test only for the targets cargo builds with\n\
+    libtest's harness, as rustc's --test does: a target with harness = false, or one that cargo neither\n\
+    tests nor benchmarks, such as a build script or an example, is analysed without it. Every run\n\
+    analyses the declared configurations that --configuration selects, which it requires, and a\n\
+    --configuration the workspace does not declare or selects twice fails the run. Build scripts and\n\
+    procedural macros run: for each analysed configuration, cargo builds the procedural macros offline\n\
+    with the rustc of the sysroot and --jobs parallel jobs, which build scripts see in NUM_JOBS, and\n\
+    runs the build scripts, apart from those out_dirs declares, and --jobs processes of the sysroot's\n\
+    rust-analyzer-proc-macro-srv expand the procedural macros, whose output is analysed like any macro\n\
+    expansion, its input where it is written and the tokens it generates trusted, and a build script\n\
+    that fails or emits a cfg that does not parse, one that needs a build script out_dirs declares, a\n\
+    build script output that cannot be read, a procedural macro that fails to build or that the server\n\
+    cannot load, a declared target without its standard library, a sysroot without rustc and a sysroot\n\
+    without the server, or whose server cannot start, fail the run. Every decision is semantic, as\n\
+    rust-analyzer resolves the code. The analysis runs on --jobs worker threads and reports the same\n\
+    issues for every count. Shared module files are analysed in every crate that includes them. The\n\
+    public item, constant, method order, integration test target and benchmark target rules apply to\n\
     items written in module files, including those that a macro_rules! macro of the crate writes, the\n\
     item order rule to the items written in module files, where a macro call takes one place whatever it\n\
     writes, and the name, tuple and parameter rules to the text written in them; an item that an\n\
@@ -101,20 +106,29 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     crates generate, is trusted. Derive macro output is analysed like any macro expansion, except that\n\
     of the built-in derives that rust-analyzer records as impls of their trait without expanding them,\n\
     which is trusted; text written outside a crate's module files, such as in other crates or in the\n\
-    build script output that include! brings in, is trusted, and results reflect the files on disk,\n\
-    including generated ones. Test code is every integration test target, every target of a test crate\n\
-    other than a benchmark target and every module that cfg(test) gates, inline or in its own file and\n\
-    under any name, and benchmark code is every benchmark target, measured through criterion, the\n\
-    criterion package from crates.io, whose calls the criterion rules check wherever workspace code\n\
-    makes them; a test crate is a workspace member that test_crates lists, whose package cannot be\n\
-    published (publish = false), and that no member other than a test crate depends on through a normal\n\
-    or build dependency. The error type rules count every implementation of std::error::Error in the\n\
-    production code of a crate target, those that macros generate included, and accept only those that\n\
-    the Error derive of thiserror, the thiserror-impl package from crates.io, generates for an enum. The\n\
-    error type rules and the rules about where items live apply to production code and not to test code,\n\
-    where nobody matches on an error or finds an item by its file; `heisenberg explain` and `heisenberg\n\
-    catalogue` state for each rule whether it applies to all code or to production code. A standard\n\
-    library without the items that the analysis relies on fails the run.\n\
+    build script output that include! brings in, is trusted by the rules about how code is written, and\n\
+    results reflect the files on disk, including generated ones. Trust ends where the analysis would be\n\
+    incomplete: a name, method or macro that rust-analyzer cannot resolve and an expansion that fails\n\
+    are violations in all the code of a crate target, whoever wrote the macro that generates it, and\n\
+    unsafe code is a violation in everything the workspace wrote, wherever it expands, in what its\n\
+    procedural macros generate and in the build script output that include! brings in. Heisenberg does\n\
+    not verify what build scripts and procedural macros do when they run, the code of registry and git\n\
+    dependencies, the linker and the native libraries, or that the workspace compiles and passes clippy:\n\
+    it checks that the required lints are denied, not that the code meets them. A partial run evaluates\n\
+    the rules its footer lists and exits with 0 when they find no issue. Test code is every integration\n\
+    test target, every target of a test crate other than a benchmark target and every module that\n\
+    cfg(test) gates, inline or in its own file and under any name, and benchmark code is every benchmark\n\
+    target, measured through criterion, the criterion package from crates.io, whose calls the criterion\n\
+    rules check wherever workspace code makes them; a test crate is a workspace member that test_crates\n\
+    lists, whose package cannot be published (publish = false), and that no member other than a test\n\
+    crate depends on through a normal or build dependency. The error type rules count every\n\
+    implementation of std::error::Error in the production code of a crate target, those that macros\n\
+    generate included, and accept only those that the Error derive of thiserror, the thiserror-impl\n\
+    package from crates.io, generates for an enum. The error type rules and the rules about where items\n\
+    live apply to production code and not to test code, where nobody matches on an error or finds an\n\
+    item by its file; `heisenberg explain` and `heisenberg catalogue` state for each rule whether it\n\
+    applies to all code or to production code. A standard library without the items that the analysis\n\
+    relies on fails the run.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\
@@ -154,7 +168,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     Rule 1.14 UnresolvedModule: A module declaration whose file rust-analyzer cannot resolve\n    \
     Rule 1.15 UnresolvedPath: A path that rust-analyzer cannot resolve\n    \
     Rule 1.16 UnsafeCode: Unsafe code in a crate that integrates no foreign code\n    \
-    Rule 1.17 DocTestsEnabled: A target whose doc tests are enabled\n  \
+    Rule 1.17 DocTestsEnabled: A target whose doc tests are enabled\n    \
+    Rule 1.18 UndeclaredEnvironmentVariable: An env! or option_env! of a variable that nothing\n    \
+    declares\n  \
     2 Declared configurations\n    \
     Rule 2.1 AttributeAppliedInNoConfiguration: A cfg_attr that applies in no declared configuration\n    \
     Rule 2.2 CodeActiveInNoConfiguration: Code that no declared configuration builds\n    \
@@ -192,7 +208,9 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     version or a git rev\n    \
     Rule 4.9 TestDependencyInProduction: A production dependency that only test code uses\n    \
     Rule 4.10 TestLibraryInProductionPackage: A test library declared by a production package\n    \
-    Rule 4.11 UnusedDependency: A dependency that no code uses\n  \
+    Rule 4.11 UnusedDependency: A dependency that no code uses\n    \
+    Rule 4.12 PathPackageOutsideWorkspace: A package built from a local path that is not a workspace\n    \
+    member\n  \
     5 Modules and items\n    \
     Rule 5.1 AdditionalPublicItem: A module with more than one public item\n    \
     Rule 5.2 GlobImport: A glob import\n    \

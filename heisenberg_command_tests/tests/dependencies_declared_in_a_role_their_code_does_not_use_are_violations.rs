@@ -21,7 +21,12 @@ fn dependencies_declared_in_a_role_their_code_does_not_use_are_violations() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["TestDependencyInProduction: 1 violation\n\
+        Ok(["PathPackageOutsideWorkspace: 1 violation\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package outside_checker v0.1.0 is built from outside_checker/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            \n\
+            TestDependencyInProduction: 1 violation\n\
             A dependency declared for production is built into every user of the package, so one that only tests need states a production input that production does not have. Declare the dependency in dev-dependencies, or move the tests that need it into a test crate.\n\
             \n\
             - app/Cargo.toml: Dependency tested_with is referred to only by test, benchmark or example code\n\
@@ -39,7 +44,7 @@ fn dependencies_declared_in_a_role_their_code_does_not_use_are_violations() {
             - app/Cargo.toml: Build-dependency unbuilt is referred to by no code that the role serves\n\
             \n\
             ------------------------------\n\
-            5 errors found in 3 rules\n\
+            6 errors found in 4 rules\n\
             ------------------------------\n", full_run_footer(13, 24).as_str()]
             .concat()
             .as_str())

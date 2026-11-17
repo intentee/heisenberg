@@ -56,6 +56,9 @@ pub enum ViolationKind {
         tool: String,
     },
     TupleInSignature,
+    UndeclaredEnvironmentVariable {
+        variable: String,
+    },
     UndestructuredParameter {
         type_name: String,
     },
@@ -127,6 +130,10 @@ impl Display for ViolationKind {
                 .write_str("Code depends on cfg(test) outside a test module"),
             Self::Test(violation) => violation.fmt(formatter),
             Self::TupleInSignature => formatter.write_str("Tuple type in a signature"),
+            Self::UndeclaredEnvironmentVariable { variable } => write!(
+                formatter,
+                "Environment variable {variable} is declared by neither cargo, the cargo configuration nor the build script"
+            ),
             Self::UndestructuredParameter { type_name } => write!(
                 formatter,
                 "Parameter is used only through the fields of {type_name}"

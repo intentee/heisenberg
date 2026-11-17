@@ -37,6 +37,7 @@ impl PackageRules<'_> {
         violations.extend(self.doc_tested_targets());
         violations.extend(self.integration_test_targets());
         violations.extend(self.packages_without_libraries());
+        violations.extend(self.path_packages_outside_the_workspace());
 
         violations.into_iter().collect()
     }
@@ -289,6 +290,29 @@ impl PackageRules<'_> {
                         }))
                     }
                 }
+            })
+            .collect()
+    }
+
+    fn path_packages_outside_the_workspace(&self) -> Vec<PackageViolation> {
+        let workspace_path = self.resolved.workspace_path();
+
+        self.resolved
+            .packages
+            .iter()
+            .filter(
+                |PackageDocument {
+                     is_member,
+                     metadata,
+                     ..
+                 }| !is_member && metadata.source.is_none(),
+            )
+            .map(|package| {
+                PackageViolation::Manifest(ManifestViolation::PathPackageOutsideWorkspace {
+                    manifest: workspace_path.manifest(),
+                    package: package.versioned_name(),
+                    package_manifest: package.relative_manifest(&workspace_path),
+                })
             })
             .collect()
     }

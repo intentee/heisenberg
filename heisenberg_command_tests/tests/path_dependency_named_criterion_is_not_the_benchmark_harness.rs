@@ -24,8 +24,13 @@ fn path_dependency_named_criterion_is_not_the_benchmark_harness() {
             - benches/measurement.rs:1:1: Benchmark target registers no criterion benchmark\n    \
             use criterion::Criterion;\n\
             \n\
+            PathPackageOutsideWorkspace: 1 violation\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package criterion v0.1.0 is built from criterion/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            \n\
             ------------------------------\n\
-            1 errors found in 1 rule\n\
+            2 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::NotEvaluated.host_footer(2, 2).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

@@ -25,7 +25,7 @@ fn environment_value_overrides_a_configured_variable_that_is_not_forced() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(["IncludedSourceFile: 1 violation\n\
-            An included file is trusted as generated text, so code written by hand escapes every rule once it is included. Make the file a module, or have a build script generate it into OUT_DIR.\n\
+            An included file is trusted as generated text, so code written by hand escapes the rules about how code is written once it is included. Make the file a module, or have a build script generate it into OUT_DIR.\n\
             \n\
             - src/lib.rs:1:1: Included file inherited/items.rs is not a build script output\n    \
             include!(concat!(env!(\"GENERATED\"), \"/items.rs\"));\n\

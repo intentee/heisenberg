@@ -30,8 +30,13 @@ fn non_test_item_in_an_integration_test_target_is_a_violation() {
             - tests/mixed.rs:21:12: Integration test target holds an item that is neither a test, a constant, an import nor a private helper used only in its own file\n        \
             pub fn helpers() -> super::Library {\n\
             \n\
+            PathPackageOutsideWorkspace: 1 violation\n\
+            Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+            \n\
+            - Cargo.toml: Package runtime v0.1.0 is built from runtime/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+            \n\
             ------------------------------\n\
-            2 errors found in 2 rules\n\
+            3 errors found in 3 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(2, 3).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

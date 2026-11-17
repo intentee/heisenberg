@@ -14,11 +14,17 @@ const UNIX_SUPPRESSIONS: &str = "- src/suppressed.rs:1:18: Attribute suppresses 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 const SUPPRESSIONS: usize = 8;
 
+#[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+const ERRORS: usize = 9;
+
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
 const UNIX_SUPPRESSIONS: &str = "";
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
 const SUPPRESSIONS: usize = 6;
+
+#[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))]
+const ERRORS: usize = 7;
 
 #[test]
 fn lint_suppression_is_a_violation() {
@@ -51,8 +57,13 @@ fn lint_suppression_is_a_violation() {
              - src/suppressed.rs:28:3: Attribute suppresses lints\n    \
              #[expect(clippy::expect_used, reason = \"the fixture expects\")]\n\
              \n\
+             PathPackageOutsideWorkspace: 1 violation\n\
+             Only workspace members are analysed. A package built from local sources that is not a member is code the project owns and compiles, yet no rule reads it. Make the package a member of the workspace, or depend on a release of it from a registry or on a git revision.\n\
+             \n\
+             - Cargo.toml: Package generator v0.1.0 is built from generator/Cargo.toml, which is not a workspace member, so its code is not analysed\n\
+             \n\
              ------------------------------\n\
-             {SUPPRESSIONS} errors found in 1 rule\n\
+             {ERRORS} errors found in 2 rules\n\
              ------------------------------\n\
              {}",
             NextestPresenceEvaluation::NotEvaluated.host_footer(1, 2)
