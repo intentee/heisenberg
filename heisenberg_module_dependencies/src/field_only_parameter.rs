@@ -9,11 +9,11 @@ use ra_ap_hir::Variant;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
 use ra_ap_ide_db::famous_defs::FamousDefs;
-use ra_ap_ide_db::search::FileReference;
-use ra_ap_ide_db::search::UsageSearchResult;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::ast;
 
+use crate::definition_usages::DefinitionUsages;
+use crate::found_reference::FoundReference;
 use crate::token_origin::TokenOrigin;
 
 pub struct FieldOnlyParameter<'parameter, 'database> {
@@ -21,6 +21,7 @@ pub struct FieldOnlyParameter<'parameter, 'database> {
     pub krate: Crate,
     pub semantics: &'parameter Semantics<'database, RootDatabase>,
     pub token_origin: &'parameter TokenOrigin<'parameter, 'database>,
+    pub usages: &'parameter DefinitionUsages<'parameter, 'database>,
 }
 
 impl<'database> FieldOnlyParameter<'_, 'database> {
@@ -31,9 +32,10 @@ impl<'database> FieldOnlyParameter<'_, 'database> {
             let held = declared.strip_references();
 
             Self::is_struct_or_tuple(&held)
-                .then(|| Definition::Local(local).usages(self.semantics).all())
-                .and_then(|UsageSearchResult { references }| {
-                    references
+                .then(|| self.usages.of(Definition::Local(local)))
+                .and_then(|found| {
+                    found
+                        .by_file
                         .values()
                         .flatten()
                         .map(|reference| self.read_field_type(reference, &held))
@@ -52,7 +54,7 @@ impl<'database> FieldOnlyParameter<'_, 'database> {
         })
     }
 
-    fn field_access(FileReference { name, .. }: &FileReference) -> Option<ast::FieldExpr> {
+    fn field_access(FoundReference { name, .. }: &FoundReference) -> Option<ast::FieldExpr> {
         let path_expression = name
             .as_name_ref()
             .and_then(|name_ref| name_ref.syntax().parent())
@@ -100,7 +102,7 @@ impl<'database> FieldOnlyParameter<'_, 'database> {
 
     fn read_field_type(
         &self,
-        reference: &FileReference,
+        reference: &FoundReference,
         held: &Type<'_>,
     ) -> Option<Type<'database>> {
         let database = self.semantics.db;

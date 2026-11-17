@@ -3,8 +3,6 @@ use ra_ap_hir::Semantics;
 use ra_ap_hir::Variant;
 use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::defs::Definition;
-use ra_ap_ide_db::search::FileReference;
-use ra_ap_ide_db::search::ReferenceCategory;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::ast;
@@ -12,6 +10,7 @@ use ra_ap_syntax::ast;
 use heisenberg_module_graph::used_item::UsedItem;
 
 use crate::definition_usages::DefinitionUsages;
+use crate::found_reference::FoundReference;
 
 pub struct ItemReferences<'references, 'database> {
     pub definition: Definition<'database>,
@@ -25,11 +24,11 @@ impl<'database> ItemReferences<'_, 'database> {
     pub fn using_nodes(&self) -> Option<Vec<SyntaxNode>> {
         self.usages
             .of(self.definition)
-            .references
+            .by_file
             .values()
             .flatten()
             .filter(|reference| self.counts(reference))
-            .map(|FileReference { name, .. }| name.syntax().parent())
+            .map(|FoundReference { name, .. }| name.syntax().parent())
             .collect::<Option<Vec<SyntaxNode>>>()
             .map(|using| using.into_iter().chain(self.spreads()).collect())
     }
@@ -43,7 +42,7 @@ impl<'database> ItemReferences<'_, 'database> {
             })
     }
 
-    fn counts(&self, FileReference { category, name, .. }: &FileReference) -> bool {
+    fn counts(&self, FoundReference { name, writes }: &FoundReference) -> bool {
         match self.item {
             UsedItem::Constant | UsedItem::Function | UsedItem::Static | UsedItem::TypeAlias => {
                 true
@@ -53,7 +52,7 @@ impl<'database> ItemReferences<'_, 'database> {
                 .parent()
                 .is_none_or(|parent| !self.is_inside_its_item(&parent)),
             UsedItem::Field => {
-                !category.contains(ReferenceCategory::WRITE)
+                !writes
                     && name
                         .syntax()
                         .parent()
@@ -95,10 +94,10 @@ impl<'database> ItemReferences<'_, 'database> {
         self.owner().map_or_else(Vec::new, |owner| {
             self.usages
                 .with_self_references(owner)
-                .references
+                .by_file
                 .values()
                 .flatten()
-                .filter_map(|FileReference { name, .. }| {
+                .filter_map(|FoundReference { name, .. }| {
                     name.syntax()
                         .ancestors()
                         .find_map(ast::Path::cast)

@@ -1,9 +1,11 @@
 use crate::gauge::Gauge;
 use crate::settings::Settings;
+use crate::tuning::Tuning;
 
 pub struct Usage {
     pub gauge_is_high: bool,
     pub depth: u8,
+    pub gain: u8,
 }
 
 impl Usage {
@@ -12,6 +14,7 @@ impl Usage {
         Self {
             gauge_is_high: Gauge::new().level().is_high(),
             depth: Settings { depth: 0, width: 1 }.deepened().depth,
+            gain: Tuning { gain: 0, width: 1 }.amplified().gain,
         }
     }
 }
@@ -27,6 +30,7 @@ mod tests {
     use crate::reading::Reading;
     use crate::registry::REGISTRY;
     use crate::settings::Settings;
+    use crate::tuning::Tuning;
 
     #[test]
     fn gauge_starts_unobserved() {
@@ -43,5 +47,6 @@ mod tests {
     fn probed_level_is_not_high() {
         assert!(!Level::Probed.is_high());
         assert_eq!(Settings { depth: 0, width: 2 }.deepened().width, 2);
+        assert_eq!(Tuning { gain: 0, width: 2 }.amplified().width, 2);
     }
 }

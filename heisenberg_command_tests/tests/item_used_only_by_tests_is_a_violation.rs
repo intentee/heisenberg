@@ -40,7 +40,7 @@ fn item_used_only_by_tests_is_a_violation() {
             \n\
             ------------------------------\n\
             8 errors found in 1 rule\n\
-            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 12).as_str()].concat().as_str())
+            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 13).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

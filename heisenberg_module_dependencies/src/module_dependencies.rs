@@ -37,6 +37,7 @@ use crate::inactive_code_site::InactiveCodeSite;
 use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_diagnostics::ModuleDiagnostics;
 use crate::module_paths::ModulePaths;
+use crate::searched_tokens::SearchedTokens;
 use crate::standard_items::StandardItems;
 use crate::vetted_crates::VettedCrates;
 
@@ -110,6 +111,9 @@ impl ModuleDependencies<'_, '_> {
         let test_gated_code = OnceMap::default();
         let test_modules = TestModules::default();
         let trait_result_errors = OnceMap::default();
+        let searched_tokens = attach_db(&project.database, || {
+            SearchedTokens::new(&Semantics::new(&project.database), workspace_files)
+        });
 
         members
             .par_iter()
@@ -151,6 +155,7 @@ impl ModuleDependencies<'_, '_> {
                             krate: *krate,
                             module_paths: &module_paths,
                             non_production_files,
+                            searched_tokens: &searched_tokens,
                             source_files: files,
                             standard_items: &standard_items,
                             test_gated_code: &test_gated_code,

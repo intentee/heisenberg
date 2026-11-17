@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -31,6 +32,8 @@ use crate::module_dependencies_error::ModuleDependenciesError;
 use crate::module_paths::ModulePaths;
 use crate::module_walk::ModuleWalk;
 use crate::path_resolutions::PathResolutions;
+use crate::reference_search::ReferenceSearch;
+use crate::searched_tokens::SearchedTokens;
 use crate::standard_items::StandardItems;
 use crate::template_captures::TemplateCaptures;
 use crate::token_origin::TokenOrigin;
@@ -46,6 +49,7 @@ pub struct CrateWalk<'walk> {
     pub krate: Crate,
     pub module_paths: &'walk ModulePaths,
     pub non_production_files: &'walk NonProductionFiles,
+    pub searched_tokens: &'walk SearchedTokens,
     pub source_files: &'walk SourceFiles,
     pub standard_items: &'walk StandardItems,
     pub test_gated_code: &'walk OnceMap<InFile<SyntaxNodePtr>, bool>,
@@ -69,7 +73,13 @@ impl CrateWalk<'_> {
         let options = self.krate.cfg(database);
         let production_options = self.test_modules.production_options(database, self.krate);
         let template_captures = TemplateCaptures::new(&semantics);
-        let usages = DefinitionUsages::new(&semantics);
+        let usages = DefinitionUsages::new(ReferenceSearch {
+            file_modules: self.file_modules,
+            semantics: &semantics,
+            template_captures: &template_captures,
+            tokens: self.searched_tokens,
+            trees: RefCell::default(),
+        });
         let runs_libtest_tests = Cell::new(false);
         let mut walked = WalkedModule::default();
 

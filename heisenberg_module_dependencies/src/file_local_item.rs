@@ -23,12 +23,8 @@ impl FileLocalItem<'_, '_, '_> {
     }
 
     fn is_used_only_in_its_file(&self) -> bool {
-        let database = self.usages.semantics.db;
-        let references = &self.usages.all(self.definition).references;
+        let references = &self.usages.all(self.definition).by_file;
 
-        !references.is_empty()
-            && references
-                .keys()
-                .all(|file| file.file_id(database) == self.file_id)
+        !references.is_empty() && references.keys().all(|file| *file == self.file_id)
     }
 }

@@ -2239,9 +2239,11 @@ impl<'database> ModuleWalk<'_, 'database> {
                     .and_then(|receiver| receiver.as_local(database))
             })
             .is_some_and(|receiver| {
-                Definition::Local(receiver)
-                    .usages(self.semantics)
-                    .at_least_one()
+                !self
+                    .usages
+                    .of(Definition::Local(receiver))
+                    .by_file
+                    .is_empty()
             })
     }
 
@@ -2365,7 +2367,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                     && !self
                         .usages
                         .all(ModuleDef::Function(function))
-                        .references
+                        .by_file
                         .is_empty()
             })
             .map(|_| {
@@ -2626,6 +2628,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                     krate: self.krate,
                     semantics: self.semantics,
                     token_origin: self.token_origin,
+                    usages: self.usages,
                 }
                 .destructurable_type()
                 .map(|held| {
