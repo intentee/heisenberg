@@ -2,6 +2,8 @@ use crate::rule_evaluation::RuleEvaluation;
 use crate::rule_scope::RuleScope;
 use crate::rule_section::RuleSection;
 
+const IDENTIFIER_PREFIX: &str = "H";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct IssueText {
     pub definition: &'static str,
@@ -19,6 +21,6 @@ pub struct IssueText {
 impl IssueText {
     #[must_use]
     pub fn identifier(&self) -> String {
-        format!("H{:03}", self.number)
+        format!("{IDENTIFIER_PREFIX}{:03}", self.number)
     }
 }

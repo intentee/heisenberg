@@ -6,9 +6,9 @@ use std::path::Path;
 fn main() -> Result<(), io::Error> {
     println!("cargo::rustc-env=DECLARED_STAMP=declared");
 
-    if let Some(out_dir) = env::var_os("OUT_DIR") {
-        fs::write(Path::new(&out_dir).join("stamp.rs"), "pub struct Stamp;\n")?;
-    }
+    let out_dir = env::var_os("OUT_DIR").ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+
+    fs::write(Path::new(&out_dir).join("stamp.rs"), "pub struct Stamp;\n")?;
 
     Ok(())
 }
