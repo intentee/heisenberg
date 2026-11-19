@@ -1,5 +1,5 @@
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum BuildScriptOrigin {
-    Declared,
-    Run,
+    Declared { manifest: String },
+    Run { script: String },
 }

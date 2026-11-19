@@ -78,6 +78,10 @@ impl CrateWalk<'_> {
         let template_captures = TemplateCaptures::new(&semantics);
         let usages = DefinitionUsages::new(ReferenceSearch {
             file_modules: self.file_modules,
+            home_file: module
+                .definition_source_file_id(database)
+                .original_file(database)
+                .file_id(database),
             semantics: &semantics,
             template_captures: &template_captures,
             tokens: self.searched_tokens,

@@ -390,6 +390,20 @@ impl<'database> ModuleWalk<'_, 'database> {
             .map(|location| Violation { kind, location })
     }
 
+    fn checks_exporting_uses(
+        &self,
+        definition: Definition<'database>,
+        item: UsedItem,
+        node: &SyntaxNode,
+    ) -> bool {
+        item != UsedItem::Variant
+            && self
+                .unpublished_packages
+                .contains(&self.crate_target.package_name)
+            && self.is_exported(definition)
+            && self.placement_rules_apply(node)
+    }
+
     fn conditional_attributes(
         &self,
         configured: &ConfiguredNode<'_>,
@@ -1071,14 +1085,9 @@ impl<'database> ModuleWalk<'_, 'database> {
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
         EveryConfigurationFindings { held, refuted }: &mut EveryConfigurationFindings,
+        exporting_uses_checked: bool,
     ) -> Result<(), ModuleDependenciesError> {
-        if item != UsedItem::Variant
-            && self
-                .unpublished_packages
-                .contains(&self.crate_target.package_name)
-            && self.is_exported(definition)
-            && self.placement_rules_apply(node)
-        {
+        if exporting_uses_checked {
             let is_needed = ItemReferences {
                 definition,
                 item,
@@ -1132,6 +1141,9 @@ impl<'database> ModuleWalk<'_, 'database> {
             .as_assoc_item(database)
             .is_some_and(|item| item.container_or_implemented_trait(database).is_some());
 
+        let exporting_uses_checked = !is_trait_item
+            && self.checks_exporting_uses(Definition::Function(function), UsedItem::Function, node);
+
         self.procedural_function(function, node, origin, is_trait_item)
             .and_then(|procedural| {
                 violations.extend(procedural);
@@ -1143,6 +1155,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                         UsedItem::Function,
                         node,
                         origin,
+                        exporting_uses_checked,
                     )
                 }
             })
@@ -1161,6 +1174,7 @@ impl<'database> ModuleWalk<'_, 'database> {
                         node,
                         origin,
                         every_configuration,
+                        exporting_uses_checked,
                     )
                 }
             })
@@ -1767,13 +1781,13 @@ impl<'database> ModuleWalk<'_, 'database> {
         item: UsedItem,
         node: &SyntaxNode,
         origin: &SubtreeOrigin,
+        exporting_uses_checked: bool,
     ) -> Result<Option<Violation>, ModuleDependenciesError> {
         ((self
             .unpublished_packages
             .contains(&self.crate_target.package_name)
             || !self.is_exported(definition))
-            && !self.non_production_code.contains(node)
-            && !self.in_test_gated_code(node))
+            && !self.is_outside_production(node))
         .then(|| {
             let references = ItemReferences {
                 definition,
@@ -1783,9 +1797,10 @@ impl<'database> ModuleWalk<'_, 'database> {
                 usages: self.usages,
             };
 
-            (!references.is_used_by(|user| !self.is_outside_production(user)))
-                .then(|| references.using_nodes())
-                .flatten()
+            (exporting_uses_checked
+                || !references.is_used_by(|user| !self.is_outside_production(user)))
+            .then(|| references.using_nodes())
+            .flatten()
         })
         .flatten()
         .filter(|using| {
@@ -1908,8 +1923,25 @@ impl<'database> ModuleWalk<'_, 'database> {
         };
 
         used.map_or(Ok(None), |UsedDefinition { definition, item }| {
-            self.export_finding(definition, item, node, origin, every_configuration)
-                .and_then(|()| self.item_used_outside_production(definition, item, node, origin))
+            let exporting_uses_checked = self.checks_exporting_uses(definition, item, node);
+
+            self.export_finding(
+                definition,
+                item,
+                node,
+                origin,
+                every_configuration,
+                exporting_uses_checked,
+            )
+            .and_then(|()| {
+                self.item_used_outside_production(
+                    definition,
+                    item,
+                    node,
+                    origin,
+                    exporting_uses_checked,
+                )
+            })
         })
     }
 

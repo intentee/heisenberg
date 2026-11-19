@@ -72,15 +72,14 @@ impl ResolvedPackages {
 
                                 BuildScriptVariables {
                                     configurations,
-                                    file: if substituted {
-                                        workspace_path.manifest()
-                                    } else {
-                                        workspace_path.relative(src_path)
-                                    },
                                     origin: if substituted {
-                                        BuildScriptOrigin::Declared
+                                        BuildScriptOrigin::Declared {
+                                            manifest: workspace_path.manifest(),
+                                        }
                                     } else {
-                                        BuildScriptOrigin::Run
+                                        BuildScriptOrigin::Run {
+                                            script: workspace_path.relative(src_path),
+                                        }
                                     },
                                     package: name.to_string(),
                                     variables,

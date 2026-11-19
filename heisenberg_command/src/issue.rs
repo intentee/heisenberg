@@ -348,9 +348,6 @@ impl Issue {
     #[must_use]
     pub fn location(&self) -> IssueLocation {
         match self {
-            Self::BuildScriptVariables(BuildScriptVariables { file, .. }) => {
-                IssueLocation::new_whole_file(file)
-            }
             Self::CodeActiveInNoConfiguration { focus } => IssueLocation::new_position(focus),
             Self::ConfinedPackageReached {
                 breach:
@@ -369,7 +366,13 @@ impl Issue {
                 IssueLocation::new_position(cycle_site(witnesses))
             }
             Self::Package(violation) => IssueLocation::new_whole_file(violation.file()),
-            Self::SharedModuleFile { file, .. } => IssueLocation::new_whole_file(file),
+            Self::BuildScriptVariables(BuildScriptVariables {
+                origin:
+                    BuildScriptOrigin::Declared { manifest: file }
+                    | BuildScriptOrigin::Run { script: file },
+                ..
+            })
+            | Self::SharedModuleFile { file, .. } => IssueLocation::new_whole_file(file),
             Self::UnexecutedRegion { region } => IssueLocation::new_position(region),
             Self::UnresolvedForeignReferences { sites, .. } => {
                 IssueLocation::new_position(&sites.first)
@@ -384,14 +387,14 @@ impl Issue {
     pub fn message(&self) -> String {
         match self {
             Self::BuildScriptVariables(BuildScriptVariables {
-                origin: BuildScriptOrigin::Declared,
+                origin: BuildScriptOrigin::Declared { .. },
                 package,
                 ..
             }) => format!(
                 "Declared output of the build script of {package} sets environment variables for the compiler"
             ),
             Self::BuildScriptVariables(BuildScriptVariables {
-                origin: BuildScriptOrigin::Run,
+                origin: BuildScriptOrigin::Run { .. },
                 package,
                 ..
             }) => format!("Build script of {package} sets environment variables for the compiler"),

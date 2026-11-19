@@ -6,7 +6,6 @@ use ra_ap_hir::Adt;
 use ra_ap_hir::InFile;
 use ra_ap_hir::Local;
 use ra_ap_hir::Module;
-use ra_ap_hir::Name;
 use ra_ap_hir::Semantics;
 use ra_ap_hir::Visibility;
 use ra_ap_ide_db::RootDatabase;
@@ -38,13 +37,19 @@ struct AssignmentSide {
     operator: ast::BinaryOp,
 }
 
-struct CapturedReference {
+struct LocatedReference {
     file: FileId,
     reference: FoundReference,
 }
 
+struct SearchTarget {
+    scope: ReferenceScope,
+    spellings: [String; 2],
+}
+
 pub struct ReferenceSearch<'search, 'database> {
     pub file_modules: &'search HashMap<FileId, Vec<Module>>,
+    pub home_file: FileId,
     pub semantics: &'search Semantics<'database, RootDatabase>,
     pub template_captures: &'search TemplateCaptures<'search, 'database>,
     pub tokens: &'search SearchedTokens,
@@ -55,24 +60,12 @@ impl<'database> ReferenceSearch<'_, 'database> {
     pub fn finds(
         &self,
         definition: Definition<'database>,
-        first_file: FileId,
         accepts: impl Fn(&FoundReference) -> bool,
     ) -> bool {
-        definition
-            .name(self.semantics.db)
-            .zip(self.scope(definition))
-            .is_some_and(|(name, scope)| {
-                let written = name.as_str();
-
-                [written.to_owned(), format!("r#{written}")]
-                    .iter()
-                    .any(|spelling| {
-                        self.finds_named(definition, spelling, &scope, first_file, &accepts)
-                    })
-                    || self
-                        .captures(definition, written, &scope)
-                        .any(|CapturedReference { reference, .. }| accepts(&reference))
-            })
+        self.target(definition).is_some_and(|target| {
+            self.located(definition, &target, false)
+                .any(|LocatedReference { reference, .. }| accepts(&reference))
+        })
     }
 
     pub fn references(
@@ -80,11 +73,18 @@ impl<'database> ReferenceSearch<'_, 'database> {
         definition: Definition<'database>,
         with_self_references: bool,
     ) -> FoundReferences {
-        definition
-            .name(self.semantics.db)
-            .zip(self.scope(definition))
-            .map(|(name, scope)| self.found(definition, &name, &scope, with_self_references))
-            .unwrap_or_default()
+        self.target(definition)
+            .map_or_else(FoundReferences::default, |target| {
+                let mut found = FoundReferences::default();
+
+                for LocatedReference { file, reference } in
+                    self.located(definition, &target, with_self_references)
+                {
+                    found.by_file.entry(file).or_default().push(reference);
+                }
+
+                found
+            })
     }
 
     fn aliases(&self, referred: Definition<'database>, definition: Definition<'database>) -> bool {
@@ -102,7 +102,7 @@ impl<'database> ReferenceSearch<'_, 'database> {
         definition: Definition<'database>,
         written: &str,
         scope: &ReferenceScope,
-    ) -> impl Iterator<Item = CapturedReference> {
+    ) -> impl Iterator<Item = LocatedReference> {
         self.tokens
             .strings
             .iter()
@@ -128,7 +128,7 @@ impl<'database> ReferenceSearch<'_, 'database> {
                     .map(|string| {
                         let range = string.syntax().text_range();
 
-                        CapturedReference {
+                        LocatedReference {
                             file: *file,
                             reference: FoundReference {
                                 name: FileReferenceNode::FormatStringEntry(string, range),
@@ -138,74 +138,6 @@ impl<'database> ReferenceSearch<'_, 'database> {
                     })
                 })
             })
-    }
-
-    fn finds_named(
-        &self,
-        definition: Definition<'database>,
-        spelling: &str,
-        scope: &ReferenceScope,
-        first_file: FileId,
-        accepts: &impl Fn(&FoundReference) -> bool,
-    ) -> bool {
-        let sites = self.sites(spelling);
-
-        self.nodes_at(
-            spelling,
-            scope,
-            sites
-                .iter()
-                .filter(|TokenSite { file, .. }| *file == first_file)
-                .chain(
-                    sites
-                        .iter()
-                        .filter(|TokenSite { file, .. }| *file != first_file),
-                ),
-        )
-        .any(|named| {
-            self.reference(definition, &named, false)
-                .is_some_and(|reference| accepts(&reference))
-        })
-    }
-
-    fn found(
-        &self,
-        definition: Definition<'database>,
-        name: &Name,
-        scope: &ReferenceScope,
-        with_self_references: bool,
-    ) -> FoundReferences {
-        let mut found = FoundReferences::default();
-        let written = name.as_str();
-
-        for spelling in [written.to_owned(), format!("r#{written}")] {
-            for named in self.nodes_at(&spelling, scope, self.sites(&spelling).iter()) {
-                if let Some(reference) = self.reference(definition, &named, with_self_references) {
-                    self.record(&named, reference, &mut found);
-                }
-            }
-        }
-
-        self.record_captures(definition, written, scope, &mut found);
-
-        if with_self_references && let Definition::Adt(adt) = definition {
-            for named in self.nodes_at(SELF_TYPE, scope, self.sites(SELF_TYPE).iter()) {
-                if let Some(name_ref) = ast::NameRef::cast(named.clone())
-                    && self.names_type_of(&name_ref, adt)
-                {
-                    self.record(
-                        &named,
-                        FoundReference {
-                            name: FileReferenceNode::NameRef(name_ref),
-                            writes: false,
-                        },
-                        &mut found,
-                    );
-                }
-            }
-        }
-
-        found
     }
 
     fn is_file_in_scope(&self, scope: &ReferenceScope, file: FileId) -> bool {
@@ -267,6 +199,58 @@ impl<'database> ReferenceSearch<'_, 'database> {
             })
     }
 
+    fn located<'located>(
+        &'located self,
+        definition: Definition<'database>,
+        SearchTarget { scope, spellings }: &'located SearchTarget,
+        with_self_references: bool,
+    ) -> impl Iterator<Item = LocatedReference> {
+        let [written, _] = spellings;
+
+        spellings
+            .iter()
+            .flat_map(move |spelling| {
+                self.nodes_named(spelling, scope).filter_map(move |named| {
+                    self.reference(definition, &named, with_self_references)
+                        .map(|reference| self.located_at(&named, reference))
+                })
+            })
+            .chain(self.captures(definition, written, scope))
+            .chain(
+                match definition {
+                    Definition::Adt(adt) if with_self_references => Some(adt),
+                    _ => None,
+                }
+                .into_iter()
+                .flat_map(move |adt| {
+                    self.nodes_named(SELF_TYPE, scope).filter_map(move |named| {
+                        ast::NameRef::cast(named.clone())
+                            .filter(|name_ref| self.names_type_of(name_ref, adt))
+                            .map(|name_ref| {
+                                self.located_at(
+                                    &named,
+                                    FoundReference {
+                                        name: FileReferenceNode::NameRef(name_ref),
+                                        writes: false,
+                                    },
+                                )
+                            })
+                    })
+                }),
+            )
+    }
+
+    fn located_at(&self, named: &SyntaxNode, reference: FoundReference) -> LocatedReference {
+        LocatedReference {
+            file: self
+                .semantics
+                .original_range(named)
+                .file_id
+                .file_id(self.semantics.db),
+            reference,
+        }
+    }
+
     fn names_type_of(&self, name_ref: &ast::NameRef, adt: Adt) -> bool {
         matches!(
             NameRefClass::classify(self.semantics, name_ref),
@@ -292,48 +276,31 @@ impl<'database> ReferenceSearch<'_, 'database> {
         }
     }
 
-    fn nodes_at<'sites>(
+    fn nodes_named(
         &self,
         spelling: &str,
         scope: &ReferenceScope,
-        sites: impl Iterator<Item = &'sites TokenSite>,
     ) -> impl Iterator<Item = SyntaxNode> {
+        let sites = self
+            .tokens
+            .names
+            .get(spelling)
+            .map_or(&[][..], Vec::as_slice);
+
         sites
+            .iter()
+            .filter(move |TokenSite { file, .. }| *file == self.home_file)
+            .chain(
+                sites
+                    .iter()
+                    .filter(move |TokenSite { file, .. }| *file != self.home_file),
+            )
             .filter(move |site| self.is_in_scope(scope, site))
             .filter_map(move |TokenSite { file, offset }| {
                 self.token(*file, *offset, spelling)
                     .map(|token| self.nodes(*file, token))
             })
             .flatten()
-    }
-
-    fn record(
-        &self,
-        named: &SyntaxNode,
-        reference: FoundReference,
-        FoundReferences { by_file }: &mut FoundReferences,
-    ) {
-        by_file
-            .entry(
-                self.semantics
-                    .original_range(named)
-                    .file_id
-                    .file_id(self.semantics.db),
-            )
-            .or_default()
-            .push(reference);
-    }
-
-    fn record_captures(
-        &self,
-        definition: Definition<'database>,
-        written: &str,
-        scope: &ReferenceScope,
-        FoundReferences { by_file }: &mut FoundReferences,
-    ) {
-        for CapturedReference { file, reference } in self.captures(definition, written, scope) {
-            by_file.entry(file).or_default().push(reference);
-        }
     }
 
     fn reference(
@@ -408,11 +375,18 @@ impl<'database> ReferenceSearch<'_, 'database> {
         }
     }
 
-    fn sites(&self, spelling: &str) -> &[TokenSite] {
-        self.tokens
-            .names
-            .get(spelling)
-            .map_or(&[][..], Vec::as_slice)
+    fn target(&self, definition: Definition<'database>) -> Option<SearchTarget> {
+        definition
+            .name(self.semantics.db)
+            .zip(self.scope(definition))
+            .map(|(name, scope)| {
+                let written = name.as_str();
+
+                SearchTarget {
+                    scope,
+                    spellings: [written.to_owned(), format!("r#{written}")],
+                }
+            })
     }
 
     fn token(&self, file: FileId, offset: TextSize, spelling: &str) -> Option<SyntaxToken> {
