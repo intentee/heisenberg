@@ -148,29 +148,24 @@ impl<'database> ReferenceSearch<'_, 'database> {
         first_file: FileId,
         accepts: &impl Fn(&FoundReference) -> bool,
     ) -> bool {
-        let sites = self
-            .tokens
-            .names
-            .get(spelling)
-            .map_or(&[][..], Vec::as_slice);
+        let sites = self.sites(spelling);
 
-        sites
-            .iter()
-            .filter(|TokenSite { file, .. }| *file == first_file)
-            .chain(
-                sites
-                    .iter()
-                    .filter(|TokenSite { file, .. }| *file != first_file),
-            )
-            .filter(|site| self.is_in_scope(scope, site))
-            .any(|TokenSite { file, offset }| {
-                self.token(*file, *offset, spelling).is_some_and(|token| {
-                    self.nodes(*file, token).iter().any(|named| {
-                        self.reference(definition, named, false)
-                            .is_some_and(|reference| accepts(&reference))
-                    })
-                })
-            })
+        self.nodes_at(
+            spelling,
+            scope,
+            sites
+                .iter()
+                .filter(|TokenSite { file, .. }| *file == first_file)
+                .chain(
+                    sites
+                        .iter()
+                        .filter(|TokenSite { file, .. }| *file != first_file),
+                ),
+        )
+        .any(|named| {
+            self.reference(definition, &named, false)
+                .is_some_and(|reference| accepts(&reference))
+        })
     }
 
     fn found(
@@ -184,7 +179,7 @@ impl<'database> ReferenceSearch<'_, 'database> {
         let written = name.as_str();
 
         for spelling in [written.to_owned(), format!("r#{written}")] {
-            for named in self.nodes_named(&spelling, scope) {
+            for named in self.nodes_at(&spelling, scope, self.sites(&spelling).iter()) {
                 if let Some(reference) = self.reference(definition, &named, with_self_references) {
                     self.record(&named, reference, &mut found);
                 }
@@ -194,7 +189,7 @@ impl<'database> ReferenceSearch<'_, 'database> {
         self.record_captures(definition, written, scope, &mut found);
 
         if with_self_references && let Definition::Adt(adt) = definition {
-            for named in self.nodes_named(SELF_TYPE, scope) {
+            for named in self.nodes_at(SELF_TYPE, scope, self.sites(SELF_TYPE).iter()) {
                 if let Some(name_ref) = ast::NameRef::cast(named.clone())
                     && self.names_type_of(&name_ref, adt)
                 {
@@ -297,19 +292,19 @@ impl<'database> ReferenceSearch<'_, 'database> {
         }
     }
 
-    fn nodes_named(&self, spelling: &str, scope: &ReferenceScope) -> Vec<SyntaxNode> {
-        self.tokens
-            .names
-            .get(spelling)
-            .into_iter()
-            .flatten()
-            .filter(|site| self.is_in_scope(scope, site))
-            .filter_map(|TokenSite { file, offset }| {
+    fn nodes_at<'sites>(
+        &self,
+        spelling: &str,
+        scope: &ReferenceScope,
+        sites: impl Iterator<Item = &'sites TokenSite>,
+    ) -> impl Iterator<Item = SyntaxNode> {
+        sites
+            .filter(move |site| self.is_in_scope(scope, site))
+            .filter_map(move |TokenSite { file, offset }| {
                 self.token(*file, *offset, spelling)
                     .map(|token| self.nodes(*file, token))
             })
             .flatten()
-            .collect()
     }
 
     fn record(
@@ -411,6 +406,13 @@ impl<'database> ReferenceSearch<'_, 'database> {
                     }),
                 })
         }
+    }
+
+    fn sites(&self, spelling: &str) -> &[TokenSite] {
+        self.tokens
+            .names
+            .get(spelling)
+            .map_or(&[][..], Vec::as_slice)
     }
 
     fn token(&self, file: FileId, offset: TextSize, spelling: &str) -> Option<SyntaxToken> {
