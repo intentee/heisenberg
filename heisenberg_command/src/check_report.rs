@@ -15,6 +15,7 @@ use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_module_graph::unresolved_foreign_reference::UnresolvedForeignReference;
 use heisenberg_module_graph::violation::Violation;
 use heisenberg_module_graph::violation_kind::ViolationKind;
+use heisenberg_project_model::build_script_variables::BuildScriptVariables;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::configuration_list::ConfigurationList;
 use heisenberg_project_model::configuration_reach::ConfigurationReach;
@@ -87,6 +88,7 @@ fn violation_reports(
 
 pub struct CheckReport {
     pub analyses: Vec<ConfigurationAnalysis>,
+    pub build_script_variables: Vec<BuildScriptVariables>,
     pub nextest_presence: NextestPresenceVerdict,
     pub package_violations: Vec<PackageViolation>,
     pub scope: RunScope,
@@ -171,6 +173,14 @@ impl CheckReport {
                 .collect(),
             files,
         }
+    }
+
+    fn build_script_variable_issues(&self) -> Vec<Issue> {
+        self.build_script_variables
+            .iter()
+            .cloned()
+            .map(Issue::BuildScriptVariables)
+            .collect()
     }
 
     fn compliance_summary(&self) -> ComplianceSummary {
@@ -422,6 +432,7 @@ impl CheckReport {
         );
 
         issues.extend(shared_module_file_issues(&shared_files));
+        issues.extend(self.build_script_variable_issues());
         issues.extend(self.confinement_breach_issues());
         issues.extend(self.duplicated_function_body_issues());
 

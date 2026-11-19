@@ -26,6 +26,8 @@ use heisenberg_project_model::resolved_project::ResolvedProject;
 use heisenberg_project_model::run_scope::RunScope;
 use heisenberg_project_model::rust_versions::RustVersions;
 use heisenberg_project_model::rustfmt_requirements::RustfmtRequirements;
+use heisenberg_workspace_build::build_outputs::BuildOutputs;
+use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
 
 use crate::check_report::CheckReport;
 use crate::configuration_analysis::ConfigurationAnalysis;
@@ -113,6 +115,7 @@ impl ConfigurationPipeline for CheckCommand {
         &self,
         configuration: &Configuration,
         project: &mut LoadedProject<'_>,
+        BuildOutputs { build_scripts, .. }: &BuildOutputs,
         scope: &RunScope,
         _: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError> {
@@ -130,6 +133,13 @@ impl ConfigurationPipeline for CheckCommand {
                 .files
                 .relative_paths(&project.build_script_output_files)
         };
+        let build_script_variables = build_scripts
+            .iter()
+            .filter(|(_, BuildScriptOutput { env, .. })| !env.is_empty())
+            .map(|(package, BuildScriptOutput { env, .. })| {
+                (package.clone(), env.keys().cloned().collect())
+            })
+            .collect();
         let confinement = project.packages.confinement.reach(&project.build);
 
         ModuleDependencies { project }
@@ -140,6 +150,7 @@ impl ConfigurationPipeline for CheckCommand {
             })
             .map(|graphs| ConfigurationAnalysis {
                 build_script_output_files,
+                build_script_variables,
                 configuration: configuration.clone(),
                 confinement,
                 cycles: graphs
@@ -175,6 +186,7 @@ impl ConfigurationPipeline for CheckCommand {
     fn report(
         &self,
         ResolvedProject {
+            configurations,
             declared_test_crates,
             packages,
             project,
@@ -266,8 +278,23 @@ impl ConfigurationPipeline for CheckCommand {
             )
             .collect();
 
+        let build_script_variables = project.resolved.build_script_variables(
+            &analyses
+                .iter()
+                .map(
+                    |ConfigurationAnalysis {
+                         build_script_variables,
+                         configuration,
+                         ..
+                     }| (configuration, build_script_variables),
+                )
+                .collect(),
+            configurations,
+        );
+
         CheckReport {
             analyses,
+            build_script_variables,
             nextest_presence,
             package_violations,
             scope: scope.clone(),

@@ -33,6 +33,24 @@ impl<'database> ItemReferences<'_, 'database> {
             .collect()
     }
 
+    pub fn is_used_by(&self, user_qualifies: impl Fn(&SyntaxNode) -> bool) -> bool {
+        self.usages.search.finds(
+            self.definition,
+            self.semantics
+                .original_range(self.node)
+                .file_id
+                .file_id(self.semantics.db),
+            |reference| {
+                self.counts(reference)
+                    && reference
+                        .name
+                        .syntax()
+                        .parent()
+                        .is_some_and(|user| user_qualifies(&user))
+            },
+        )
+    }
+
     pub fn using_nodes(&self) -> Option<Vec<SyntaxNode>> {
         self.usages
             .of(self.definition)

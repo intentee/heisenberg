@@ -18,8 +18,14 @@ fn undeclared_environment_variable_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["UndeclaredEnvironmentVariable: 3 violations\n\
-            The compiler reads such a variable from the shell that starts the build, so the code that is compiled depends on an input that no file declares, and the analysis sees a placeholder in its place. Declare the variable in the [env] table of the cargo configuration, or have the build script emit it with cargo::rustc-env.\n\
+        Ok(["BuildScriptEnvironmentVariable: 1 violation\n\
+            Cargo hands such a variable to the compiler after the variables it sets itself, so it reaches every tool that runs in place of the compiler: clippy reads its lint arguments and the location of its configuration from that environment, and a build script can switch off the lints the workspace denies. Write the value into a file in OUT_DIR and bring it in with include!, or declare a fixed value in the [env] table of the cargo configuration.\n\
+            \n\
+            - build.rs: Build script of undeclared_environment_variables sets environment variables for the compiler\n      \
+            sets EMITTED_FOR_THE_FIXTURE\n\
+            \n\
+            UndeclaredEnvironmentVariable: 3 violations\n\
+            The compiler reads such a variable from the shell that starts the build, so the code that is compiled depends on an input that no file declares, and the analysis sees a placeholder in its place. Declare the variable in the [env] table of the cargo configuration, or have the build script write the value into a file in OUT_DIR and bring it in with include!.\n\
             \n\
             - src/undeclared.rs:4:14: Environment variable UNDECLARED_BY_THE_FIXTURE is declared by neither cargo, the cargo configuration nor the build script\n            \
             Some(env!(\"UNDECLARED_BY_THE_FIXTURE\")),\n\
@@ -29,7 +35,7 @@ fn undeclared_environment_variable_is_a_violation() {
             Some(env!(\"CARGO_BIN_NAME\")),\n\
             \n\
             ------------------------------\n\
-            3 errors found in 1 rule\n\
+            4 errors found in 2 rules\n\
             ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(4, 6).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);

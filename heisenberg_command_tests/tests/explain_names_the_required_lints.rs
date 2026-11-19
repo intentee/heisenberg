@@ -24,7 +24,7 @@ fn explain_names_the_required_lints() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "Rule 3.6 RequiredLintNotDenied: A workspace member that leaves a required lint or lint group below deny\n\
+            "H028 RequiredLintNotDenied: A workspace member that leaves a required lint or lint group below deny\n\
         Section 3, Lints and formatting. Scope: package. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A workspace member whose lints, after workspace inheritance and in cargo's order, leave a required lint or lint group below deny, under either spelling of its name or a name clippy renamed to it, a warn level counting as deny while the warnings group is denied. Every member, a test crate included, denies the warnings group, the clippy all, nursery and pedantic groups and the panicking lints, the clippy lints that report code that can panic. A finding for a lints table is reported at the manifest that declares the table, once at the workspace manifest for every member that inherits [workspace.lints].\n\

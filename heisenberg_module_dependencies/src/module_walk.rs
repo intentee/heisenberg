@@ -1578,6 +1578,10 @@ impl<'database> ModuleWalk<'_, 'database> {
             && owner.is_none_or(|adt| adt.visibility(database).is_public())
     }
 
+    fn is_outside_production(&self, node: &SyntaxNode) -> bool {
+        self.non_production_code.contains(node) || self.in_test_gated_code(node)
+    }
+
     fn is_own_crate_adt(&self, adt: Adt) -> bool {
         adt.module(self.semantics.db).krate(self.semantics.db) == self.krate
     }
@@ -1652,24 +1656,24 @@ impl<'database> ModuleWalk<'_, 'database> {
     fn is_unsafe_without_the_keyword(&self, node: &SyntaxNode) -> bool {
         let database = self.semantics.db;
 
-        self.token_origin.is_workspace_code(node)
-            && (ast::Meta::cast(node.clone()).is_some_and(|meta| {
-                !node
-                    .parent()
-                    .is_some_and(|parent| ast::UnsafeMeta::can_cast(parent.kind()))
-                    && BuiltinAttribute {
-                        meta: &meta,
-                        paths: self.paths,
-                    }
-                    .is_named(&UNSAFE_ATTRIBUTES)
-            }) || ast::MacroCall::cast(node.clone())
-                .and_then(|call| self.semantics.to_def(&call))
-                .is_some_and(|expansion| {
-                    matches!(
-                        expansion.lookup(database).def.kind,
-                        MacroDefKind::BuiltIn(_, BuiltinFnLikeExpander::GlobalAsm)
-                    )
-                }))
+        (ast::Meta::cast(node.clone()).is_some_and(|meta| {
+            !node
+                .parent()
+                .is_some_and(|parent| ast::UnsafeMeta::can_cast(parent.kind()))
+                && BuiltinAttribute {
+                    meta: &meta,
+                    paths: self.paths,
+                }
+                .is_named(&UNSAFE_ATTRIBUTES)
+        }) || ast::MacroCall::cast(node.clone())
+            .and_then(|call| self.semantics.to_def(&call))
+            .is_some_and(|expansion| {
+                matches!(
+                    expansion.lookup(database).def.kind,
+                    MacroDefKind::BuiltIn(_, BuiltinFnLikeExpander::GlobalAsm)
+                )
+            }))
+            && self.token_origin.is_workspace_code(node)
     }
 
     fn is_written_by_the_workspace(&self, node: &SyntaxNode) -> bool {
@@ -1771,21 +1775,21 @@ impl<'database> ModuleWalk<'_, 'database> {
             && !self.non_production_code.contains(node)
             && !self.in_test_gated_code(node))
         .then(|| {
-            ItemReferences {
+            let references = ItemReferences {
                 definition,
                 item,
                 node,
                 semantics: self.semantics,
                 usages: self.usages,
-            }
-            .using_nodes()
+            };
+
+            (!references.is_used_by(|user| !self.is_outside_production(user)))
+                .then(|| references.using_nodes())
+                .flatten()
         })
         .flatten()
         .filter(|using| {
-            !using.is_empty()
-                && using.iter().all(|user| {
-                    self.non_production_code.contains(user) || self.in_test_gated_code(user)
-                })
+            !using.is_empty() && using.iter().all(|user| self.is_outside_production(user))
         })
         .map(|using| {
             self.locate_focus(node, origin).map(|location| Violation {

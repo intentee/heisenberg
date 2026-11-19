@@ -29,8 +29,14 @@ fn each_configuration_is_analysed_with_its_own_declared_build_script_output() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok(format!(
-            "------------------------------\n\
-             No errors found!\n\
+            "BuildScriptEnvironmentVariable: 1 violation\n\
+             Cargo hands such a variable to the compiler after the variables it sets itself, so it reaches every tool that runs in place of the compiler: clippy reads its lint arguments and the location of its configuration from that environment, and a build script can switch off the lints the workspace denies. Write the value into a file in OUT_DIR and bring it in with include!, or declare a fixed value in the [env] table of the cargo configuration.\n\
+             \n\
+             - Cargo.toml: Declared output of the build script of bindings_sys sets environment variables for the compiler\n      \
+             sets DECLARED_VALUE\n\
+             \n\
+             ------------------------------\n\
+             1 errors found in 1 rule\n\
              ------------------------------\n\
              Analysed on {HOST_CONFIGURATION}: 3 crate targets, 5 modules\n\
              Analysed on {HOST_CONFIGURATION}-accelerated: 3 crate targets, 6 modules\n\
@@ -38,5 +44,5 @@ fn each_configuration_is_analysed_with_its_own_declared_build_script_output() {
         )
         .as_str())
     );
-    assert_eq!(outcome.status, HeisenbergExitStatus::Compliant);
+    assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

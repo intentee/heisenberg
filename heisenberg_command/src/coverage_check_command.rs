@@ -11,6 +11,7 @@ use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::resolved_project::ResolvedProject;
 use heisenberg_project_model::run_scope::RunScope;
+use heisenberg_workspace_build::build_outputs::BuildOutputs;
 
 use crate::configuration_coverage::ConfigurationCoverage;
 use crate::configuration_pipeline::ConfigurationPipeline;
@@ -52,6 +53,7 @@ impl ConfigurationPipeline for CoverageCheckCommand {
         &self,
         configuration: &Configuration,
         project: &mut LoadedProject<'_>,
+        _: &BuildOutputs,
         _: &RunScope,
         coverage: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError> {

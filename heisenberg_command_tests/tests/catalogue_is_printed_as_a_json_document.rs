@@ -31,7 +31,7 @@ fn catalogue_is_printed_as_a_json_document() {
             "definition": "A cfg_select! call, whose unselected arms escape the analysis.",
             "evaluation": "in each analysed configuration",
             "exceptions": [],
-            "identifier": "Rule 1.1",
+            "identifier": "H001",
             "name": "ConfigurationSelectionMacro",
             "rationale": "cfg_select! discards the arms it does not select before they can be analysed.",
             "remedy": "Write each arm as an item under its own #[cfg] attribute.",

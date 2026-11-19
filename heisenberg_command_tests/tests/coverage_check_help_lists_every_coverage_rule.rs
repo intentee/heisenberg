@@ -59,8 +59,8 @@ const COVERAGE_CHECK_HELP: &str = "Report the production code of a Cargo workspa
     \n\
     Rules: every rule is mandatory and decidable, and is listed under its section with its identifier.\n  \
     10 Coverage\n    \
-    Rule 10.1 CodeWithoutCoverageData: A production function without coverage data\n    \
-    Rule 10.2 UncoveredCode: Production code that no test executes\n\
+    H116 CodeWithoutCoverageData: A production function without coverage data\n    \
+    H117 UncoveredCode: Production code that no test executes\n\
     \n\
     Run `heisenberg explain <ISSUE_TYPE>` for the definition of a rule, why it exists and how to satisfy\n\
     it, and `heisenberg catalogue` for the scope and the evaluation of every rule.\n\

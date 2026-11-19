@@ -40,6 +40,7 @@ use crate::constants::BENCHMARK_TARGET_RUN_BY_TESTS;
 use crate::constants::BENCHMARK_TARGET_WITH_LIBTEST_HARNESS;
 use crate::constants::BENCHMARK_TARGET_WITHOUT_CRITERION_BENCHMARK;
 use crate::constants::BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES;
+use crate::constants::BUILD_SCRIPT_ENVIRONMENT_VARIABLE;
 use crate::constants::CLIPPY_CONFIGURATION_AMBIGUOUS;
 use crate::constants::CLIPPY_CONFIGURATION_MISSING;
 use crate::constants::CODE_ACTIVE_IN_NO_CONFIGURATION;
@@ -117,7 +118,7 @@ use crate::placement_issue::PlacementIssue;
 use crate::rustfmt_issue::RustfmtIssue;
 use crate::test_issue::TestIssue;
 
-const RULE_FAMILIES: [&[IssueType]; 14] = [
+const RULE_FAMILIES: [&[IssueType]; 15] = [
     &[
         IssueType::Error(ErrorIssue::ErrorIssuedOutsideItsCrate),
         IssueType::Error(ErrorIssue::ResultErrorNotAnError),
@@ -129,6 +130,10 @@ const RULE_FAMILIES: [&[IssueType]; 14] = [
         IssueType::UnresolvedMethodCall,
         IssueType::UnresolvedModule,
         IssueType::UnresolvedPath,
+    ],
+    &[
+        IssueType::BuildScriptEnvironmentVariable,
+        IssueType::UndeclaredEnvironmentVariable,
     ],
     &[
         IssueType::AttributeAppliedInNoConfiguration,
@@ -214,6 +219,7 @@ pub enum IssueType {
     BenchmarkTargetWithLibtestHarness,
     BenchmarkTargetWithoutCriterionBenchmark,
     BenchmarksOnlyPackageWithoutLibraries,
+    BuildScriptEnvironmentVariable,
     ClippyConfigurationAmbiguous,
     ClippyConfigurationMissing,
     CodeActiveInNoConfiguration,
@@ -384,6 +390,7 @@ impl IssueType {
             Self::BenchmarksOnlyPackageWithoutLibraries => {
                 BENCHMARKS_ONLY_PACKAGE_WITHOUT_LIBRARIES
             }
+            Self::BuildScriptEnvironmentVariable => BUILD_SCRIPT_ENVIRONMENT_VARIABLE,
             Self::ClippyConfigurationAmbiguous => CLIPPY_CONFIGURATION_AMBIGUOUS,
             Self::ClippyConfigurationMissing => CLIPPY_CONFIGURATION_MISSING,
             Self::CodeActiveInNoConfiguration => CODE_ACTIVE_IN_NO_CONFIGURATION,
@@ -458,7 +465,7 @@ impl IssueType {
         }
     }
 
-    const fn ungrouped() -> [Self; 75] {
+    const fn ungrouped() -> [Self; 76] {
         [
             Self::AttributeAppliedInNoConfiguration,
             Self::BenchmarkTargetExcludedFromBenchmarks,
@@ -466,6 +473,7 @@ impl IssueType {
             Self::BenchmarkTargetWithLibtestHarness,
             Self::BenchmarkTargetWithoutCriterionBenchmark,
             Self::BenchmarksOnlyPackageWithoutLibraries,
+            Self::BuildScriptEnvironmentVariable,
             Self::ClippyConfigurationAmbiguous,
             Self::ClippyConfigurationMissing,
             Self::CodeActiveInNoConfiguration,

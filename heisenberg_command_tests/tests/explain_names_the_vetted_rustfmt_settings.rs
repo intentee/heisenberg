@@ -24,7 +24,7 @@ fn explain_names_the_vetted_rustfmt_settings() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "Rule 3.14 UnvettedRustfmtSetting: A rustfmt configuration setting that Heisenberg has not vetted\n\
+            "H036 UnvettedRustfmtSetting: A rustfmt configuration setting that Heisenberg has not vetted\n\
         Section 3, Lints and formatting. Scope: workspace. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A setting of a rustfmt.toml or .rustfmt.toml, in the workspace root or a directory between the workspace root and a module file of a workspace member, other than the stable settings that only choose a layout. Settings that exempt code from formatting, such as disable_all_formatting, ignore or skip_children, unstable settings and unknown settings are not vetted.\n\

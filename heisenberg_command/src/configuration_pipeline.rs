@@ -48,7 +48,8 @@ fn analysed<TPipeline: ConfigurationPipeline + ?Sized>(
         .built(outputs)
         .map_err(configuration_failure(configuration))
         .and_then(|mut project| {
-            let analysis = pipeline.analysis(configuration, &mut project, scope, prerequisite);
+            let analysis =
+                pipeline.analysis(configuration, &mut project, outputs, scope, prerequisite);
             let LoadedProject { database, .. } = project;
 
             WorkerPool::release(database);
@@ -100,6 +101,7 @@ pub trait ConfigurationPipeline: Sync {
         &self,
         configuration: &Configuration,
         project: &mut LoadedProject<'_>,
+        outputs: &BuildOutputs,
         scope: &RunScope,
         prerequisite: &Self::Prerequisite,
     ) -> Result<Self::Analysis, HeisenbergCommandError>;

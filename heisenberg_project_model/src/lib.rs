@@ -2,6 +2,8 @@ mod absolute_utf8_path;
 pub mod benchmark_target_violation;
 pub mod build_link;
 mod build_script_environment;
+pub mod build_script_origin;
+pub mod build_script_variables;
 mod build_selection;
 pub mod build_side;
 pub mod build_unit;

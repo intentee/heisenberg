@@ -8,7 +8,7 @@ pub struct IssueText {
     pub evaluation: RuleEvaluation,
     pub exceptions: &'static [&'static str],
     pub name: &'static str,
-    pub ordinal: u8,
+    pub number: u16,
     pub rationale: &'static str,
     pub remedy: &'static str,
     pub scope: RuleScope,
@@ -19,6 +19,6 @@ pub struct IssueText {
 impl IssueText {
     #[must_use]
     pub fn identifier(&self) -> String {
-        format!("Rule {}.{}", self.section.number(), self.ordinal)
+        format!("H{:03}", self.number)
     }
 }

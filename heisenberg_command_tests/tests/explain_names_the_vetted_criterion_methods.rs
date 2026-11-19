@@ -24,7 +24,7 @@ fn explain_names_the_vetted_criterion_methods() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "Rule 9.10 UnvettedCriterionMethod: A criterion method that Heisenberg has not vetted\n\
+            "H115 UnvettedCriterionMethod: A criterion method that Heisenberg has not vetted\n\
         Section 9, Benchmarks. Scope: module file. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A call or reference, in the code of a workspace member, to an inherent method of criterion's Criterion, BenchmarkGroup, Bencher or AsyncBencher that Heisenberg has not vetted: one that changes how long or how many samples it measures, how it judges results or which benchmarks run, a method that criterion hides from its documentation, or a method that Heisenberg does not know. criterion is the criterion package from crates.io, and the methods of traits that these types implement are not inherent methods.\n\

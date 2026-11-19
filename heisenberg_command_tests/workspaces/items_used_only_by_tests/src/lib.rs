@@ -7,5 +7,6 @@ mod raw;
 mod reading;
 mod registry;
 mod settings;
+mod signal;
 mod tuning;
 pub mod usage;

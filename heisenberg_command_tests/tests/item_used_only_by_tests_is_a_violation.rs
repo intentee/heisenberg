@@ -18,11 +18,13 @@ fn item_used_only_by_tests_is_a_violation() {
 
     assert_eq!(
         str::from_utf8(&outcome.output),
-        Ok(["ItemUsedOnlyByTests: 8 violations\n\
+        Ok(["ItemUsedOnlyByTests: 10 violations\n\
             Production code holds only what production uses. Move an item that only tests use into the test module that uses it, or into a test crate, a package that test_crates in [workspace.metadata.heisenberg] lists.\n\
             \n\
             - src/constants.rs:3:11: Constant is used only by tests\n    \
             pub const TEST_LIMIT: u8 = 9;\n\
+            - src/constants.rs:5:11: Constant is used only by tests\n    \
+            pub const TEST_PATTERN: u8 = 7;\n\
             - src/gauge.rs:6:9: Field is read only by tests\n        \
             pub observed: u8,\n\
             - src/level.rs:4:5: Variant is constructed only by tests\n        \
@@ -37,10 +39,12 @@ fn item_used_only_by_tests_is_a_violation() {
             pub type Reading = u8;\n\
             - src/registry.rs:1:12: Static is used only by tests\n    \
             pub static REGISTRY: u8 = 1;\n\
+            - src/signal.rs:2:13: Field is read only by tests\n        \
+            Pulse { strength: u8, width: u8 },\n\
             \n\
             ------------------------------\n\
-            8 errors found in 1 rule\n\
-            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 13).as_str()].concat().as_str())
+            10 errors found in 1 rule\n\
+            ------------------------------\n", NextestPresenceEvaluation::Evaluated.host_footer(1, 14).as_str()].concat().as_str())
     );
     assert_eq!(outcome.status, HeisenbergExitStatus::Violations);
 }

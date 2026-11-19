@@ -24,7 +24,7 @@ fn explain_names_the_required_clippy_settings() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "Rule 3.5 RequiredClippySettingMissing: A clippy configuration without a required setting\n\
+            "H027 RequiredClippySettingMissing: A clippy configuration without a required setting\n\
         Section 3, Lints and formatting. Scope: workspace. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A clippy configuration that does not give each required setting the value it requires: true for the test allowances, which are the only way tests may use expect and unwrap, and false for avoid-breaking-exported-api, which clippy otherwise sets to true and so leaves the lints that would change a public signature silent on public items.\n\

@@ -24,7 +24,7 @@ fn explain_names_the_clippy_configuration_files() {
     assert_eq!(
         str::from_utf8(&output),
         Ok(
-            "Rule 3.2 ClippyConfigurationMissing: A workspace member without a clippy configuration\n\
+            "H024 ClippyConfigurationMissing: A workspace member without a clippy configuration\n\
         Section 3, Lints and formatting. Scope: workspace. Applies to all code. Evaluated in each analysed configuration.\n\
         \n\
         A workspace member with no clippy configuration file in its directory or an ancestor within the workspace.\n\

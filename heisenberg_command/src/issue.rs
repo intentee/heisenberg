@@ -11,6 +11,8 @@ use heisenberg_module_graph::module_dependency::ModuleDependency;
 use heisenberg_module_graph::module_file_analysis::ModuleFileAnalysis;
 use heisenberg_module_graph::module_path::ModulePath;
 use heisenberg_module_graph::source_location::SourceLocation;
+use heisenberg_project_model::build_script_origin::BuildScriptOrigin;
+use heisenberg_project_model::build_script_variables::BuildScriptVariables;
 use heisenberg_project_model::configuration::Configuration;
 use heisenberg_project_model::confined_reach::ConfinedReach;
 use heisenberg_project_model::confinement_breach::ConfinementBreach;
@@ -57,6 +59,7 @@ fn cycle_site(witnesses: &NonEmpty<CycleWitness>) -> &SourceLocation {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Issue {
+    BuildScriptVariables(BuildScriptVariables),
     CodeActiveInNoConfiguration {
         focus: SourceLocation,
     },
@@ -194,6 +197,10 @@ impl Issue {
                     },
                 )
                 .collect(),
+            Self::BuildScriptVariables(BuildScriptVariables { variables, .. }) => variables
+                .iter()
+                .map(|variable| format!("  sets {variable}"))
+                .collect(),
             Self::ConfinedPackageReached {
                 breach: ConfinementBreach { path, .. },
                 ..
@@ -235,6 +242,7 @@ impl Issue {
     #[must_use]
     pub fn issue_type(&self) -> IssueType {
         match self {
+            Self::BuildScriptVariables(_) => IssueType::BuildScriptEnvironmentVariable,
             Self::CodeActiveInNoConfiguration { .. } => IssueType::CodeActiveInNoConfiguration,
             Self::ConfinedPackageReached { .. } => IssueType::ConfinedPackageReachedOutsideItsUsers,
             Self::DuplicatedFunctionBody { .. } => IssueType::DuplicatedFunctionBody,
@@ -298,7 +306,8 @@ impl Issue {
                 }
                 .to_string()
             }
-            Self::ConfinedPackageReached {
+            Self::BuildScriptVariables(BuildScriptVariables { configurations, .. })
+            | Self::ConfinedPackageReached {
                 breach: ConfinementBreach { configurations, .. },
             } => ConfigurationNarrowing {
                 all: analysed_configurations,
@@ -339,6 +348,9 @@ impl Issue {
     #[must_use]
     pub fn location(&self) -> IssueLocation {
         match self {
+            Self::BuildScriptVariables(BuildScriptVariables { file, .. }) => {
+                IssueLocation::new_whole_file(file)
+            }
             Self::CodeActiveInNoConfiguration { focus } => IssueLocation::new_position(focus),
             Self::ConfinedPackageReached {
                 breach:
@@ -371,6 +383,18 @@ impl Issue {
     #[must_use]
     pub fn message(&self) -> String {
         match self {
+            Self::BuildScriptVariables(BuildScriptVariables {
+                origin: BuildScriptOrigin::Declared,
+                package,
+                ..
+            }) => format!(
+                "Declared output of the build script of {package} sets environment variables for the compiler"
+            ),
+            Self::BuildScriptVariables(BuildScriptVariables {
+                origin: BuildScriptOrigin::Run,
+                package,
+                ..
+            }) => format!("Build script of {package} sets environment variables for the compiler"),
             Self::CodeActiveInNoConfiguration { .. } => {
                 "Code is active in no declared configuration".to_owned()
             }

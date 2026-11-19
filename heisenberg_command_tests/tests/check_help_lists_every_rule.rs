@@ -114,21 +114,22 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     procedural macros generate and in the build script output that include! brings in. Heisenberg does\n\
     not verify what build scripts and procedural macros do when they run, the code of registry and git\n\
     dependencies, the linker and the native libraries, or that the workspace compiles and passes clippy:\n\
-    it checks that the required lints are denied, not that the code meets them. A partial run evaluates\n\
-    the rules its footer lists and exits with 0 when they find no issue. Test code is every integration\n\
-    test target, every target of a test crate other than a benchmark target and every module that\n\
-    cfg(test) gates, inline or in its own file and under any name, and benchmark code is every benchmark\n\
-    target, measured through criterion, the criterion package from crates.io, whose calls the criterion\n\
-    rules check wherever workspace code makes them; a test crate is a workspace member that test_crates\n\
-    lists, whose package cannot be published (publish = false), and that no member other than a test\n\
-    crate depends on through a normal or build dependency. The error type rules count every\n\
-    implementation of std::error::Error in the production code of a crate target, those that macros\n\
-    generate included, and accept only those that the Error derive of thiserror, the thiserror-impl\n\
-    package from crates.io, generates for an enum. The error type rules and the rules about where items\n\
-    live apply to production code and not to test code, where nobody matches on an error or finds an\n\
-    item by its file; `heisenberg explain` and `heisenberg catalogue` state for each rule whether it\n\
-    applies to all code or to production code. A standard library without the items that the analysis\n\
-    relies on fails the run.\n\
+    it checks that the required lints are denied, not that the code meets them, and clippy decides by\n\
+    itself which code its lints skip, such as code it attributes to a macro of another crate or to a\n\
+    procedural macro. A partial run evaluates the rules its footer lists and exits with 0 when they find\n\
+    no issue. Test code is every integration test target, every target of a test crate other than a\n\
+    benchmark target and every module that cfg(test) gates, inline or in its own file and under any\n\
+    name, and benchmark code is every benchmark target, measured through criterion, the criterion\n\
+    package from crates.io, whose calls the criterion rules check wherever workspace code makes them; a\n\
+    test crate is a workspace member that test_crates lists, whose package cannot be published (publish\n\
+    = false), and that no member other than a test crate depends on through a normal or build\n\
+    dependency. The error type rules count every implementation of std::error::Error in the production\n\
+    code of a crate target, those that macros generate included, and accept only those that the Error\n\
+    derive of thiserror, the thiserror-impl package from crates.io, generates for an enum. The error\n\
+    type rules and the rules about where items live apply to production code and not to test code, where\n\
+    nobody matches on an error or finds an item by its file; `heisenberg explain` and `heisenberg\n\
+    catalogue` state for each rule whether it applies to all code or to production code. A standard\n\
+    library without the items that the analysis relies on fails the run.\n\
     \n\
     Report: Issues are grouped by type, in one section per type: a `<IssueType>: <count> violation(s)`\n\
     line, a line that states the purpose of the rule and what to do, an empty line, and one `-\n\
@@ -151,151 +152,146 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     \n\
     Rules: every rule is mandatory and decidable, and is listed under its section with its identifier.\n  \
     1 Analysable code\n    \
-    Rule 1.1 ConfigurationSelectionMacro: A cfg_select! call\n    \
-    Rule 1.2 FailedMacroExpansion: A macro call that fails to expand\n    \
-    Rule 1.3 IncludedSourceFile: An include! of a file that is not a build script output\n    \
-    Rule 1.4 InvalidMacroDefinition: A macro definition that is not valid\n    \
-    Rule 1.5 ModuleFileInsideBlock: A module file declared inside a block\n    \
-    Rule 1.6 SharedModuleFile: A module file included as several modules\n    \
-    Rule 1.7 UnimplementedBuiltinMacro: A built-in macro that rust-analyzer cannot expand\n    \
-    Rule 1.8 UnmappedItem: An item that cannot be mapped to its definition\n    \
-    Rule 1.9 UnparsableMacroExpansion: A macro expansion that does not parse\n    \
-    Rule 1.10 UnreachableSourceFile: A source file that no crate target includes\n    \
-    Rule 1.11 UnresolvedExternCrate: An extern crate that rust-analyzer cannot resolve\n    \
-    Rule 1.12 UnresolvedMacroCall: A macro call, attribute or derive whose macro rust-analyzer\n    \
-    cannot resolve\n    \
-    Rule 1.13 UnresolvedMethodCall: A method call that rust-analyzer cannot resolve\n    \
-    Rule 1.14 UnresolvedModule: A module declaration whose file rust-analyzer cannot resolve\n    \
-    Rule 1.15 UnresolvedPath: A path that rust-analyzer cannot resolve\n    \
-    Rule 1.16 UnsafeCode: Unsafe code in a crate that integrates no foreign code\n    \
-    Rule 1.17 DocTestsEnabled: A target whose doc tests are enabled\n    \
-    Rule 1.18 UndeclaredEnvironmentVariable: An env! or option_env! of a variable that nothing\n    \
-    declares\n  \
+    H001 ConfigurationSelectionMacro: A cfg_select! call\n    \
+    H002 FailedMacroExpansion: A macro call that fails to expand\n    \
+    H003 IncludedSourceFile: An include! of a file that is not a build script output\n    \
+    H004 InvalidMacroDefinition: A macro definition that is not valid\n    \
+    H005 ModuleFileInsideBlock: A module file declared inside a block\n    \
+    H006 SharedModuleFile: A module file included as several modules\n    \
+    H007 UnimplementedBuiltinMacro: A built-in macro that rust-analyzer cannot expand\n    \
+    H008 UnmappedItem: An item that cannot be mapped to its definition\n    \
+    H009 UnparsableMacroExpansion: A macro expansion that does not parse\n    \
+    H010 UnreachableSourceFile: A source file that no crate target includes\n    \
+    H011 UnresolvedExternCrate: An extern crate that rust-analyzer cannot resolve\n    \
+    H012 UnresolvedMacroCall: A macro call, attribute or derive whose macro rust-analyzer cannot\n    \
+    resolve\n    \
+    H013 UnresolvedMethodCall: A method call that rust-analyzer cannot resolve\n    \
+    H014 UnresolvedModule: A module declaration whose file rust-analyzer cannot resolve\n    \
+    H015 UnresolvedPath: A path that rust-analyzer cannot resolve\n    \
+    H016 UnsafeCode: Unsafe code in a crate that integrates no foreign code\n    \
+    H017 DocTestsEnabled: A target whose doc tests are enabled\n    \
+    H018 UndeclaredEnvironmentVariable: An env! or option_env! of a variable that nothing declares\n    \
+    H118 BuildScriptEnvironmentVariable: A variable that a member's build script sets for the\n    \
+    compiler\n  \
     2 Declared configurations\n    \
-    Rule 2.1 AttributeAppliedInNoConfiguration: A cfg_attr that applies in no declared configuration\n    \
-    Rule 2.2 CodeActiveInNoConfiguration: Code that no declared configuration builds\n    \
-    Rule 2.3 NegatedConfiguration: A cfg predicate that negates a feature, test or debug_assertions\n    \
-    Rule 2.4 VacuousNegatedConfiguration: A cfg predicate that negates a configuration no declared\n    \
+    H019 AttributeAppliedInNoConfiguration: A cfg_attr that applies in no declared configuration\n    \
+    H020 CodeActiveInNoConfiguration: Code that no declared configuration builds\n    \
+    H021 NegatedConfiguration: A cfg predicate that negates a feature, test or debug_assertions\n    \
+    H022 VacuousNegatedConfiguration: A cfg predicate that negates a configuration no declared\n    \
     configuration sets\n  \
     3 Lints and formatting\n    \
-    Rule 3.1 ClippyConfigurationAmbiguous: A directory that holds both clippy configuration files\n    \
-    Rule 3.2 ClippyConfigurationMissing: A workspace member without a clippy configuration\n    \
-    Rule 3.3 LintAllowedInManifest: A manifest lints table that allows a lint\n    \
-    Rule 3.4 LintSuppression: An attribute that suppresses or lowers lints over code written in the\n    \
+    H023 ClippyConfigurationAmbiguous: A directory that holds both clippy configuration files\n    \
+    H024 ClippyConfigurationMissing: A workspace member without a clippy configuration\n    \
+    H025 LintAllowedInManifest: A manifest lints table that allows a lint\n    \
+    H026 LintSuppression: An attribute that suppresses or lowers lints over code written in the\n    \
     workspace\n    \
-    Rule 3.5 RequiredClippySettingMissing: A clippy configuration without a required setting\n    \
-    Rule 3.6 RequiredLintNotDenied: A workspace member that leaves a required lint or lint group\n    \
-    below deny\n    \
-    Rule 3.7 RustVersionBelowSupported: A rust-version older than the supported Rust\n    \
-    Rule 3.8 RustfmtConfigurationAmbiguous: A directory with both rustfmt configuration files\n    \
-    Rule 3.9 RustfmtConfigurationInvalid: A rustfmt configuration that is not valid TOML\n    \
-    Rule 3.10 RustfmtConfigurationMissing: A workspace without a rustfmt configuration\n    \
-    Rule 3.11 RustfmtConfigurationUnreadable: A rustfmt configuration that cannot be read\n    \
-    Rule 3.12 ToolAttribute: An attribute of the clippy or rustfmt tool\n    \
-    Rule 3.13 UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n    \
-    Rule 3.14 UnvettedRustfmtSetting: A rustfmt configuration setting that Heisenberg has not vetted\n  \
+    H027 RequiredClippySettingMissing: A clippy configuration without a required setting\n    \
+    H028 RequiredLintNotDenied: A workspace member that leaves a required lint or lint group below\n    \
+    deny\n    \
+    H029 RustVersionBelowSupported: A rust-version older than the supported Rust\n    \
+    H030 RustfmtConfigurationAmbiguous: A directory with both rustfmt configuration files\n    \
+    H031 RustfmtConfigurationInvalid: A rustfmt configuration that is not valid TOML\n    \
+    H032 RustfmtConfigurationMissing: A workspace without a rustfmt configuration\n    \
+    H033 RustfmtConfigurationUnreadable: A rustfmt configuration that cannot be read\n    \
+    H034 ToolAttribute: An attribute of the clippy or rustfmt tool\n    \
+    H035 UnvettedClippySetting: A clippy configuration setting that Heisenberg has not vetted\n    \
+    H036 UnvettedRustfmtSetting: A rustfmt configuration setting that Heisenberg has not vetted\n  \
     4 Packages and dependencies\n    \
-    Rule 4.1 ConfinedPackageReachedOutsideItsUsers: A member that reaches a confined package without\n    \
+    H037 ConfinedPackageReachedOutsideItsUsers: A member that reaches a confined package without\n    \
     being one of its users\n    \
-    Rule 4.2 ConfinedPackageUserListedTwice: A confined package user listed more than once\n    \
-    Rule 4.3 ConfinedPackageUserNotAMember: A confined package user that is not a workspace member\n    \
-    Rule 4.4 ConfinedPackageUserNotReachingIt: A confined package user that never reaches the\n    \
-    package\n    \
-    Rule 4.5 PackageDependencyCycle: Packages that depend on each other through dev-dependencies\n    \
-    Rule 4.6 PackageDependsOnItself: A package that depends on itself through dev-dependencies\n    \
-    Rule 4.7 UnknownConfinedPackage: A confined package that the workspace does not resolve\n    \
-    Rule 4.8 UnpinnedDependencyRequirement: A dependency requirement that is not a MAJOR.MINOR\n    \
-    version or a git rev\n    \
-    Rule 4.9 TestDependencyInProduction: A production dependency that only test code uses\n    \
-    Rule 4.10 TestLibraryInProductionPackage: A test library declared by a production package\n    \
-    Rule 4.11 UnusedDependency: A dependency that no code uses\n    \
-    Rule 4.12 PathPackageOutsideWorkspace: A package built from a local path that is not a workspace\n    \
+    H038 ConfinedPackageUserListedTwice: A confined package user listed more than once\n    \
+    H039 ConfinedPackageUserNotAMember: A confined package user that is not a workspace member\n    \
+    H040 ConfinedPackageUserNotReachingIt: A confined package user that never reaches the package\n    \
+    H041 PackageDependencyCycle: Packages that depend on each other through dev-dependencies\n    \
+    H042 PackageDependsOnItself: A package that depends on itself through dev-dependencies\n    \
+    H043 UnknownConfinedPackage: A confined package that the workspace does not resolve\n    \
+    H044 UnpinnedDependencyRequirement: A dependency requirement that is not a MAJOR.MINOR version\n    \
+    or a git rev\n    \
+    H045 TestDependencyInProduction: A production dependency that only test code uses\n    \
+    H046 TestLibraryInProductionPackage: A test library declared by a production package\n    \
+    H047 UnusedDependency: A dependency that no code uses\n    \
+    H048 PathPackageOutsideWorkspace: A package built from a local path that is not a workspace\n    \
     member\n  \
     5 Modules and items\n    \
-    Rule 5.1 AdditionalPublicItem: A module with more than one public item\n    \
-    Rule 5.2 GlobImport: A glob import\n    \
-    Rule 5.3 ImplWithoutLocalType: An impl of another crate's trait with no home in this crate\n    \
-    Rule 5.4 ImportInsideBlock: An import written inside a block\n    \
-    Rule 5.5 ItemOutOfOrder: An item that follows an item of a later group\n    \
-    Rule 5.6 MethodOutOfOrder: A function of an impl block or trait that follows one it belongs\n    \
-    before\n    \
-    Rule 5.7 MisplacedBlanketImpl: A blanket impl outside the file of its trait\n    \
-    Rule 5.8 MisplacedForeignTypeImpl: A local trait's impl for a foreign type outside the trait's\n    \
-    file\n    \
-    Rule 5.9 MisplacedImpl: An impl block outside the file of the type it belongs to\n    \
-    Rule 5.10 MisplacedTraitObjectImpl: An impl for a trait object outside the file of its trait\n    \
-    Rule 5.11 ModuleCycle: Modules that depend on each other\n    \
-    Rule 5.12 ModuleNotNamedAfterItsItem: A module that is not named after its public item\n    \
-    Rule 5.13 NonConstantInConstantsModule: A public item other than a constant in crate::constants\n    \
-    Rule 5.14 PublicAssociatedConstant: A public associated constant of an inherent impl\n    \
-    Rule 5.15 PublicConstantOutsideConstantsModule: A public constant outside crate::constants\n    \
-    Rule 5.16 Reexport: A re-export\n    \
-    Rule 5.17 ItemMoreVisibleThanItsUses: An exported item that no other crate target uses\n  \
+    H049 AdditionalPublicItem: A module with more than one public item\n    \
+    H050 GlobImport: A glob import\n    \
+    H051 ImplWithoutLocalType: An impl of another crate's trait with no home in this crate\n    \
+    H052 ImportInsideBlock: An import written inside a block\n    \
+    H053 ItemOutOfOrder: An item that follows an item of a later group\n    \
+    H054 MethodOutOfOrder: A function of an impl block or trait that follows one it belongs before\n    \
+    H055 MisplacedBlanketImpl: A blanket impl outside the file of its trait\n    \
+    H056 MisplacedForeignTypeImpl: A local trait's impl for a foreign type outside the trait's file\n    \
+    H057 MisplacedImpl: An impl block outside the file of the type it belongs to\n    \
+    H058 MisplacedTraitObjectImpl: An impl for a trait object outside the file of its trait\n    \
+    H059 ModuleCycle: Modules that depend on each other\n    \
+    H060 ModuleNotNamedAfterItsItem: A module that is not named after its public item\n    \
+    H061 NonConstantInConstantsModule: A public item other than a constant in crate::constants\n    \
+    H062 PublicAssociatedConstant: A public associated constant of an inherent impl\n    \
+    H063 PublicConstantOutsideConstantsModule: A public constant outside crate::constants\n    \
+    H064 Reexport: A re-export\n    \
+    H065 ItemMoreVisibleThanItsUses: An exported item that no other crate target uses\n  \
     6 Names, data and functions\n    \
-    Rule 6.1 DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n    \
-    Rule 6.2 NonDocComment: A comment that is not a doc comment\n    \
-    Rule 6.3 PositionalFields: A struct or variant with two or more positional fields\n    \
-    Rule 6.4 ProceduralFunction: A function that takes a type of its crate without belonging to it\n    \
-    Rule 6.5 SingleLetterName: A parameter name of a single character\n    \
-    Rule 6.6 TupleInSignature: A tuple type in an item signature\n    \
-    Rule 6.7 UndestructuredParameter: A parameter used only through its fields\n    \
-    Rule 6.8 UnprefixedTypeParameter: A type parameter not named T followed by a capitalized word\n  \
+    H066 DuplicatedFunctionBody: Functions whose signatures and bodies are identical\n    \
+    H067 NonDocComment: A comment that is not a doc comment\n    \
+    H068 PositionalFields: A struct or variant with two or more positional fields\n    \
+    H069 ProceduralFunction: A function that takes a type of its crate without belonging to it\n    \
+    H070 SingleLetterName: A parameter name of a single character\n    \
+    H071 TupleInSignature: A tuple type in an item signature\n    \
+    H072 UndestructuredParameter: A parameter used only through its fields\n    \
+    H073 UnprefixedTypeParameter: A type parameter not named T followed by a capitalized word\n  \
     7 Error types\n    \
-    Rule 7.1 ErrorMessageFunction: An error message formatted by a function\n    \
-    Rule 7.2 ErrorMessageOnTheEnum: An error message written on the enum instead of its variants\n    \
-    Rule 7.3 ErrorSourceOutsideChain: An error held outside the source chain\n    \
-    Rule 7.4 ErrorTypeNotAnEnum: An error type deriving thiserror::Error that is not an enum\n    \
-    Rule 7.5 ErrorTypeOutsideItsModule: An error type outside a module file named after it\n    \
-    Rule 7.6 HandwrittenErrorDisplay: An error type that formats its message by hand\n    \
-    Rule 7.7 HandwrittenErrorType: An error type implemented by hand\n    \
-    Rule 7.8 MacroGeneratedErrorType: An error type implemented by a macro other than\n    \
-    thiserror::Error\n    \
-    Rule 7.9 MultipleErrorTypes: A crate with more than one error type\n    \
-    Rule 7.10 SourceInErrorMessage: An error message that formats its own source\n    \
-    Rule 7.11 UntypedResultError: A Result whose error type erases the failure\n    \
-    Rule 7.12 ResultErrorNotAnError: A Result whose error type is a workspace type that is not an\n    \
-    error\n    \
-    Rule 7.13 ErrorIssuedOutsideItsCrate: An error type returned or constructed by a crate that does\n    \
-    not own it\n  \
+    H074 ErrorMessageFunction: An error message formatted by a function\n    \
+    H075 ErrorMessageOnTheEnum: An error message written on the enum instead of its variants\n    \
+    H076 ErrorSourceOutsideChain: An error held outside the source chain\n    \
+    H077 ErrorTypeNotAnEnum: An error type deriving thiserror::Error that is not an enum\n    \
+    H078 ErrorTypeOutsideItsModule: An error type outside a module file named after it\n    \
+    H079 HandwrittenErrorDisplay: An error type that formats its message by hand\n    \
+    H080 HandwrittenErrorType: An error type implemented by hand\n    \
+    H081 MacroGeneratedErrorType: An error type implemented by a macro other than thiserror::Error\n    \
+    H082 MultipleErrorTypes: A crate with more than one error type\n    \
+    H083 SourceInErrorMessage: An error message that formats its own source\n    \
+    H084 UntypedResultError: A Result whose error type erases the failure\n    \
+    H085 ResultErrorNotAnError: A Result whose error type is a workspace type that is not an error\n    \
+    H086 ErrorIssuedOutsideItsCrate: An error type returned or constructed by a crate that does not\n    \
+    own it\n  \
     8 Tests\n    \
-    Rule 8.1 IgnoredTest: A test that the test run skips\n    \
-    Rule 8.2 ItemUsedOnlyByTests: A production item that only tests use\n    \
-    Rule 8.3 NextestConfigurationMissing: A workspace without a nextest configuration\n    \
-    Rule 8.4 NextestOverride: A per-test override in the nextest configuration\n    \
-    Rule 8.5 NextestTimeoutNotEnforced: A nextest profile whose slow-timeout exceeds the limits\n    \
-    Rule 8.6 NonTestItemInTestTarget: An integration test item that is neither a test nor a\n    \
-    file-local helper\n    \
-    Rule 8.7 PublishableTestCrate: A declared test crate that can be published\n    \
-    Rule 8.8 ReferencedTest: A test that other code references\n    \
-    Rule 8.9 SplitIntegrationTests: Integration tests spread over several targets or discovered\n    \
+    H087 IgnoredTest: A test that the test run skips\n    \
+    H088 ItemUsedOnlyByTests: A production item that only tests use\n    \
+    H089 NextestConfigurationMissing: A workspace without a nextest configuration\n    \
+    H090 NextestOverride: A per-test override in the nextest configuration\n    \
+    H091 NextestTimeoutNotEnforced: A nextest profile whose slow-timeout exceeds the limits\n    \
+    H092 NonTestItemInTestTarget: An integration test item that is neither a test nor a file-local\n    \
+    helper\n    \
+    H093 PublishableTestCrate: A declared test crate that can be published\n    \
+    H094 ReferencedTest: A test that other code references\n    \
+    H095 SplitIntegrationTests: Integration tests spread over several targets or discovered\n    \
     automatically\n    \
-    Rule 8.10 TestCrateDeclaredTwice: A test crate listed more than once\n    \
-    Rule 8.11 TestCrateNotAMember: A declared test crate that is not a workspace member\n    \
-    Rule 8.12 TestCrateUsedByProduction: A declared test crate that production code depends on\n    \
-    Rule 8.13 TestModuleInItsOwnFile: A test module declared in a file of its own\n    \
-    Rule 8.14 TestModuleNotNamedTests: A test module that is not named tests\n    \
-    Rule 8.15 TestOnlyCodeInProduction: Code that depends on cfg(test) outside a test module\n    \
-    Rule 8.16 TestOutsideTestModule: A test written outside a test module\n    \
-    Rule 8.17 TestsOnlyPackageWithoutTestLibraries: A package of tests that holds no test library of\n    \
-    its own\n    \
-    Rule 8.18 UnneededNextestConfiguration: A nextest configuration in a workspace without libtest\n    \
-    tests\n    \
-    Rule 8.19 UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n  \
+    H096 TestCrateDeclaredTwice: A test crate listed more than once\n    \
+    H097 TestCrateNotAMember: A declared test crate that is not a workspace member\n    \
+    H098 TestCrateUsedByProduction: A declared test crate that production code depends on\n    \
+    H099 TestModuleInItsOwnFile: A test module declared in a file of its own\n    \
+    H100 TestModuleNotNamedTests: A test module that is not named tests\n    \
+    H101 TestOnlyCodeInProduction: Code that depends on cfg(test) outside a test module\n    \
+    H102 TestOutsideTestModule: A test written outside a test module\n    \
+    H103 TestsOnlyPackageWithoutTestLibraries: A package of tests that holds no test library of its\n    \
+    own\n    \
+    H104 UnneededNextestConfiguration: A nextest configuration in a workspace without libtest tests\n    \
+    H105 UnvettedNextestSetting: A nextest configuration setting that Heisenberg has not vetted\n  \
     9 Benchmarks\n    \
-    Rule 9.1 BenchmarkTargetExcludedFromBenchmarks: A benchmark target that cargo bench never runs\n    \
-    Rule 9.2 BenchmarkTargetRunByTests: A benchmark target that the test run runs\n    \
-    Rule 9.3 BenchmarkTargetWithLibtestHarness: A benchmark target built with libtest's harness\n    \
-    Rule 9.4 BenchmarkTargetWithoutCriterionBenchmark: A benchmark target that registers no\n    \
-    criterion benchmark\n    \
-    Rule 9.5 BenchmarksOnlyPackageWithoutLibraries: A package of benchmarks that holds no library of\n    \
-    its own\n    \
-    Rule 9.6 ItemUsedOnlyByBenchmarks: A production item that only benchmarks use\n    \
-    Rule 9.7 MustUseBenchmarkOutput: A measured routine whose must-use result criterion drops\n    \
-    Rule 9.8 NonBenchmarkItemInBenchmarkTarget: A benchmark target item that is neither its entry\n    \
-    point nor a file-local helper\n    \
-    Rule 9.9 UndeterminedBenchmarkOutput: A measured routine whose return type the analysis cannot\n    \
+    H106 BenchmarkTargetExcludedFromBenchmarks: A benchmark target that cargo bench never runs\n    \
+    H107 BenchmarkTargetRunByTests: A benchmark target that the test run runs\n    \
+    H108 BenchmarkTargetWithLibtestHarness: A benchmark target built with libtest's harness\n    \
+    H109 BenchmarkTargetWithoutCriterionBenchmark: A benchmark target that registers no criterion\n    \
+    benchmark\n    \
+    H110 BenchmarksOnlyPackageWithoutLibraries: A package of benchmarks that holds no library of its\n    \
+    own\n    \
+    H111 ItemUsedOnlyByBenchmarks: A production item that only benchmarks use\n    \
+    H112 MustUseBenchmarkOutput: A measured routine whose must-use result criterion drops\n    \
+    H113 NonBenchmarkItemInBenchmarkTarget: A benchmark target item that is neither its entry point\n    \
+    nor a file-local helper\n    \
+    H114 UndeterminedBenchmarkOutput: A measured routine whose return type the analysis cannot\n    \
     determine\n    \
-    Rule 9.10 UnvettedCriterionMethod: A criterion method that Heisenberg has not vetted\n\
+    H115 UnvettedCriterionMethod: A criterion method that Heisenberg has not vetted\n\
     \n\
     Run `heisenberg explain <ISSUE_TYPE>` for the definition of a rule, why it exists and how to satisfy\n\
     it, and `heisenberg catalogue` for the scope and the evaluation of every rule.\n\

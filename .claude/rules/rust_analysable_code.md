@@ -2,6 +2,7 @@
 kind: rule
 section: 1
 enforced_by:
+  - BuildScriptEnvironmentVariable
   - ConfigurationSelectionMacro
   - DocTestsEnabled
   - FailedMacroExpansion
@@ -35,4 +36,5 @@ Every statement is mandatory and is decided by the Heisenberg check named after 
 - Every `.rs` file of a workspace member is a module file of a crate target. [UnreachableSourceFile]
 - No unsafe code, except in a crate target whose production code integrates foreign code. Unsafe code is counted wherever the workspace wrote it: in module files, in the expansion of its macros and in its build script output; `global_asm!` and an unmarked `no_mangle`, `export_name` or `link_section` are unsafe code. [UnsafeCode]
 - `env!` and `option_env!` name only variables that cargo, the `[env]` table of the cargo configuration or the build script of the package declares. [UndeclaredEnvironmentVariable]
+- A workspace member's build script sets no environment variable for the compiler, since such a variable reaches clippy as well: a value the build script computes is written into a file in `OUT_DIR` and brought in with `include!`, and a fixed value is declared in the `[env]` table. [BuildScriptEnvironmentVariable]
 - No target has doc tests enabled: a doc test is code inside a comment that no analysis reads. Code that must compile lives in an example or a test. [DocTestsEnabled]

@@ -1,13 +1,21 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use cargo_metadata::Package;
+use cargo_metadata::Target;
+use cargo_metadata::TargetKind;
 use guppy::graph::cargo::CargoResolverVersion;
 use ra_ap_paths::Utf8Path;
 use serde_json::Value;
 use serde_json::json;
 
+use heisenberg_workspace_build::build_script_output::BuildScriptOutput;
+
+use crate::build_script_origin::BuildScriptOrigin;
+use crate::build_script_variables::BuildScriptVariables;
 use crate::build_selection::BuildSelection;
 use crate::command_line_feature_scope::CommandLineFeatureScope;
+use crate::configuration::Configuration;
 use crate::dependency_document::DependencyDocument;
 use crate::member_target::MemberTarget;
 use crate::package_document::PackageDocument;
@@ -26,6 +34,64 @@ pub struct ResolvedPackages {
 }
 
 impl ResolvedPackages {
+    #[must_use]
+    pub fn build_script_variables(
+        &self,
+        emitted: &BTreeMap<&Configuration, &BTreeMap<String, BTreeSet<String>>>,
+        declared: &BTreeMap<Configuration, BTreeMap<String, BuildScriptOutput>>,
+    ) -> Vec<BuildScriptVariables> {
+        let workspace_path = &self.workspace_path();
+
+        self.members()
+            .flat_map(
+                |PackageDocument {
+                     metadata:
+                         Package {
+                             id, name, targets, ..
+                         },
+                     ..
+                 }| {
+                    targets
+                        .iter()
+                        .filter(|Target { kind, .. }| kind.contains(&TargetKind::CustomBuild))
+                        .filter_map(move |Target { src_path, .. }| {
+                            let mut configurations = BTreeSet::new();
+                            let mut variables = BTreeSet::new();
+
+                            for (configuration, packages) in emitted {
+                                if let Some(names) = packages.get(&id.repr) {
+                                    configurations.insert((*configuration).clone());
+                                    variables.extend(names.iter().cloned());
+                                }
+                            }
+
+                            (!variables.is_empty()).then(|| {
+                                let substituted = declared
+                                    .values()
+                                    .any(|outputs| outputs.contains_key(&id.repr));
+
+                                BuildScriptVariables {
+                                    configurations,
+                                    file: if substituted {
+                                        workspace_path.manifest()
+                                    } else {
+                                        workspace_path.relative(src_path)
+                                    },
+                                    origin: if substituted {
+                                        BuildScriptOrigin::Declared
+                                    } else {
+                                        BuildScriptOrigin::Run
+                                    },
+                                    package: name.to_string(),
+                                    variables,
+                                }
+                            })
+                        })
+                },
+            )
+            .collect()
+    }
+
     pub fn member_named(&self, name: &str) -> Option<&PackageDocument> {
         self.named(name)
             .find(|PackageDocument { is_member, .. }| *is_member)

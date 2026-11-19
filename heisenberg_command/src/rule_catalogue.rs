@@ -16,26 +16,26 @@ use crate::issue_type::IssueType;
 use crate::rule_section::RuleSection;
 
 pub struct RuleCatalogue {
-    pub sections: BTreeMap<RuleSection, BTreeMap<u8, IssueType>>,
+    pub sections: BTreeMap<RuleSection, BTreeMap<u16, IssueType>>,
 }
 
 impl RuleCatalogue {
     #[must_use]
     pub fn new(includes: fn(&IssueType) -> bool) -> Self {
-        let mut sections: BTreeMap<RuleSection, BTreeMap<u8, IssueType>> = BTreeMap::new();
+        let mut sections: BTreeMap<RuleSection, BTreeMap<u16, IssueType>> = BTreeMap::new();
 
         for issue_type in IssueType::value_variants()
             .iter()
             .filter(|issue_type| includes(issue_type))
         {
             let IssueText {
-                ordinal, section, ..
+                number, section, ..
             } = issue_type.text();
 
             sections
                 .entry(section)
                 .or_default()
-                .insert(ordinal, *issue_type);
+                .insert(number, *issue_type);
         }
 
         Self { sections }
@@ -115,6 +115,7 @@ impl RuleCatalogue {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::collections::BTreeSet;
 
     use clap::ValueEnum;
 
@@ -127,8 +128,9 @@ mod tests {
             RuleCatalogue::new(|_| true)
                 .sections
                 .values()
-                .map(BTreeMap::len)
-                .sum::<usize>(),
+                .flat_map(BTreeMap::keys)
+                .collect::<BTreeSet<&u16>>()
+                .len(),
             IssueType::value_variants().len()
         );
     }

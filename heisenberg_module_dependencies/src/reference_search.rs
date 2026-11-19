@@ -38,6 +38,11 @@ struct AssignmentSide {
     operator: ast::BinaryOp,
 }
 
+struct CapturedReference {
+    file: FileId,
+    reference: FoundReference,
+}
+
 pub struct ReferenceSearch<'search, 'database> {
     pub file_modules: &'search HashMap<FileId, Vec<Module>>,
     pub semantics: &'search Semantics<'database, RootDatabase>,
@@ -47,6 +52,29 @@ pub struct ReferenceSearch<'search, 'database> {
 }
 
 impl<'database> ReferenceSearch<'_, 'database> {
+    pub fn finds(
+        &self,
+        definition: Definition<'database>,
+        first_file: FileId,
+        accepts: impl Fn(&FoundReference) -> bool,
+    ) -> bool {
+        definition
+            .name(self.semantics.db)
+            .zip(self.scope(definition))
+            .is_some_and(|(name, scope)| {
+                let written = name.as_str();
+
+                [written.to_owned(), format!("r#{written}")]
+                    .iter()
+                    .any(|spelling| {
+                        self.finds_named(definition, spelling, &scope, first_file, &accepts)
+                    })
+                    || self
+                        .captures(definition, written, &scope)
+                        .any(|CapturedReference { reference, .. }| accepts(&reference))
+            })
+    }
+
     pub fn references(
         &self,
         definition: Definition<'database>,
@@ -67,6 +95,82 @@ impl<'database> ReferenceSearch<'_, 'database> {
             (Definition::TypeAlias(alias), Definition::Adt(adt))
                 if alias.ty(database) == adt.ty(database)
         )
+    }
+
+    fn captures(
+        &self,
+        definition: Definition<'database>,
+        written: &str,
+        scope: &ReferenceScope,
+    ) -> impl Iterator<Item = CapturedReference> {
+        self.tokens
+            .strings
+            .iter()
+            .filter(|(file, _)| self.is_file_in_scope(scope, **file))
+            .flat_map(move |(file, sites)| {
+                sites.iter().filter_map(move |StringSite { offset, text }| {
+                    (text.contains(written)
+                        && self.is_in_scope(
+                            scope,
+                            &TokenSite {
+                                file: *file,
+                                offset: *offset,
+                            },
+                        ))
+                    .then(|| self.token(*file, *offset, text))
+                    .flatten()
+                    .filter(|token| {
+                        self.template_captures
+                            .captures(token)
+                            .contains(&Some(definition))
+                    })
+                    .and_then(ast::String::cast)
+                    .map(|string| {
+                        let range = string.syntax().text_range();
+
+                        CapturedReference {
+                            file: *file,
+                            reference: FoundReference {
+                                name: FileReferenceNode::FormatStringEntry(string, range),
+                                writes: false,
+                            },
+                        }
+                    })
+                })
+            })
+    }
+
+    fn finds_named(
+        &self,
+        definition: Definition<'database>,
+        spelling: &str,
+        scope: &ReferenceScope,
+        first_file: FileId,
+        accepts: &impl Fn(&FoundReference) -> bool,
+    ) -> bool {
+        let sites = self
+            .tokens
+            .names
+            .get(spelling)
+            .map_or(&[][..], Vec::as_slice);
+
+        sites
+            .iter()
+            .filter(|TokenSite { file, .. }| *file == first_file)
+            .chain(
+                sites
+                    .iter()
+                    .filter(|TokenSite { file, .. }| *file != first_file),
+            )
+            .filter(|site| self.is_in_scope(scope, site))
+            .any(|TokenSite { file, offset }| {
+                self.token(*file, *offset, spelling).is_some_and(|token| {
+                    self.nodes(*file, token).iter().any(|named| {
+                        self.reference(definition, named, false)
+                            .is_some_and(|reference| accepts(&reference))
+                    })
+                })
+            })
     }
 
     fn found(
@@ -232,38 +336,8 @@ impl<'database> ReferenceSearch<'_, 'database> {
         scope: &ReferenceScope,
         FoundReferences { by_file }: &mut FoundReferences,
     ) {
-        for (file, sites) in self
-            .tokens
-            .strings
-            .iter()
-            .filter(|(file, _)| self.is_file_in_scope(scope, **file))
-        {
-            for StringSite { offset, text } in sites {
-                if text.contains(written)
-                    && self.is_in_scope(
-                        scope,
-                        &TokenSite {
-                            file: *file,
-                            offset: *offset,
-                        },
-                    )
-                    && let Some(string) = self
-                        .token(*file, *offset, text)
-                        .filter(|token| {
-                            self.template_captures
-                                .captures(token)
-                                .contains(&Some(definition))
-                        })
-                        .and_then(ast::String::cast)
-                {
-                    let range = string.syntax().text_range();
-
-                    by_file.entry(*file).or_default().push(FoundReference {
-                        name: FileReferenceNode::FormatStringEntry(string, range),
-                        writes: false,
-                    });
-                }
-            }
+        for CapturedReference { file, reference } in self.captures(definition, written, scope) {
+            by_file.entry(file).or_default().push(reference);
         }
     }
 
