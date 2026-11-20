@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fs;
-use std::str;
 use std::sync::Arc;
 
 use ra_ap_paths::AbsPath;
@@ -14,6 +13,7 @@ use ra_ap_vfs::VfsPath;
 
 use heisenberg_task_graph::once_map::OnceMap;
 
+use crate::checked_source_text::checked_source_text;
 use crate::constants::CARGO_MANIFEST_FILE;
 use crate::constants::RUST_SOURCE_EXTENSION;
 use crate::project_model_error::ProjectModelError;
@@ -22,30 +22,20 @@ use crate::workspace_path::WorkspacePath;
 
 fn checked_text(path: &AbsPath) -> Result<(), Arc<ProjectModelError>> {
     fs::read(path)
-        .map_err(|source| ProjectModelError::SourceFileUnreadable {
-            path: path.to_path_buf(),
-            source,
-        })
-        .and_then(|bytes| {
-            str::from_utf8(&bytes).map(drop).map_err(|source| {
-                ProjectModelError::SourceFileNotUtf8 {
-                    path: path.to_path_buf(),
-                    source,
-                }
+        .map_err(|source| {
+            Arc::new(ProjectModelError::SourceFileUnreadable {
+                path: path.to_path_buf(),
+                source,
             })
         })
-        .map_err(Arc::new)
+        .and_then(|bytes| checked_source_text(path, &bytes))
 }
 
 fn recorded_text_check(
     text_checks: &OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
     real_path: &AbsPath,
 ) -> Result<(), Arc<ProjectModelError>> {
-    text_checks.get_or_init(real_path.to_path_buf(), text_check(real_path))
-}
-
-fn text_check(real_path: &AbsPath) -> impl FnOnce() -> Result<(), Arc<ProjectModelError>> + '_ {
-    move || checked_text(real_path)
+    text_checks.get_or_init(real_path.to_path_buf(), || checked_text(real_path))
 }
 
 pub struct SourceFiles {
@@ -128,17 +118,6 @@ impl SourceFiles {
             .map(|SourceFile { relative_path, .. }| relative_path.clone())
             .collect()
     }
-
-    pub(crate) fn check_texts(
-        vfs: &Vfs,
-        text_checks: &OnceMap<AbsPathBuf, Result<(), Arc<ProjectModelError>>>,
-    ) {
-        vfs.iter()
-            .filter_map(|(_, path)| path.as_path())
-            .for_each(|real_path| {
-                text_checks.initialize(real_path.to_path_buf(), text_check(real_path));
-            });
-    }
 }
 
 #[cfg(test)]
@@ -149,6 +128,7 @@ mod tests {
     use std::io;
     use std::io::ErrorKind;
     use std::mem;
+    use std::process;
 
     use ra_ap_paths::AbsPathBuf;
     use ra_ap_vfs::Vfs;
@@ -158,6 +138,32 @@ mod tests {
 
     use super::SourceFiles;
     use crate::project_model_error::ProjectModelError;
+
+    #[test]
+    fn unchecked_source_file_that_is_not_utf8_fails_the_source_files() {
+        let directory = AbsPathBuf::assert_utf8(env::temp_dir());
+        let not_utf8 = directory.join(format!(
+            "heisenberg_unchecked_source_file_{}.rs",
+            process::id()
+        ));
+        let mut vfs = Vfs::default();
+
+        fs::write(&not_utf8, [0xFF]).expect("the non-UTF-8 source file must be written");
+        vfs.set_file_contents(VfsPath::from(not_utf8.clone()), Some(Vec::new()));
+
+        let failure = SourceFiles::new(&vfs, &directory, &OnceMap::default())
+            .err()
+            .map(|error| error.to_string());
+
+        fs::remove_file(&not_utf8).expect("the non-UTF-8 source file must be removed");
+
+        assert_eq!(
+            failure,
+            Some(format!(
+                "`{not_utf8}` is not UTF-8, so rust-analyzer loads it without text"
+            ))
+        );
+    }
 
     #[test]
     fn virtual_source_file_fails_the_source_files() {

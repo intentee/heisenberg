@@ -9,6 +9,7 @@ cargo-platform = { workspace = true }
 cargo-util-schemas = { workspace = true }
 cargo-util-terminal = { workspace = true }
 cargo_metadata = { workspace = true }
+crossbeam-channel = { workspace = true }
 guppy = { workspace = true }
 heisenberg_analysis_threads = { workspace = true }
 heisenberg_graph_cycles = { workspace = true }
@@ -26,6 +27,7 @@ ra_ap_proc_macro_api = { workspace = true }
 ra_ap_project_model = { workspace = true }
 ra_ap_toolchain = { workspace = true }
 ra_ap_vfs = { workspace = true }
+ra_ap_vfs-notify = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

@@ -7,13 +7,11 @@ use cargo_metadata::camino::Utf8PathBuf;
 use ra_ap_cfg::CfgAtom;
 use ra_ap_cfg::CfgDiff;
 use ra_ap_ide_db::FxHashMap;
+use ra_ap_ide_db::RootDatabase;
 use ra_ap_ide_db::base_db::Env;
 use ra_ap_ide_db::base_db::target::Arch;
 use ra_ap_ide_db::base_db::target::TargetData;
 use ra_ap_intern::sym;
-use ra_ap_load_cargo::LoadCargoConfig;
-use ra_ap_load_cargo::ProcMacroServerChoice;
-use ra_ap_load_cargo::load_workspace;
 use ra_ap_paths::AbsPathBuf;
 use ra_ap_proc_macro_api::ProcMacroClient;
 use ra_ap_project_model::CargoWorkspace;
@@ -39,7 +37,7 @@ use crate::project_model_error::ProjectModelError;
 use crate::resolved_build::ResolvedBuild;
 use crate::run_context::RunContext;
 use crate::run_scope::RunScope;
-use crate::source_files::SourceFiles;
+use crate::source_load::SourceLoad;
 use crate::supported_target::SupportedTarget;
 use crate::target_cfg::TargetCfg;
 use crate::target_model::TargetModel;
@@ -160,37 +158,27 @@ impl ResolvedProject<'_> {
                             target.sysroot.clone(),
                         )
                     })
-                    .and_then(|workspace| {
-                        load_workspace(
-                            workspace.clone(),
-                            &FxHashMap::default(),
-                            &LoadCargoConfig {
-                                load_out_dirs_from_check: false,
-                                num_worker_threads: 1,
-                                prefill_caches: false,
-                                proc_macro_processes: 0,
-                                with_proc_macro_server: ProcMacroServerChoice::None,
-                            },
-                        )
-                        .map_err(Into::into)
-                        .map_err(ProjectModelError::WorkspaceLoad)
-                        .map(|(database, vfs, _)| {
-                            SourceFiles::check_texts(&vfs, &self.source_text_checks);
+                    .map(|workspace| {
+                        let mut database = RootDatabase::new(None);
+                        let vfs = SourceLoad {
+                            text_checks: &self.source_text_checks,
+                            workspace: &workspace,
+                        }
+                        .load(&mut database);
 
-                            LoadedWorkspace {
-                                build,
-                                build_script_contents: &self.build_script_contents,
-                                database,
-                                jobs: self.run.jobs,
-                                packages: &self.packages,
-                                proc_macro_server: &self.proc_macro_server,
-                                source_text_checks: &self.source_text_checks,
-                                target: Arc::clone(target),
-                                vfs,
-                                workspace,
-                                workspace_root: &self.project.resolved.workspace.root,
-                            }
-                        })
+                        LoadedWorkspace {
+                            build,
+                            build_script_contents: &self.build_script_contents,
+                            database,
+                            jobs: self.run.jobs,
+                            packages: &self.packages,
+                            proc_macro_server: &self.proc_macro_server,
+                            source_text_checks: &self.source_text_checks,
+                            target: Arc::clone(target),
+                            vfs,
+                            workspace,
+                            workspace_root: &self.project.resolved.workspace.root,
+                        }
                     })
             })
     }

@@ -479,6 +479,4 @@ pub enum ProjectModelError {
     VirtualSourceFile(VfsPath),
     #[error("the workspace manifest `{0}` has no parent directory")]
     WorkspaceManifestPath(AbsPathBuf),
-    #[error("rust-analyzer cannot load the workspace for the target")]
-    WorkspaceLoad(#[source] Box<dyn Error + Send + Sync>),
 }

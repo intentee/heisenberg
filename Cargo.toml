@@ -192,6 +192,7 @@ cargo-util-schemas = "0.14"
 cargo-util-terminal = "0.1"
 cargo_metadata = "0.23"
 clap = { version = "4.6", features = ["derive", "env"] }
+crossbeam-channel = "0.5"
 filetime = "0.2"
 guppy = { version = "0.19", features = ["custom-cfg-platforms"] }
 heisenberg_absolute_path = { version = "0.1", path = "heisenberg_absolute_path" }
@@ -231,6 +232,7 @@ ra_ap_syntax = "0.0.358"
 ra_ap_syntax-bridge = "0.0.358"
 ra_ap_toolchain = "0.0.358"
 ra_ap_vfs = "0.0.358"
+ra_ap_vfs-notify = "0.0.358"
 rayon = "1.12"
 salsa = { version = "0.28", default-features = false, features = ["inventory", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
