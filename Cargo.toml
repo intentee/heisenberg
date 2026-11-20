@@ -147,7 +147,7 @@ cfgs = []
 env = {}
 
 [workspace.metadata.heisenberg.out_dirs.libz-sys]
-version = "1.1.32"
+version = "1.1.33"
 
 [workspace.metadata.heisenberg.out_dirs.libz-sys.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/libz-sys/x86_64-pc-windows-msvc"
