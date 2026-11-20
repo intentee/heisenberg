@@ -6,6 +6,7 @@ use ra_ap_hir::Adt;
 use ra_ap_hir::InFile;
 use ra_ap_hir::Local;
 use ra_ap_hir::Module;
+use ra_ap_hir::Name;
 use ra_ap_hir::Semantics;
 use ra_ap_hir::Visibility;
 use ra_ap_ide_db::RootDatabase;
@@ -14,8 +15,10 @@ use ra_ap_ide_db::defs::Definition;
 use ra_ap_ide_db::defs::NameClass;
 use ra_ap_ide_db::defs::NameRefClass;
 use ra_ap_ide_db::search::FileReferenceNode;
+use ra_ap_intern::sym;
 use ra_ap_syntax::AstNode;
 use ra_ap_syntax::AstToken;
+use ra_ap_syntax::SyntaxKind;
 use ra_ap_syntax::SyntaxNode;
 use ra_ap_syntax::SyntaxToken;
 use ra_ap_syntax::TextSize;
@@ -26,11 +29,8 @@ use crate::found_reference::FoundReference;
 use crate::found_references::FoundReferences;
 use crate::reference_scope::ReferenceScope;
 use crate::searched_tokens::SearchedTokens;
-use crate::string_site::StringSite;
 use crate::template_captures::TemplateCaptures;
 use crate::token_site::TokenSite;
-
-const SELF_TYPE: &str = "Self";
 
 struct AssignmentSide {
     expression: ast::BinExpr,
@@ -43,8 +43,8 @@ struct LocatedReference {
 }
 
 struct SearchTarget {
+    name: Name,
     scope: ReferenceScope,
-    spellings: [String; 2],
 }
 
 pub struct ReferenceSearch<'search, 'database> {
@@ -100,25 +100,17 @@ impl<'database> ReferenceSearch<'_, 'database> {
     fn captures(
         &self,
         definition: Definition<'database>,
-        written: &str,
+        name: &Name,
         scope: &ReferenceScope,
     ) -> impl Iterator<Item = LocatedReference> {
         self.tokens
-            .strings
+            .captures
+            .get(name)
+            .map_or(&[][..], Vec::as_slice)
             .iter()
-            .filter(|(file, _)| self.is_file_in_scope(scope, **file))
-            .flat_map(move |(file, sites)| {
-                sites.iter().filter_map(move |StringSite { offset, text }| {
-                    (text.contains(written)
-                        && self.is_in_scope(
-                            scope,
-                            &TokenSite {
-                                file: *file,
-                                offset: *offset,
-                            },
-                        ))
-                    .then(|| self.token(*file, *offset, text))
-                    .flatten()
+            .filter(move |site| self.is_in_scope(scope, **site))
+            .filter_map(move |TokenSite { file, offset }| {
+                self.token(*file, *offset, |token| token.kind() == SyntaxKind::STRING)
                     .filter(|token| {
                         self.template_captures
                             .captures(token)
@@ -136,7 +128,6 @@ impl<'database> ReferenceSearch<'_, 'database> {
                             },
                         }
                     })
-                })
             })
     }
 
@@ -167,11 +158,11 @@ impl<'database> ReferenceSearch<'_, 'database> {
         }
     }
 
-    fn is_in_scope(&self, scope: &ReferenceScope, TokenSite { file, offset }: &TokenSite) -> bool {
-        self.is_file_in_scope(scope, *file)
+    fn is_in_scope(&self, scope: &ReferenceScope, TokenSite { file, offset }: TokenSite) -> bool {
+        self.is_file_in_scope(scope, file)
             && match scope {
                 ReferenceScope::Crates(_) | ReferenceScope::ModuleTree(_) => true,
-                ReferenceScope::Range { range, .. } => range.contains_inclusive(*offset),
+                ReferenceScope::Range { range, .. } => range.contains_inclusive(offset),
             }
     }
 
@@ -202,20 +193,15 @@ impl<'database> ReferenceSearch<'_, 'database> {
     fn located<'located>(
         &'located self,
         definition: Definition<'database>,
-        SearchTarget { scope, spellings }: &'located SearchTarget,
+        SearchTarget { name, scope }: &'located SearchTarget,
         with_self_references: bool,
     ) -> impl Iterator<Item = LocatedReference> {
-        let [written, _] = spellings;
-
-        spellings
-            .iter()
-            .flat_map(move |spelling| {
-                self.nodes_named(spelling, scope).filter_map(move |named| {
-                    self.reference(definition, &named, with_self_references)
-                        .map(|reference| self.located_at(&named, reference))
-                })
+        self.nodes_named(name.clone(), scope)
+            .filter_map(move |named| {
+                self.reference(definition, &named, with_self_references)
+                    .map(|reference| self.located_at(&named, reference))
             })
-            .chain(self.captures(definition, written, scope))
+            .chain(self.captures(definition, name, scope))
             .chain(
                 match definition {
                     Definition::Adt(adt) if with_self_references => Some(adt),
@@ -223,19 +209,20 @@ impl<'database> ReferenceSearch<'_, 'database> {
                 }
                 .into_iter()
                 .flat_map(move |adt| {
-                    self.nodes_named(SELF_TYPE, scope).filter_map(move |named| {
-                        ast::NameRef::cast(named.clone())
-                            .filter(|name_ref| self.names_type_of(name_ref, adt))
-                            .map(|name_ref| {
-                                self.located_at(
-                                    &named,
-                                    FoundReference {
-                                        name: FileReferenceNode::NameRef(name_ref),
-                                        writes: false,
-                                    },
-                                )
-                            })
-                    })
+                    self.nodes_named(Name::new_symbol_root(sym::Self_), scope)
+                        .filter_map(move |named| {
+                            ast::NameRef::cast(named.clone())
+                                .filter(|name_ref| self.names_type_of(name_ref, adt))
+                                .map(|name_ref| {
+                                    self.located_at(
+                                        &named,
+                                        FoundReference {
+                                            name: FileReferenceNode::NameRef(name_ref),
+                                            writes: false,
+                                        },
+                                    )
+                                })
+                        })
                 }),
             )
     }
@@ -276,16 +263,8 @@ impl<'database> ReferenceSearch<'_, 'database> {
         }
     }
 
-    fn nodes_named(
-        &self,
-        spelling: &str,
-        scope: &ReferenceScope,
-    ) -> impl Iterator<Item = SyntaxNode> {
-        let sites = self
-            .tokens
-            .names
-            .get(spelling)
-            .map_or(&[][..], Vec::as_slice);
+    fn nodes_named(&self, name: Name, scope: &ReferenceScope) -> impl Iterator<Item = SyntaxNode> {
+        let sites = self.tokens.names.get(&name).map_or(&[][..], Vec::as_slice);
 
         sites
             .iter()
@@ -295,9 +274,9 @@ impl<'database> ReferenceSearch<'_, 'database> {
                     .iter()
                     .filter(move |TokenSite { file, .. }| *file != self.home_file),
             )
-            .filter(move |site| self.is_in_scope(scope, site))
+            .filter(move |site| self.is_in_scope(scope, **site))
             .filter_map(move |TokenSite { file, offset }| {
-                self.token(*file, *offset, spelling)
+                self.token(*file, *offset, |token| Name::new_root(token.text()) == name)
                     .map(|token| self.nodes(*file, token))
             })
             .flatten()
@@ -379,17 +358,15 @@ impl<'database> ReferenceSearch<'_, 'database> {
         definition
             .name(self.semantics.db)
             .zip(self.scope(definition))
-            .map(|(name, scope)| {
-                let written = name.as_str();
-
-                SearchTarget {
-                    scope,
-                    spellings: [written.to_owned(), format!("r#{written}")],
-                }
-            })
+            .map(|(name, scope)| SearchTarget { name, scope })
     }
 
-    fn token(&self, file: FileId, offset: TextSize, spelling: &str) -> Option<SyntaxToken> {
+    fn token(
+        &self,
+        file: FileId,
+        offset: TextSize,
+        accepts: impl Fn(&SyntaxToken) -> bool,
+    ) -> Option<SyntaxToken> {
         self.trees
             .borrow_mut()
             .entry(file)
@@ -400,7 +377,7 @@ impl<'database> ReferenceSearch<'_, 'database> {
                     .clone()
             })
             .token_at_offset(offset)
-            .find(|token| token.text_range().start() == offset && token.text() == spelling)
+            .find(|token| token.text_range().start() == offset && accepts(token))
     }
 
     fn writes(named: &Definition<'_>, name_ref: &ast::NameRef) -> bool {

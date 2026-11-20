@@ -85,7 +85,6 @@ mod signature_scope;
 mod signature_tuple;
 mod standard_item;
 mod standard_items;
-mod string_site;
 mod substituted_resolution;
 mod subtree;
 mod subtree_origin;
