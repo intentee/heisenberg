@@ -1,13 +1,93 @@
+use std::cell::Cell;
+use std::cmp::Reverse;
 use std::collections::BTreeMap;
+use std::collections::BinaryHeap;
+use std::sync::Mutex;
 use std::sync::OnceLock;
+use std::sync::PoisonError;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+use rayon::Scope;
 use rayon::scope;
 
-use crate::task::Task;
 use crate::task_graph_error::TaskGraphError;
 use crate::task_node::TaskNode;
+
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+struct ReadyTask {
+    chain: usize,
+    node: Reverse<usize>,
+}
+
+struct Execution<'graph, TValue, TOutput, TWork> {
+    chains: BTreeMap<usize, usize>,
+    dependents: Vec<Vec<usize>>,
+    nodes: &'graph [TaskNode<TValue>],
+    outputs: &'graph [OnceLock<TOutput>],
+    pending: Vec<AtomicUsize>,
+    ready: Mutex<BinaryHeap<ReadyTask>>,
+    work: &'graph TWork,
+}
+
+impl<TValue: Sync, TOutput: Send + Sync, TWork: Sync> Execution<'_, TValue, TOutput, TWork> {
+    fn next(&self) -> Option<ReadyTask> {
+        self.ready
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .pop()
+    }
+
+    fn release<'scope, TState: Clone + Send + 'scope>(
+        &'scope self,
+        scope: &Scope<'scope>,
+        node: usize,
+        state: TState,
+    ) where
+        TWork: Fn(&mut TState, &TValue) -> TOutput,
+    {
+        self.ready
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(ReadyTask {
+                chain: self.chains.get(&node).copied().unwrap_or_default(),
+                node: Reverse(node),
+            });
+        scope.spawn(move |scope| self.run_ready(scope, &state));
+    }
+
+    fn run_ready<'scope, TState: Clone + Send + 'scope>(
+        &'scope self,
+        scope: &Scope<'scope>,
+        state: &TState,
+    ) where
+        TWork: Fn(&mut TState, &TValue) -> TOutput,
+    {
+        while let Some(ReadyTask {
+            node: Reverse(node),
+            ..
+        }) = self.next()
+        {
+            self.nodes
+                .get(node)
+                .zip(self.outputs.get(node))
+                .into_iter()
+                .for_each(|(TaskNode { value, .. }, output)| {
+                    output.get_or_init(|| (self.work)(&mut state.clone(), value));
+                });
+
+            for dependent in self.dependents.get(node).into_iter().flatten() {
+                if self
+                    .pending
+                    .get(*dependent)
+                    .is_some_and(|pending| pending.fetch_sub(1, Ordering::AcqRel) == 1)
+                {
+                    self.release(scope, *dependent, state.clone());
+                }
+            }
+        }
+    }
+}
 
 pub struct TaskGraph<'graph, TValue> {
     pub nodes: &'graph [TaskNode<TValue>],
@@ -42,73 +122,98 @@ impl<TValue: Sync> TaskGraph<'_, TValue> {
         }
     }
 
+    fn chains(&self, dependents: &[Vec<usize>]) -> BTreeMap<usize, usize> {
+        let mut chains: BTreeMap<usize, usize> = BTreeMap::new();
+        let unmeasured: Vec<Cell<usize>> = dependents
+            .iter()
+            .map(|waiting| Cell::new(waiting.len()))
+            .collect();
+        let mut measurable: Vec<usize> = dependents
+            .iter()
+            .enumerate()
+            .filter(|(_, waiting)| waiting.is_empty())
+            .map(|(node, _)| node)
+            .collect();
+
+        while let Some(node) = measurable.pop() {
+            let chain = dependents
+                .get(node)
+                .into_iter()
+                .flatten()
+                .filter_map(|dependent| chains.get(dependent))
+                .max()
+                .copied()
+                .unwrap_or_default()
+                .saturating_add(1);
+
+            chains.insert(node, chain);
+
+            for dependency in self
+                .nodes
+                .get(node)
+                .into_iter()
+                .flat_map(|TaskNode { dependencies, .. }| dependencies)
+            {
+                if unmeasured.get(*dependency).is_some_and(|count| {
+                    count.set(count.get().saturating_sub(1));
+                    count.get() == 0
+                }) {
+                    measurable.push(*dependency);
+                }
+            }
+        }
+
+        chains
+    }
+
+    fn dependents(&self) -> Result<Vec<Vec<usize>>, TaskGraphError> {
+        let mut dependents: Vec<Vec<usize>> = self.nodes.iter().map(|_| Vec::new()).collect();
+
+        for (node, TaskNode { dependencies, .. }) in self.nodes.iter().enumerate() {
+            for dependency in dependencies {
+                dependents
+                    .get_mut(*dependency)
+                    .ok_or(TaskGraphError::UnknownDependency {
+                        dependency: *dependency,
+                        node,
+                    })?
+                    .push(node);
+            }
+        }
+
+        Ok(dependents)
+    }
+
     fn execute<TState: Clone + Send, TOutput: Send + Sync>(
         &self,
         outputs: &[OnceLock<TOutput>],
         state: TState,
         work: &(impl Fn(&mut TState, &TValue) -> TOutput + Sync),
     ) -> Result<(), TaskGraphError> {
-        let tasks: Vec<Task<'_, TValue, TOutput>> = self
-            .nodes
-            .iter()
-            .zip(outputs)
-            .map(
-                |(
-                    TaskNode {
-                        dependencies,
-                        value,
-                    },
-                    output,
-                )| Task {
-                    dependents: OnceLock::new(),
-                    output,
-                    pending: AtomicUsize::new(dependencies.len()),
-                    value,
-                },
-            )
-            .collect();
-
-        let tasks = &tasks;
-
-        self.link(tasks).map(|()| {
-            scope(move |scope| {
-                for task in tasks
+        self.dependents().map(|dependents| {
+            let execution = Execution {
+                chains: self.chains(&dependents),
+                dependents,
+                nodes: self.nodes,
+                outputs,
+                pending: self
+                    .nodes
                     .iter()
-                    .filter(|Task { pending, .. }| pending.load(Ordering::Acquire) == 0)
-                {
-                    task.spawn(scope, state.clone(), work);
+                    .map(|TaskNode { dependencies, .. }| AtomicUsize::new(dependencies.len()))
+                    .collect(),
+                ready: Mutex::default(),
+                work,
+            };
+            let execution = &execution;
+
+            scope(move |scope| {
+                for (node, TaskNode { dependencies, .. }) in self.nodes.iter().enumerate() {
+                    if dependencies.is_empty() {
+                        execution.release(scope, node, state.clone());
+                    }
                 }
             });
         })
-    }
-
-    fn link<'tasks, TOutput>(
-        &self,
-        tasks: &'tasks [Task<'tasks, TValue, TOutput>],
-    ) -> Result<(), TaskGraphError> {
-        let mut dependents: BTreeMap<usize, Vec<&'tasks Task<'tasks, TValue, TOutput>>> =
-            BTreeMap::new();
-
-        for (node, (TaskNode { dependencies, .. }, task)) in
-            self.nodes.iter().zip(tasks).enumerate()
-        {
-            for dependency in dependencies {
-                tasks
-                    .get(*dependency)
-                    .ok_or(TaskGraphError::UnknownDependency {
-                        dependency: *dependency,
-                        node,
-                    })?;
-                dependents.entry(*dependency).or_default().push(task);
-            }
-        }
-
-        for (node, task) in tasks.iter().enumerate() {
-            task.dependents
-                .get_or_init(|| dependents.remove(&node).unwrap_or_default());
-        }
-
-        Ok(())
     }
 }
 
@@ -117,6 +222,7 @@ mod tests {
     use std::panic;
     use std::panic::AssertUnwindSafe;
     use std::sync::Barrier;
+    use std::sync::Mutex;
     use std::sync::atomic::AtomicBool;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
@@ -234,6 +340,47 @@ mod tests {
         });
 
         assert_eq!(leaders.iter().filter(|leader| **leader).count(), 1);
+    }
+
+    #[test]
+    fn ready_tasks_start_in_order_of_the_longest_chain_waiting_on_them() {
+        let nodes = vec![
+            TaskNode {
+                dependencies: Vec::new(),
+                value: 0,
+            },
+            TaskNode {
+                dependencies: Vec::new(),
+                value: 1,
+            },
+            TaskNode {
+                dependencies: vec![0],
+                value: 2,
+            },
+            TaskNode {
+                dependencies: vec![2],
+                value: 3,
+            },
+        ];
+        let started = Mutex::new(Vec::new());
+
+        pool(1).install(|| {
+            TaskGraph { nodes: &nodes }
+                .run((), |(), node| {
+                    started
+                        .lock()
+                        .expect("no task panics while it holds the record")
+                        .push(*node);
+                })
+                .expect("the graph is acyclic")
+        });
+
+        assert_eq!(
+            started
+                .into_inner()
+                .expect("no task panics while it holds the record"),
+            vec![0, 2, 1, 3]
+        );
     }
 
     #[test]
