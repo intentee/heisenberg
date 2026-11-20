@@ -31,7 +31,7 @@ fn uncovered_code_of_a_path_module_is_reported_where_it_is_written() {
             ------------------------------\n\
             1 errors found in 1 rule\n\
             ------------------------------\n",
-            coverage_footer(1, 2, 9).as_str()
+            coverage_footer(1, 2, 8).as_str()
         ]
         .concat()
         .as_str())

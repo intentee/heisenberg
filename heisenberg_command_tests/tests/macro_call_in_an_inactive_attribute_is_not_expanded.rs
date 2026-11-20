@@ -9,7 +9,7 @@ use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck
 #[test]
 fn macro_call_in_an_inactive_attribute_is_not_expanded() {
     let fixture = FixtureWorkspace {
-        name: "coverage_macro_in_an_inactive_attribute",
+        name: "coverage_macro_in_inactive_attr",
     };
     let outcome = HeisenbergCoverageCheck {
         export: &fixture.coverage_export(COVERAGE_EXPORT_FILE),

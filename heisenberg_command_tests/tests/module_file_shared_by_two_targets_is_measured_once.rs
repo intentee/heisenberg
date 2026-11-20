@@ -24,7 +24,7 @@ fn module_file_shared_by_two_targets_is_measured_once() {
             "------------------------------\n\
             No errors found!\n\
             ------------------------------\n",
-            coverage_footer(2, 3, 11).as_str()
+            coverage_footer(2, 3, 10).as_str()
         ]
         .concat()
         .as_str())

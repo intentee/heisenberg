@@ -22,7 +22,7 @@ pub const COVERAGE_EXPORT_ARGUMENT: &str = "--coverage-export";
 
 pub const COVERAGE_EXPORT_FILE: &str = "llvm-cov.json";
 
-pub const COVERAGE_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in the measured configuration, whose tests the coverage export records\nRules: 2 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
+pub const COVERAGE_FOOTER_END: &str = "Precondition: rustc 1.100.0 compiles the workspace in the measured configuration, whose tests the coverage export records\nRules: 2 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
 
 pub const EXPLAIN_SUBCOMMAND: &str = "explain";
 
@@ -54,9 +54,11 @@ pub const FIRST_REGION_KIND_POINTER: &str = "/data/0/functions/0/regions/0/7";
 
 pub const FIRST_REGION_LINE_POINTER: &str = "/data/0/functions/0/regions/0/0";
 
-pub const FULL_RUN_FOOTER_END: &str = "Precondition: rustc 1.99.1 compiles the workspace in every declared configuration\nRules: 116 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
+pub const FULL_RUN_FOOTER_END: &str = "Precondition: rustc 1.100.0 compiles the workspace in every declared configuration\nRules: 116 evaluated, 0 evaluated in part, 0 not evaluated\nHeisenberg 0.1.0\n";
 
 pub const FUNCTION_FIRST_FILE_POINTER: &str = "/filenames/0";
+
+pub const FUNCTION_FIRST_REGION_POINTER: &str = "/regions/0";
 
 pub const HELP_ARGUMENT: &str = "--help";
 

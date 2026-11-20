@@ -1,9 +1,9 @@
 use crate::measured_function::MeasuredFunction;
-use crate::measured_region::MeasuredRegion;
+use crate::measured_item::MeasuredItem;
 
 pub struct MeasuredCode {
     pub functions: Vec<MeasuredFunction>,
-    pub standalone_regions: Vec<MeasuredRegion>,
+    pub items: Vec<MeasuredItem>,
 }
 
 impl MeasuredCode {
@@ -12,7 +12,11 @@ impl MeasuredCode {
             regions.sort();
         }
 
+        for MeasuredItem { regions, .. } in &mut self.items {
+            regions.sort();
+        }
+
         self.functions.sort();
-        self.standalone_regions.sort();
+        self.items.sort();
     }
 }

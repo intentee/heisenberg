@@ -33,8 +33,12 @@ use crate::constants::RUSTFLAGS_VARIABLES;
 use crate::constants::SUPPORTED_TARGETS;
 use crate::project_model_error::ProjectModelError;
 
-fn target_rustflags_key(target: &str) -> String {
-    format!("{CARGO_TARGET_TABLE}.{target}.{CARGO_RUSTFLAGS}")
+fn configuration_key(parts: &[&str]) -> String {
+    parts.join(".")
+}
+
+const fn target_rustflags_key(target: &str) -> [&str; 3] {
+    [CARGO_TARGET_TABLE, target, CARGO_RUSTFLAGS]
 }
 
 fn rejected<TValue>(
@@ -52,7 +56,7 @@ fn reject_compiler(
         compiler.map(ConfigRelativePath::value).cloned(),
         |definition| ProjectModelError::ConfiguredCompiler {
             definition,
-            key: format!("{CARGO_BUILD_TABLE}.{key}"),
+            key: configuration_key(&[CARGO_BUILD_TABLE, key]),
         },
     )
 }
@@ -71,22 +75,23 @@ pub struct CargoConfigurationOverrides<'configuration> {
 impl CargoConfigurationOverrides<'_> {
     pub fn reject(&self) -> Result<(), ProjectModelError> {
         self.reject_environment()
-            .and_then(|()| {
-                self.reject_configured_rustflags(format!("{CARGO_BUILD_TABLE}.{CARGO_RUSTFLAGS}"))
-            })
+            .and_then(|()| self.reject_configured_rustflags(&[CARGO_BUILD_TABLE, CARGO_RUSTFLAGS]))
             .and_then(|()| {
                 self.context
-                    .get::<BTreeMap<String, TargetCfgConfig>>(CARGO_TARGET_TABLE)
+                    .get::<BTreeMap<String, TargetCfgConfig>>([CARGO_TARGET_TABLE])
                     .map_err(self.unreadable_value(CARGO_TARGET_TABLE))
             })
             .and_then(|targets| {
                 targets.into_iter().try_for_each(|(target, configuration)| {
-                    reject_rustflags(target_rustflags_key(&target), configuration.rustflags)
+                    reject_rustflags(
+                        configuration_key(&target_rustflags_key(&target)),
+                        configuration.rustflags,
+                    )
                 })
             })
             .and_then(|()| {
                 SUPPORTED_TARGETS.into_iter().try_for_each(|target| {
-                    self.reject_configured_rustflags(target_rustflags_key(target.triple()))
+                    self.reject_configured_rustflags(&target_rustflags_key(target.triple()))
                 })
             })
             .and_then(|()| {
@@ -144,14 +149,14 @@ impl CargoConfigurationOverrides<'_> {
 
             self.context
                 .target_cfg_triple(triple)
-                .map_err(self.unreadable_value(&format!("{CARGO_TARGET_TABLE}.{triple}")))
+                .map_err(self.unreadable_value(&configuration_key(&[CARGO_TARGET_TABLE, triple])))
                 .and_then(
                     |TargetConfig {
                          links_overrides, ..
                      }| {
                         links_overrides.keys().next().map_or(Ok(()), |library| {
                             Err(ProjectModelError::ConfiguredBuildScriptOverride {
-                                key: format!("{CARGO_TARGET_TABLE}.{triple}.{library}"),
+                                key: configuration_key(&[CARGO_TARGET_TABLE, triple, library]),
                             })
                         })
                     },
@@ -171,23 +176,27 @@ impl CargoConfigurationOverrides<'_> {
                 configured
                     .keys()
                     .find(|name| name.eq_ignore_ascii_case(variable))
-                    .map(|name| format!("{CARGO_ENVIRONMENT_TABLE}.{name}"))
+                    .cloned()
             })
-            .and_then(|key| {
-                key.map_or(Ok(()), |key| {
+            .and_then(|name| {
+                name.map_or(Ok(()), |name| {
+                    let key = [CARGO_ENVIRONMENT_TABLE, name.as_str()];
+
                     self.context
-                        .get::<OptValue<EnvConfigValue>>(&key)
-                        .map_err(self.unreadable_value(&key))
+                        .get::<OptValue<EnvConfigValue>>(key)
+                        .map_err(self.unreadable_value(&configuration_key(&key)))
                         .and_then(|configured| rejected(configured, error))
                 })
             })
     }
 
-    fn reject_configured_rustflags(&self, key: String) -> Result<(), ProjectModelError> {
+    fn reject_configured_rustflags(&self, key: &[&str]) -> Result<(), ProjectModelError> {
+        let rendered = configuration_key(key);
+
         self.context
-            .get::<OptValue<StringList>>(&key)
-            .map_err(self.unreadable_value(&key))
-            .and_then(|rustflags| reject_rustflags(key, rustflags))
+            .get::<OptValue<StringList>>(key)
+            .map_err(self.unreadable_value(&rendered))
+            .and_then(|rustflags| reject_rustflags(rendered, rustflags))
     }
 
     fn reject_environment(&self) -> Result<(), ProjectModelError> {
@@ -257,7 +266,7 @@ impl CargoConfigurationOverrides<'_> {
         self.context
             .get::<Option<
                 BTreeMap<String, BTreeMap<String, Value<TomlDependency<ConfigRelativePath>>>>,
-            >>(CARGO_PATCH_TABLE)
+            >>([CARGO_PATCH_TABLE])
             .map_err(self.unreadable_value(CARGO_PATCH_TABLE))
             .and_then(|patches| {
                 patches
@@ -270,7 +279,7 @@ impl CargoConfigurationOverrides<'_> {
                             .map(|(package, Value { definition, .. })| {
                                 ProjectModelError::ConfiguredPatch {
                                     definition,
-                                    key: format!("{CARGO_PATCH_TABLE}.{registry}.{package}"),
+                                    key: configuration_key(&[CARGO_PATCH_TABLE, &registry, &package]),
                                 }
                             })
                     })

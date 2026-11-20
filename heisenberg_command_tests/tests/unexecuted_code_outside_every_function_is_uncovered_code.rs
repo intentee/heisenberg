@@ -21,16 +21,21 @@ fn unexecuted_code_outside_every_function_is_uncovered_code() {
     assert_eq!(
         str::from_utf8(&outcome.output),
         Ok([
-            "UncoveredCode: 1 violation\n\
+            "UncoveredCode: 2 violations\n\
             Every line of production code runs under the tests. Add tests that execute the code, or remove the code that nothing needs.\n\
             \n\
-            - src/lib.rs:1:45: No test executes the code\n    \
-            pub static DOUBLE: fn(u32) -> u32 = |value| value * 2;\n\
+            - src/lib.rs:1:12: No test executes parts of the item\n    \
+            pub static DOUBLE: fn(u32) -> u32 = |value| value * 2;\n      \
+            not executed at src/lib.rs:1:45\n      \
+            not executed at src/lib.rs:1:53\n\
+            - src/lib.rs:3:12: No test executes parts of the item\n    \
+            pub static PARITY: fn(u32) -> &'static str = |value| if value % 2 == 0 { \"even\" } else { \"odd\" };\n      \
+            not executed at src/lib.rs:3:90\n\
             \n\
             ------------------------------\n\
-            1 errors found in 1 rule\n\
+            2 errors found in 1 rule\n\
             ------------------------------\n",
-            coverage_footer(1, 1, 4).as_str()
+            coverage_footer(1, 1, 9).as_str()
         ]
         .concat()
         .as_str())

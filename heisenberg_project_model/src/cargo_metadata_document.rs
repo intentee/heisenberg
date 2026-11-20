@@ -63,8 +63,7 @@ impl CargoMetadataDocument<'_, '_> {
                                     .normalized_toml()
                                     .lints
                                     .as_ref()
-                                    .map(|InheritableLints { lints, .. }| lints.clone())
-                                    .unwrap_or_default(),
+                                    .map_or_default(|InheritableLints { lints, .. }| lints.clone()),
                                 lints_source: if package
                                     .manifest()
                                     .original_toml()

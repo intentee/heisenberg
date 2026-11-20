@@ -9,7 +9,7 @@ use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck
 #[test]
 fn functions_one_macro_text_writes_are_measured_as_one() {
     let fixture = FixtureWorkspace {
-        name: "coverage_macro_text_shared_by_functions",
+        name: "coverage_shared_macro_text",
     };
     let outcome = HeisenbergCoverageCheck {
         export: &fixture.coverage_export(COVERAGE_EXPORT_FILE),

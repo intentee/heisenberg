@@ -12,7 +12,7 @@ const COVERAGE_CHECK_HELP: &str = "Report the production code of a Cargo workspa
     Settings: the [workspace.metadata.heisenberg] table that check reads, whose configurations and\n\
     test_crates are validated as check validates them; `heisenberg check --help` describes it.\n\
     \n\
-    Precondition: rustc 1.99.1 compiles the workspace in the measured configuration, which\n\
+    Precondition: rustc 1.100.0 compiles the workspace in the measured configuration, which\n\
     --configuration selects exactly once, under the preconditions of check, and --coverage-export names\n\
     the JSON export that `cargo llvm-cov report --json --include-build-script` writes after a run of the\n\
     tests of that configuration built from the current sources, without --remap-path-prefix,\n\
@@ -49,9 +49,10 @@ const COVERAGE_CHECK_HELP: &str = "Report the production code of a Cargo workspa
     by position across every instrumented build and instantiation, each executed when any of them\n\
     executed it, belong to the innermost measured function that holds the text they start at, through\n\
     every macro expansion, and to each of them when several functions are written from that text, the\n\
-    regions of a closure to its enclosing function; a region outside every function stands alone. Every\n\
-    measured function holds at least one region and every region of production code is executed; there\n\
-    is no threshold, no exemption and no filter.\n\
+    regions of a closure to its enclosing function; a region outside every function belongs to the\n\
+    innermost item that holds the text it starts at, such as a static or a macro_rules! definition.\n\
+    Every measured function holds at least one region and every region of production code is executed;\n\
+    there is no threshold, no exemption and no filter.\n\
     \n\
     Report: Issues are grouped by type, in one section per type, as check reports them, followed by the\n\
     measured configuration with its crate targets, functions and regions and by the declared\n\
@@ -82,7 +83,7 @@ const COVERAGE_CHECK_HELP: &str = "Report the production code of a Cargo workspa
     [default: 8]\n\
     \n      \
     --sysroot <SYSROOT>\n          \
-    Absolute path of the Rust 1.99.1 sysroot that contains the rust-src component\n\
+    Absolute path of the Rust 1.100.0 sysroot that contains the rust-src component\n\
     \n      \
     --workspace <WORKSPACE>\n          \
     Absolute path of the Cargo workspace directory that contains Cargo.toml\n\

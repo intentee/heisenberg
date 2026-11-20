@@ -53,8 +53,7 @@ impl ConfiguredNode<'_> {
             .flat_map(|attribute| {
                 attribute
                     .meta()
-                    .map(|meta| Self::predicates(&meta))
-                    .unwrap_or_default()
+                    .map_or_default(|meta| Self::predicates(&meta))
                     .into_iter()
                     .flat_map(|predicate| {
                         NegatedConfiguration {

@@ -31,7 +31,7 @@ fn function_under_an_attribute_macro_is_measured_through_its_expansion() {
             ------------------------------\n\
             1 errors found in 1 rule\n\
             ------------------------------\n",
-            coverage_footer(1, 1, 5).as_str()
+            coverage_footer(1, 1, 6).as_str()
         ]
         .concat()
         .as_str())

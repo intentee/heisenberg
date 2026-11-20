@@ -12,9 +12,11 @@ use ra_ap_syntax::TextSize;
 use ra_ap_syntax::ast;
 
 use heisenberg_coverage_export::exported_region::ExportedRegion;
+use heisenberg_coverage_export::region_position::RegionPosition;
 use heisenberg_coverage_export::region_span::RegionSpan;
 use heisenberg_coverage_export::zero_based_position::ZeroBasedPosition;
 use heisenberg_coverage_export::zero_based_span::ZeroBasedSpan;
+use heisenberg_source_locator::item_focus_range::item_focus_range;
 
 use crate::analysis_context::AnalysisContext;
 use crate::attributed_region::AttributedRegion;
@@ -25,6 +27,7 @@ use crate::measured_file::MeasuredFile;
 use crate::measured_functions::MeasuredFunctions;
 use crate::measured_region::MeasuredRegion;
 use crate::parsed_file::ParsedFile;
+use crate::region_owner::RegionOwner;
 use crate::region_start::RegionStart;
 
 fn text_offset(
@@ -93,6 +96,34 @@ impl FileMeasurement<'_, '_> {
             )
     }
 
+    fn owner(
+        &self,
+        file_id: HirFileId,
+        RegionStart { node, offset }: &RegionStart,
+        start: RegionPosition,
+    ) -> Result<RegionOwner, CoverageMeasurementError> {
+        let functions = self.holding_functions(file_id, node, *offset);
+
+        if functions.is_empty() {
+            node.ancestors()
+                .find(|ancestor| ast::Item::can_cast(ancestor.kind()))
+                .ok_or_else(|| CoverageMeasurementError::RegionOutsideEveryItem {
+                    export: self.export.to_path_buf(),
+                    file: self.file.path.to_path_buf(),
+                    start,
+                })
+                .and_then(|item| {
+                    self.context.locator.locate(FileRangeWrapper {
+                        file_id: self.file.file_id,
+                        range: TextRange::empty(item_focus_range(&item).start()),
+                    })
+                })
+                .map(RegionOwner::Item)
+        } else {
+            Ok(RegionOwner::Functions(functions))
+        }
+    }
+
     fn region(
         &self,
         file_id: HirFileId,
@@ -110,24 +141,27 @@ impl FileMeasurement<'_, '_> {
             path,
             ..
         } = self.file;
-        let RegionStart { node, offset } = self.region_start(root, index, *span, *exported)?;
+        let start = self.region_start(root, index, *span, *exported)?;
+        let RegionStart { node, offset } = &start;
 
-        if self.context.test_modules.contains(&node) {
+        if self.context.test_modules.contains(node) {
             Ok(None)
-        } else if activity.is_active(&node) {
+        } else if activity.is_active(node) {
             self.context
                 .locator
                 .locate(FileRangeWrapper {
                     file_id: *source_file,
-                    range: TextRange::empty(offset),
+                    range: TextRange::empty(*offset),
                 })
-                .map(|location| {
-                    Some(AttributedRegion {
-                        functions: self.holding_functions(file_id, &node, offset),
-                        region: MeasuredRegion {
-                            executed: *executed,
-                            location,
-                        },
+                .and_then(|location| {
+                    self.owner(file_id, &start, exported.start).map(|owner| {
+                        Some(AttributedRegion {
+                            owner,
+                            region: MeasuredRegion {
+                                executed: *executed,
+                                location,
+                            },
+                        })
                     })
                 })
         } else {

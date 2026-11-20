@@ -9,7 +9,7 @@ use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck
 #[test]
 fn attribute_active_only_without_cfg_test_fails_the_coverage_check() {
     let fixture = FixtureWorkspace {
-        name: "coverage_production_only_attribute",
+        name: "coverage_production_only_attr",
     };
     let outcome = HeisenbergCoverageCheck {
         export: &fixture.coverage_export(COVERAGE_EXPORT_FILE),

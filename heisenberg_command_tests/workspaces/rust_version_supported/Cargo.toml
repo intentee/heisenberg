@@ -2,7 +2,7 @@
 name = "rust_version_supported"
 edition = "2024"
 version = "0.1.0"
-rust-version = "1.99.1"
+rust-version = "1.100.0"
 
 [workspace]
 

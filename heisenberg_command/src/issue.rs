@@ -83,15 +83,16 @@ pub enum Issue {
         function: SourceLocation,
         unexecuted: NonEmpty<SourceLocation>,
     },
+    PartiallyExecutedItem {
+        item: SourceLocation,
+        unexecuted: NonEmpty<SourceLocation>,
+    },
     SharedModuleFile {
         file: String,
         inclusions: SharedFileInclusions,
     },
     UnexecutedFunction {
         function: SourceLocation,
-    },
-    UnexecutedRegion {
-        region: SourceLocation,
     },
     UnresolvedForeignReferences {
         configurations: BTreeSet<Configuration>,
@@ -210,7 +211,8 @@ impl Issue {
                 .iter()
                 .map(|copy| format!("  duplicate at {copy}"))
                 .collect(),
-            Self::PartiallyExecutedFunction { unexecuted, .. } => unexecuted
+            Self::PartiallyExecutedFunction { unexecuted, .. }
+            | Self::PartiallyExecutedItem { unexecuted, .. } => unexecuted
                 .iter()
                 .map(|region| format!("  not executed at {region}"))
                 .collect(),
@@ -234,8 +236,7 @@ impl Issue {
                 .collect(),
             Self::CodeActiveInNoConfiguration { .. }
             | Self::FunctionWithoutCoverageData { .. }
-            | Self::UnexecutedFunction { .. }
-            | Self::UnexecutedRegion { .. } => Vec::new(),
+            | Self::UnexecutedFunction { .. } => Vec::new(),
         }
     }
 
@@ -251,7 +252,7 @@ impl Issue {
             Self::Package(violation) => IssueType::from(violation),
             Self::PartiallyExecutedFunction { .. }
             | Self::UnexecutedFunction { .. }
-            | Self::UnexecutedRegion { .. } => IssueType::UncoveredCode,
+            | Self::PartiallyExecutedItem { .. } => IssueType::UncoveredCode,
             Self::SharedModuleFile { .. } => IssueType::SharedModuleFile,
             Self::UnresolvedForeignReferences { .. } => IssueType::UnresolvedPath,
             Self::Violation(ViolationReport { violation, .. }) => IssueType::from(&violation.kind),
@@ -325,8 +326,8 @@ impl Issue {
             | Self::FunctionWithoutCoverageData { .. }
             | Self::Package(_)
             | Self::PartiallyExecutedFunction { .. }
-            | Self::UnexecutedFunction { .. }
-            | Self::UnexecutedRegion { .. } => String::new(),
+            | Self::PartiallyExecutedItem { .. }
+            | Self::UnexecutedFunction { .. } => String::new(),
         };
 
         iter::once(format!("- {location}: {}{narrowing}", self.message()))
@@ -361,6 +362,7 @@ impl Issue {
             }
             Self::FunctionWithoutCoverageData { function }
             | Self::PartiallyExecutedFunction { function, .. }
+            | Self::PartiallyExecutedItem { item: function, .. }
             | Self::UnexecutedFunction { function } => IssueLocation::new_position(function),
             Self::ModuleCycle { witnesses, .. } => {
                 IssueLocation::new_position(cycle_site(witnesses))
@@ -373,7 +375,6 @@ impl Issue {
                 ..
             })
             | Self::SharedModuleFile { file, .. } => IssueLocation::new_whole_file(file),
-            Self::UnexecutedRegion { region } => IssueLocation::new_position(region),
             Self::UnresolvedForeignReferences { sites, .. } => {
                 IssueLocation::new_position(&sites.first)
             }
@@ -424,6 +425,7 @@ impl Issue {
             Self::PartiallyExecutedFunction { .. } => {
                 "No test executes parts of the function".to_owned()
             }
+            Self::PartiallyExecutedItem { .. } => "No test executes parts of the item".to_owned(),
             Self::SharedModuleFile {
                 inclusions: SharedFileInclusions { inclusions, .. },
                 ..
@@ -431,7 +433,6 @@ impl Issue {
                 format!("Module file belongs to {} modules", inclusions.len())
             }
             Self::UnexecutedFunction { .. } => "No test executes the function".to_owned(),
-            Self::UnexecutedRegion { .. } => "No test executes the code".to_owned(),
             Self::UnresolvedForeignReferences { module, .. } => {
                 format!("Path into {module} compiles, but rust-analyzer cannot resolve it")
             }

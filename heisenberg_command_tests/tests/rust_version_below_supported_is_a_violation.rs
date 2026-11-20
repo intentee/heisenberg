@@ -21,7 +21,7 @@ fn rust_version_below_supported_is_a_violation() {
         Ok(["RustVersionBelowSupported: 1 violation\n\
             The workspace is analysed and linted as the supported Rust compiles it, so a lower rust-version only relaxes the lints that Heisenberg requires. Remove rust-version or set it to the supported Rust version.\n\
             \n\
-            - Cargo.toml: Package rust_version_below_supported declares rust-version 1.85, which is older than the supported Rust 1.99.1\n\
+            - Cargo.toml: Package rust_version_below_supported declares rust-version 1.85, which is older than the supported Rust 1.100.0\n\
             \n\
             ------------------------------\n\
             1 errors found in 1 rule\n\

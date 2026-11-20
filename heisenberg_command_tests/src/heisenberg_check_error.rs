@@ -52,6 +52,8 @@ pub enum HeisenbergCheckError {
         #[source]
         source: error::Error,
     },
+    #[error("the coverage export lists no function of `{}` to tamper with", .file.display())]
+    CoverageExportFunctionMissing { file: PathBuf },
     #[error("the coverage export holds no value at `{pointer}` to tamper with")]
     CoverageExportValueMissing { pointer: &'static str },
     #[error("the tampered coverage export `{}` cannot be written", .path.display())]

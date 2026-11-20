@@ -9,7 +9,7 @@ use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck
 #[test]
 fn macro_call_that_rust_analyzer_cannot_resolve_fails_the_coverage_check() {
     let fixture = FixtureWorkspace {
-        name: "coverage_macro_hidden_from_rust_analyzer",
+        name: "coverage_hidden_macro",
     };
     let outcome = HeisenbergCoverageCheck {
         export: &fixture.coverage_export(COVERAGE_EXPORT_FILE),

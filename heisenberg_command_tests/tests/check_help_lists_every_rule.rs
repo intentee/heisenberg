@@ -44,7 +44,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     test_crates declares which members are test code, confined_packages declares which members may\n\
     depend on a package, and Heisenberg verifies both declarations.\n\
     \n\
-    Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration with the standard\n\
+    Precondition: rustc 1.100.0 compiles the workspace in every analysed configuration with the standard\n\
     library of its target installed, Cargo.lock is up to date, the cargo home holds every package of\n\
     Cargo.lock (`cargo fetch`), the build runs from the workspace directory with the environment\n\
     Heisenberg runs with and without --config arguments, clippy runs without command-line arguments,\n\
@@ -313,7 +313,7 @@ const CHECK_HELP: &str = "Report module dependency cycles and structural violati
     [default: 8]\n\
     \n      \
     --sysroot <SYSROOT>\n          \
-    Absolute path of the Rust 1.99.1 sysroot that contains the rust-src component\n\
+    Absolute path of the Rust 1.100.0 sysroot that contains the rust-src component\n\
     \n      \
     --workspace <WORKSPACE>\n          \
     Absolute path of the Cargo workspace directory that contains Cargo.toml\n\

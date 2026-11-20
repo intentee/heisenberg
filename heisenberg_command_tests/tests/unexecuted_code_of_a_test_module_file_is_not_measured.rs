@@ -9,7 +9,7 @@ use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck
 #[test]
 fn unexecuted_code_of_a_test_module_file_is_not_measured() {
     let fixture = FixtureWorkspace {
-        name: "coverage_unexecuted_test_module_file",
+        name: "coverage_unexecuted_tests_file",
     };
     let outcome = HeisenbergCoverageCheck {
         export: &fixture.coverage_export(COVERAGE_EXPORT_FILE),

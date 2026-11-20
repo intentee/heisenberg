@@ -2,35 +2,36 @@
 
 CARGO_HOME ?= $(HOME)/.cargo
 COVERAGE_DIVERGENT_MACRO_FIXTURES := \
-	coverage_attribute_failing_in_rust_analyzer \
-	coverage_attribute_hidden_from_rust_analyzer \
-	coverage_attribute_hidden_in_test_code \
-	coverage_attribute_unparsable_in_rust_analyzer \
-	coverage_macro_failing_in_rust_analyzer \
-	coverage_macro_hidden_from_rust_analyzer \
-	coverage_macro_unparsable_in_rust_analyzer
+	coverage_attribute_in_test_code \
+	coverage_failing_attribute \
+	coverage_failing_macro \
+	coverage_hidden_attribute \
+	coverage_hidden_macro \
+	coverage_unparsable_attribute \
+	coverage_unparsable_macro
 COVERAGE_IDENTITY_MACRO_FIXTURES := \
-	coverage_attribute_hidden_from_rust_analyzer \
-	coverage_attribute_hidden_in_test_code \
-	coverage_attribute_macro_item
+	coverage_attribute_in_test_code \
+	coverage_attribute_macro_item \
+	coverage_hidden_attribute
 COVERAGE_FIXTURES := $(sort $(COVERAGE_DIVERGENT_MACRO_FIXTURES) $(COVERAGE_IDENTITY_MACRO_FIXTURES) \
 	coverage_code_outside_functions \
 	coverage_fully_covered \
 	coverage_inactive_module_file \
 	coverage_inactive_region \
-	coverage_macro_in_an_inactive_attribute \
-	coverage_macro_text_shared_by_functions \
+	coverage_macro_in_inactive_attr \
+	coverage_macro_rules_code \
 	coverage_macro_written_function \
 	coverage_path_module \
-	coverage_production_only_attribute \
+	coverage_production_only_attr \
 	coverage_production_only_code \
+	coverage_shared_macro_text \
 	coverage_shared_module_file \
 	coverage_uncovered_code \
 	coverage_unexecuted_example \
-	coverage_unexecuted_inline_test_module \
-	coverage_unexecuted_integration_test \
+	coverage_unexecuted_inline_tests \
+	coverage_unexecuted_integration \
 	coverage_unexecuted_test_crate \
-	coverage_unexecuted_test_module_file \
+	coverage_unexecuted_tests_file \
 	coverage_without_coverage_data)
 COVERAGE_FIXTURE_DIRECTORY := heisenberg_command_tests/workspaces
 COVERAGE_DIVERGENT_MACRO_EXPORTS := $(addprefix $(COVERAGE_FIXTURE_DIRECTORY)/,$(addsuffix /target/llvm-cov.json,$(COVERAGE_DIVERGENT_MACRO_FIXTURES)))

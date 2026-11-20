@@ -9,7 +9,7 @@ use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck
 #[test]
 fn unresolved_attribute_in_test_code_is_not_measured() {
     let fixture = FixtureWorkspace {
-        name: "coverage_attribute_hidden_in_test_code",
+        name: "coverage_attribute_in_test_code",
     };
     let outcome = HeisenbergCoverageCheck {
         export: &fixture.coverage_export(COVERAGE_EXPORT_FILE),

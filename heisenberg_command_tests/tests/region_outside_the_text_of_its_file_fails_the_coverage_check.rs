@@ -6,7 +6,7 @@ use heisenberg_command_tests::constants::COVERAGE_EXPORT_FILE;
 use heisenberg_command_tests::constants::HOST_CONFIGURATION;
 use heisenberg_command_tests::fixture_workspace::FixtureWorkspace;
 use heisenberg_command_tests::heisenberg_coverage_check::HeisenbergCoverageCheck;
-use heisenberg_command_tests::tamper_first_region_span::tamper_first_region_span;
+use heisenberg_command_tests::tamper_first_region_span_of_file::tamper_first_region_span_of_file;
 use heisenberg_command_tests::tampered_coverage_export::TamperedCoverageExport;
 use heisenberg_command_tests::tampered_export::TamperedExport;
 use heisenberg_coverage_export::region_position::RegionPosition;
@@ -26,8 +26,9 @@ fn region_outside_the_text_of_its_file_fails_the_coverage_check() {
         source: &fixture.coverage_export(COVERAGE_EXPORT_FILE),
     }
     .written(|export| {
-        tamper_first_region_span(
+        tamper_first_region_span_of_file(
             export,
+            &workspace.join("src").join("lib.rs"),
             RegionSpan {
                 start: RegionPosition {
                     line: u32::MAX,
@@ -39,7 +40,7 @@ fn region_outside_the_text_of_its_file_fails_the_coverage_check() {
                 },
             },
         )
-        .expect("the first function has a region");
+        .expect("the first function of the library has a region");
     })
     .expect("the export must be tampered with");
     let outcome = HeisenbergCoverageCheck {

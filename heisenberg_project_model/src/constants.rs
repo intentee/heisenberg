@@ -8,7 +8,7 @@ use crate::required_clippy_setting::RequiredClippySetting;
 use crate::required_lint::RequiredLint;
 use crate::supported_target::SupportedTarget;
 
-pub const SUPPORTED_RUST_VERSION: Version = Version::new(1, 99, 1);
+pub const SUPPORTED_RUST_VERSION: Version = Version::new(1, 100, 0);
 
 pub const VETTED_RUSTFMT_SETTINGS: [&str; 28] = [
     "array_width",

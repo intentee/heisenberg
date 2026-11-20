@@ -22,7 +22,7 @@ impl ConfiguredEnvironment<'_> {
     /// that is not UTF-8.
     pub fn variables(&self) -> Result<BTreeMap<String, String>, ProjectModelError> {
         self.context
-            .get::<EnvConfig>(CARGO_ENVIRONMENT_TABLE)
+            .get::<EnvConfig>([CARGO_ENVIRONMENT_TABLE])
             .map_err(Into::into)
             .map_err(ProjectModelError::CargoEnvironmentTable)
             .and_then(|declared| {

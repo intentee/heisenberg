@@ -22,6 +22,7 @@ use heisenberg_member_crates::member_crates::member_crates;
 use heisenberg_member_crates::module_files::module_files;
 use heisenberg_member_crates::resolved_member_crate::ResolvedMemberCrate;
 use heisenberg_module_graph::code_category::CodeCategory;
+use heisenberg_module_graph::source_location::SourceLocation;
 use heisenberg_project_model::loaded_project::LoadedProject;
 use heisenberg_project_model::source_files::SourceFiles;
 use heisenberg_source_locator::source_locator::SourceLocator;
@@ -39,9 +40,11 @@ use crate::measured_coverage::MeasuredCoverage;
 use crate::measured_file::MeasuredFile;
 use crate::measured_function::MeasuredFunction;
 use crate::measured_functions::MeasuredFunctions;
+use crate::measured_item::MeasuredItem;
 use crate::measured_region::MeasuredRegion;
 use crate::measurement_run::MeasurementRun;
 use crate::member_modules::MemberModules;
+use crate::region_owner::RegionOwner;
 use crate::source_freshness::SourceFreshness;
 use crate::unresolved_attributes::UnresolvedAttributes;
 
@@ -200,16 +203,12 @@ impl CoverageMeasurement<'_, '_> {
         crate_targets: usize,
     ) -> Result<MeasuredCoverage, CoverageMeasurementError> {
         let mut attached: HashMap<FilePosition, Vec<MeasuredRegion>> = HashMap::new();
-        let mut standalone_regions = Vec::new();
+        let mut items: BTreeMap<SourceLocation, Vec<MeasuredRegion>> = BTreeMap::new();
 
         regions
             .iter()
-            .try_for_each(|AttributedRegion { functions, region }| {
-                if functions.is_empty() {
-                    standalone_regions.push(region.clone());
-                }
-
-                functions.iter().try_for_each(|function| {
+            .try_for_each(|AttributedRegion { owner, region }| match owner {
+                RegionOwner::Functions(functions) => functions.iter().try_for_each(|function| {
                     names
                         .get(function)
                         .ok_or(CoverageMeasurementError::RegionOfAnUnmeasuredFunction {
@@ -217,7 +216,12 @@ impl CoverageMeasurement<'_, '_> {
                             offset: function.offset,
                         })
                         .map(|_| attached.entry(*function).or_default().push(region.clone()))
-                })
+                }),
+                RegionOwner::Item(item) => {
+                    items.entry(item.clone()).or_default().push(region.clone());
+
+                    Ok(())
+                }
             })
             .map(|()| {
                 let mut code = MeasuredCode {
@@ -228,7 +232,10 @@ impl CoverageMeasurement<'_, '_> {
                             regions: attached.remove(&function).unwrap_or_default(),
                         })
                         .collect(),
-                    standalone_regions,
+                    items: items
+                        .into_iter()
+                        .map(|(location, regions)| MeasuredItem { location, regions })
+                        .collect(),
                 };
 
                 code.sort();

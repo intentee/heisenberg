@@ -31,16 +31,16 @@ fn unexecuted_production_code_is_uncovered_code() {
             pub fn never_called() -> u32 {\n\
             - src/lib.rs:9:8: No test executes parts of the function\n    \
             pub fn label(name: &str) -> String {\n      \
-            not executed at src/lib.rs:10:25\n      \
-            not executed at src/lib.rs:10:34\n\
+            not executed at src/lib.rs:10:25\n\
             - src/lib.rs:13:8: No test executes parts of the function\n    \
             pub fn incremented(values: &[u32]) -> Vec<u32> {\n      \
-            not executed at src/lib.rs:14:31\n\
+            not executed at src/lib.rs:14:31\n      \
+            not executed at src/lib.rs:14:39\n\
             \n\
             ------------------------------\n\
             4 errors found in 1 rule\n\
             ------------------------------\n",
-            coverage_footer(1, 4, 22).as_str()
+            coverage_footer(1, 4, 18).as_str()
         ]
         .concat()
         .as_str())

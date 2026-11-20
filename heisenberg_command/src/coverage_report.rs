@@ -3,6 +3,7 @@ use clap::ValueEnum;
 use heisenberg_coverage_measurement::measured_code::MeasuredCode;
 use heisenberg_coverage_measurement::measured_coverage::MeasuredCoverage;
 use heisenberg_coverage_measurement::measured_function::MeasuredFunction;
+use heisenberg_coverage_measurement::measured_item::MeasuredItem;
 use heisenberg_coverage_measurement::measured_region::MeasuredRegion;
 use heisenberg_module_cycles::non_empty::NonEmpty;
 use heisenberg_module_graph::source_location::SourceLocation;
@@ -19,11 +20,6 @@ use crate::issue_type::IssueType;
 use crate::rendered_report::RenderedReport;
 
 fn function_issue(MeasuredFunction { location, regions }: &MeasuredFunction) -> Option<Issue> {
-    let mut unexecuted = regions
-        .iter()
-        .filter(|MeasuredRegion { executed, .. }| !executed)
-        .map(|MeasuredRegion { location, .. }| location.clone());
-
     if regions.is_empty() {
         Some(Issue::FunctionWithoutCoverageData {
             function: location.clone(),
@@ -36,16 +32,30 @@ fn function_issue(MeasuredFunction { location, regions }: &MeasuredFunction) -> 
             function: location.clone(),
         })
     } else {
-        unexecuted
-            .next()
-            .map(|first| Issue::PartiallyExecutedFunction {
-                function: location.clone(),
-                unexecuted: NonEmpty {
-                    first,
-                    others: unexecuted.collect::<Vec<SourceLocation>>(),
-                },
-            })
+        unexecuted_regions(regions).map(|unexecuted| Issue::PartiallyExecutedFunction {
+            function: location.clone(),
+            unexecuted,
+        })
     }
+}
+
+fn item_issue(MeasuredItem { location, regions }: &MeasuredItem) -> Option<Issue> {
+    unexecuted_regions(regions).map(|unexecuted| Issue::PartiallyExecutedItem {
+        item: location.clone(),
+        unexecuted,
+    })
+}
+
+fn unexecuted_regions(regions: &[MeasuredRegion]) -> Option<NonEmpty<SourceLocation>> {
+    let mut unexecuted = regions
+        .iter()
+        .filter(|MeasuredRegion { executed, .. }| !executed)
+        .map(|MeasuredRegion { location, .. }| location.clone());
+
+    unexecuted.next().map(|first| NonEmpty {
+        first,
+        others: unexecuted.collect(),
+    })
 }
 
 pub struct CoverageReport {
@@ -114,23 +124,15 @@ impl CoverageReport {
                     |ConfigurationCoverage {
                          coverage:
                              MeasuredCoverage {
-                                 code:
-                                     MeasuredCode {
-                                         functions,
-                                         standalone_regions,
-                                     },
+                                 code: MeasuredCode { functions, items },
                                  ..
                              },
                          ..
                      }| {
-                        functions.iter().filter_map(function_issue).chain(
-                            standalone_regions
-                                .iter()
-                                .filter(|MeasuredRegion { executed, .. }| !executed)
-                                .map(|MeasuredRegion { location, .. }| Issue::UnexecutedRegion {
-                                    region: location.clone(),
-                                }),
-                        )
+                        functions
+                            .iter()
+                            .filter_map(function_issue)
+                            .chain(items.iter().filter_map(item_issue))
                     },
                 )
                 .collect(),

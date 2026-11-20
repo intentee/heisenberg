@@ -22,7 +22,7 @@ impl NextestPresenceEvaluation {
         format!(
             "Not evaluated in a partial run: AttributeAppliedInNoConfiguration, CodeActiveInNoConfiguration, ConfinedPackageUserNotReachingIt, ItemMoreVisibleThanItsUses, {}TestDependencyInProduction, TestLibraryInProductionPackage, {}UnreachableSourceFile, UnusedDependency, VacuousNegatedConfiguration\n\
             Evaluated in part in a partial run: BenchmarksOnlyPackageWithoutLibraries, TestsOnlyPackageWithoutTestLibraries\n\
-            Precondition: rustc 1.99.1 compiles the workspace in every analysed configuration\n\
+            Precondition: rustc 1.100.0 compiles the workspace in every analysed configuration\n\
             Rules: {} evaluated, 2 evaluated in part, {} not evaluated\n\
             Heisenberg 0.1.0\n",
             match self {

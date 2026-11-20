@@ -22,6 +22,7 @@ pub mod nextest_presence_evaluation;
 pub mod non_utf8_os_string;
 pub mod tamper_export_value;
 pub mod tamper_first_region_span;
+pub mod tamper_first_region_span_of_file;
 pub mod tampered_coverage_export;
 pub mod tampered_export;
 pub mod worker_count_outputs;

@@ -96,6 +96,16 @@ pub enum CoverageMeasurementError {
     )]
     RegionOfAnUnmeasuredFunction { file_id: FileId, offset: TextSize },
     #[error(
+        "the coverage export `{export}` records a region at {}:{} of `{file}`, outside every item of the current text of the file; export the coverage of a run of the current sources",
+        .start.line,
+        .start.column
+    )]
+    RegionOutsideEveryItem {
+        export: AbsPathBuf,
+        file: AbsPathBuf,
+        start: RegionPosition,
+    },
+    #[error(
         "the coverage export `{export}` records a region from {}:{} to {}:{} of `{file}`, which the current text of the file does not hold; export the coverage of a run of the current sources",
         .start.line,
         .start.column,

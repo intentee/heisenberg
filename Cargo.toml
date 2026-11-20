@@ -56,7 +56,7 @@ cfgs = ["blake3_sse2_ffi", "blake3_sse41_ffi", "blake3_avx2_ffi", "blake3_avx512
 env = {}
 
 [workspace.metadata.heisenberg.out_dirs.cargo]
-version = "0.100.0"
+version = "0.101.0"
 
 [workspace.metadata.heisenberg.out_dirs.cargo.configurations.x86_64-pc-windows-msvc]
 directory = "build_script_outputs/cargo/x86_64-pc-windows-msvc"
@@ -186,9 +186,9 @@ cfgs = ['osslconf="OPENSSL_NO_IDEA"', 'osslconf="OPENSSL_NO_CAMELLIA"', 'osslcon
 env = {}
 
 [workspace.dependencies]
-cargo = { version = "0.100", features = ["vendored-libgit2", "vendored-openssl"] }
+cargo = { version = "0.101", features = ["vendored-libgit2", "vendored-openssl"] }
 cargo-platform = "0.3"
-cargo-util-schemas = "0.14"
+cargo-util-schemas = "0.15"
 cargo-util-terminal = "0.1"
 cargo_metadata = "0.23"
 clap = { version = "4.6", features = ["derive", "env"] }
