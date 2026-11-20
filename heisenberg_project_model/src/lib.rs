@@ -122,7 +122,6 @@ pub mod supported_target_list;
 mod target_cfg;
 pub mod target_manifest_flags;
 mod target_model;
-mod target_spec;
 mod unpinned_dependency;
 pub mod unpinned_requirement;
 mod utf8_environment;

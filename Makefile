@@ -64,14 +64,14 @@ SUPPORTED_TARGETS := \
 	aarch64-apple-darwin \
 	x86_64-pc-windows-msvc \
 	x86_64-unknown-linux-gnu
-TARGET_CFG_TABLES := \
+TARGET_TABLES := \
 	$(addprefix heisenberg_project_model/targets/,$(addsuffix /crates.cfg,$(SUPPORTED_TARGETS))) \
-	$(addprefix heisenberg_project_model/targets/,$(addsuffix /library.cfg,$(SUPPORTED_TARGETS))) \
-	$(addprefix heisenberg_project_model/targets/,$(addsuffix /target-spec.json,$(SUPPORTED_TARGETS)))
+	$(addprefix heisenberg_project_model/targets/,$(addsuffix /data-layout.txt,$(SUPPORTED_TARGETS))) \
+	$(addprefix heisenberg_project_model/targets/,$(addsuffix /library.cfg,$(SUPPORTED_TARGETS)))
 HEISENBERG_SOURCES := \
 	$(wildcard $(addsuffix /src/*.rs,$(HEISENBERG_CRATES))) \
 	$(addsuffix /Cargo.toml,$(HEISENBERG_CRATES)) \
-	$(TARGET_CFG_TABLES) \
+	$(TARGET_TABLES) \
 	Cargo.toml \
 	Cargo.lock
 
@@ -79,6 +79,8 @@ HEISENBERG_ARGUMENTS := --cargo-home "$(CARGO_HOME)" --sysroot "$(RUST_SYSROOT)"
 
 export HEISENBERG_CARGO_HOME := $(CARGO_HOME)
 export HEISENBERG_SYSROOT := $(RUST_SYSROOT)
+
+.DELETE_ON_ERROR:
 
 .SECONDEXPANSION:
 
@@ -93,6 +95,9 @@ $(COVERAGE_IDENTITY_MACRO_EXPORTS): $(IDENTITY_MARKER_MACROS)/Cargo.toml $(IDENT
 
 heisenberg_project_model/targets/%/crates.cfg: rust-toolchain.toml
 	rustc --print cfg --target $* > $@
+
+heisenberg_project_model/targets/%/data-layout.txt: heisenberg_project_model/targets/%/target-spec.json
+	jq --exit-status --join-output ".\"data-layout\"" $< > $@
 
 heisenberg_project_model/targets/%/library.cfg: export RUSTC_BOOTSTRAP := 1
 heisenberg_project_model/targets/%/library.cfg: rust-toolchain.toml
@@ -110,7 +115,7 @@ clean:
 	cargo clean
 
 .PHONY: clippy
-clippy: $(TARGET_CFG_TABLES)
+clippy: $(TARGET_TABLES)
 	cargo clippy --workspace --all-targets -- --deny warnings
 
 .PHONY: fetch
@@ -145,11 +150,11 @@ heisenberg.check: fetch target/release/heisenberg
 	target/release/heisenberg check $(HEISENBERG_ARGUMENTS)
 
 .PHONY: test
-test: fetch $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_CFG_TABLES)
+test: fetch $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_TABLES)
 	cargo nextest run --workspace
 
 .PHONY: test.coverage
-test.coverage: fetch target/release/heisenberg $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_CFG_TABLES)
+test.coverage: fetch target/release/heisenberg $(COVERAGE_FIXTURE_EXPORTS) $(TARGET_TABLES)
 	cargo llvm-cov clean --workspace
 	cargo llvm-cov nextest --no-report --workspace --lib --bins --tests --examples
 	cargo llvm-cov report --json --include-build-script --output-path target/llvm-cov.json

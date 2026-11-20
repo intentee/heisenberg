@@ -346,8 +346,6 @@ pub enum ProjectModelError {
     },
     #[error("cargo cannot prepare the build of the build scripts and procedural macros")]
     WorkspaceBuildSession(#[source] WorkspaceBuildError),
-    #[error("the embedded target specification cannot be read")]
-    TargetSpec(#[source] error::Error),
     #[error("the build script output cfg `{}` cannot be parsed", .cfg)]
     BuildScriptCfg {
         cfg: String,
